@@ -1,0 +1,60 @@
+# Default middleware templates
+middlewares:
+  - id: authelia
+    name: Authelia
+    type: forwardAuth
+    config:
+      address: "http://authelia:9091/api/verify?rd=https://auth.yourdomain.com"
+      trustForwardHeader: true
+      authResponseHeaders:
+        - "Remote-User"
+        - "Remote-Groups"
+        - "Remote-Name"
+        - "Remote-Email"
+
+  - id: authentik
+    name: Authentik
+    type: forwardAuth
+    config:
+      address: "http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      trustForwardHeader: true
+      authResponseHeaders:
+        - "X-authentik-username"
+        - "X-authentik-groups"
+        - "X-authentik-email"
+        - "X-authentik-name"
+        - "X-authentik-uid"
+
+  - id: basic-auth
+    name: Basic Auth
+    type: basicAuth
+    config:
+      users:
+        - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"
+
+  - id: jwt-auth
+    name: JWT Authentication
+    type: forwardAuth
+    config:
+      address: "http://jwt-auth:8080/verify"
+      trustForwardHeader: true
+      authResponseHeaders:
+        - "X-JWT-Sub"
+        - "X-JWT-Name"
+        - "X-JWT-Email"
+
+  - id: ip-whitelist
+    name: IP Whitelist
+    type: ipWhiteList
+    config:
+      sourceRange:
+        - "127.0.0.1/32"
+        - "192.168.1.0/24"
+        - "10.0.0.0/8"
+
+  - id: rate-limit
+    name: Rate Limit
+    type: rateLimit
+    config:
+      average: 100
+      burst: 50
