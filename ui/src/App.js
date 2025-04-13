@@ -94,7 +94,7 @@ const App = () => {
       <nav className="bg-white shadow-sm">
         <div className="container mx-auto px-6 py-3">
           <div className="flex justify-between items-center">
-            <div className="text-xl font-semibold text-gray-700">Middleware Manager</div>
+            <div className="text-xl font-semibold text-gray-700">Pangolin Middleware Manager</div>
             <div className="space-x-4">
               <button 
                 onClick={() => navigateTo('dashboard')}
