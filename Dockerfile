@@ -13,20 +13,15 @@ RUN npm install
 RUN mkdir src public
 
 # Copy contents of host's ui/public into container's /app/public
-# Assumes host has ui/public/index.html etc.
 COPY ui/public/ ./public/
 
 # Copy *specific* source files and directories from host's ui/src into container's /app/src
-# Add any other top-level .js/.jsx files or necessary subdirectories from ui/src here
 COPY ui/src/styles ./src/styles
 COPY ui/src/App.js ./src/App.js
 COPY ui/src/index.js ./src/index.js
-# If you have other files like setupTests.js, reportWebVitals.js etc. directly in ui/src, copy them too:
-# COPY ui/src/setupTests.js ./src/setupTests.js
-# COPY ui/src/reportWebVitals.js ./src/reportWebVitals.js
 
 
-# Verify structure (optional)
+# Verify structure
 RUN echo "--- Contents of /app/public ---"
 RUN ls -la public
 RUN echo "--- Contents of /app/src ---"
@@ -35,7 +30,7 @@ RUN ls -la src
 # Build the UI (runs in /app, expects ./src, ./public relative to package.json)
 RUN npm run build
 
-# Verify build output (optional but good practice)
+# Verify build output
 RUN echo "--- Contents of build ---"
 RUN ls -la build/
 
