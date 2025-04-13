@@ -153,3 +153,172 @@
       max-width: 1280px;
     }
   }
+
+  /* Responsive Enhancements for Middleware Manager UI */
+
+/* Base responsive container */
+.container {
+    width: 100%;
+    padding-right: 1rem;
+    padding-left: 1rem;
+    margin-right: auto;
+    margin-left: auto;
+  }
+  
+  /* Responsive navigation */
+  nav .container {
+    padding: 0.5rem 1rem;
+  }
+  
+  @media (max-width: 768px) {
+    nav .flex.justify-between {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    nav .space-x-4 {
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+    }
+    
+    nav .space-x-4 button {
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+    }
+  }
+  
+  /* Responsive card grids */
+  @media (max-width: 768px) {
+    .grid.grid-cols-1.md\:grid-cols-3 {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    
+    .grid.grid-cols-1.md\:grid-cols-2 {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+  }
+  
+  /* Make tables responsive */
+  @media (max-width: 1024px) {
+    .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    table {
+      min-width: 640px;
+    }
+  }
+  
+  /* Improve form layout on small screens */
+  @media (max-width: 640px) {
+    form input, 
+    form select, 
+    form textarea {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+    
+    .flex.justify-end.space-x-3 {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .flex.justify-end.space-x-3 button {
+      width: 100%;
+    }
+    
+    .mb-6.flex.items-center {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+  }
+  
+  /* Responsive modals */
+  @media (max-width: 640px) {
+    .fixed.inset-0.flex.items-center.justify-center .max-w-md {
+      width: calc(100% - 2rem);
+      margin: 0 1rem;
+    }
+    
+    .fixed.inset-0.flex.items-center.justify-center .px-6 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+  
+  /* Resource & Middleware actions column */
+  @media (max-width: 768px) {
+    .text-blue-600.hover\:text-blue-900,
+    .text-red-600.hover\:text-red-900 {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background-color: #f3f4f6;
+      border-radius: 0.25rem;
+      margin: 0.125rem;
+    }
+  }
+  
+  /* Dashboard sections responsive spacing */
+  @media (max-width: 640px) {
+    main.container {
+      padding-top: 1rem;
+      padding-bottom: 2rem;
+    }
+    
+    .mb-8 {
+      margin-bottom: 1.5rem;
+    }
+    
+    h1.text-2xl {
+      margin-bottom: 1rem;
+    }
+    
+    .bg-white.p-6 {
+      padding: 1rem;
+    }
+  }
+  
+  /* Search and action buttons in list views */
+  @media (max-width: 768px) {
+    .mb-6.flex.justify-between {
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: stretch;
+    }
+    
+    .mb-6.flex.justify-between .relative.w-64 {
+      width: 100%;
+    }
+    
+    .mb-6.flex.justify-between .space-x-3 {
+      display: flex;
+      justify-content: space-between;
+    }
+  }
+  
+  /* Middleware form json editor */
+  @media (max-width: 768px) {
+    textarea.w-full.px-3.py-2.border.font-mono.h-64 {
+      height: 180px;
+    }
+  }
+  
+  /* Status badges better touch targets */
+  @media (max-width: 640px) {
+    span.px-2.py-1.inline-flex.text-xs {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+  }
+  
+  /* Fix for modal scrolling on mobile */
+  @media (max-width: 640px) {
+    .fixed.inset-0.bg-gray-600.bg-opacity-50.flex.items-center.justify-center {
+      align-items: flex-start;
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+      overflow-y: auto;
+    }
+  }
