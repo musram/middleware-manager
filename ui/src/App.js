@@ -1054,6 +1054,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'redirectScheme', label: 'Redirect Scheme' },
     { value: 'chain', label: 'Middleware Chain' },
     { value: 'replacepathregex', label: 'RegEx Path Replacement' },
+    { value: 'plugin', label: 'Traefik Plugin' },
   ];
 
   // Templates for different middleware types
@@ -1094,6 +1095,56 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
       regex: "^/path/to/redirect",
       replacement: "/new/path",
       permanent: false
+    },
+    plugin: {
+      // Empty template to be filled when selecting a specific plugin
+    },
+    
+    // Specific plugin templates - will be set when user chooses a plugin type
+    geoblock: {
+      geoblock: {
+        silentStartUp: false,
+        allowLocalRequests: false,
+        logLocalRequests: false,
+        logAllowedRequests: false,
+        logApiRequests: false,
+        api: "https://get.geojs.io/v1/ip/country/{ip}",
+        apiTimeoutMs: 750,
+        cacheSize: 15,
+        forceMonthlyUpdate: false,
+        allowUnknownCountries: false,
+        unknownCountryApiResponse: "nil",
+        blackListMode: false,
+        addCountryHeader: false,
+        countries: ["DE"]
+      }
+    },
+    
+    crowdsec: {
+      crowdsec: {
+        enabled: true,
+        logLevel: "INFO",
+        updateIntervalSeconds: 15,
+        updateMaxFailure: 0,
+        defaultDecisionSeconds: 15,
+        httpTimeoutSeconds: 10,
+        crowdsecMode: "live",
+        crowdsecAppsecEnabled: true,
+        crowdsecAppsecHost: "crowdsec:7422",
+        crowdsecAppsecFailureBlock: true,
+        crowdsecAppsecUnreachableBlock: true,
+        crowdsecAppsecBodyLimit: 10485760,
+        crowdsecLapiKey: "PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK",
+        crowdsecLapiHost: "crowdsec:8080",
+        crowdsecLapiScheme: "http",
+        forwardedHeadersTrustedIPs: ["0.0.0.0/0"],
+        clientTrustedIPs: [
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16",
+          "100.89.137.0/20"
+        ]
+      }
     }
   };
 
@@ -1219,6 +1270,34 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   // Helper text for middleware types
   const getTypeHelperText = () => {
     switch (type) {
+// In the getTypeHelperText function in MiddlewareForm
+case 'plugin':
+  return (
+    <div className="text-xs text-gray-500 mt-1">
+      <p>Configure a Traefik plugin middleware.</p>
+      <div className="mt-2">
+        <h4 className="font-semibold">GeoBlock Configuration</h4>
+        <ul className="list-disc pl-5">
+          <li><strong>blackListMode</strong>: When false, countries list is a whitelist; when true, it's a blacklist</li>
+          <li><strong>countries</strong>: Array of two-letter ISO country codes</li>
+          <li><strong>allowLocalRequests</strong>: When true, allows requests from private IP ranges</li>
+          <li><strong>api</strong>: Geolocation API endpoint for IP lookups</li>
+        </ul>
+      </div>
+      
+      <div className="mt-2">
+        <h4 className="font-semibold">CrowdSec Configuration</h4>
+        <ul className="list-disc pl-5">
+          <li><strong>crowdsecLapiKey</strong>: Your CrowdSec bouncer API key</li>
+          <li><strong>crowdsecLapiHost</strong>: CrowdSec service address (e.g., "crowdsec:8080")</li>
+          <li><strong>forwardedHeadersTrustedIPs</strong>: IP ranges to trust for forwarded headers</li>
+          <li><strong>clientTrustedIPs</strong>: IP ranges to exempt from CrowdSec checks</li>
+        </ul>
+      </div>
+      
+      <p className="mt-2 italic">Note: Plugins must be installed on your Traefik instances for this configuration to work.</p>
+    </div>
+  );
       case 'replacepathregex':
         return (
           <div className="text-xs text-gray-500 mt-1">
@@ -1346,7 +1425,32 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
             </select>
             {getTypeHelperText()}
           </div>
-          
+{/* Add this after the middleware type selector in the MiddlewareForm component */}
+{type === 'plugin' && (
+  <div className="mb-4">
+    <label className="block text-gray-700 text-sm font-bold mb-2">
+      Plugin Type
+    </label>
+    <select
+      onChange={(e) => {
+        const pluginType = e.target.value;
+        if (pluginType === 'geoblock') {
+          setConfig(JSON.stringify(templates.geoblock, null, 2));
+        } else if (pluginType === 'crowdsec') {
+          setConfig(JSON.stringify(templates.crowdsec, null, 2));
+        }
+      }}
+      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">-- Select a plugin --</option>
+      <option value="geoblock">GeoBlock - Geographic Access Control</option>
+      <option value="crowdsec">CrowdSec - Threat Protection</option>
+    </select>
+    <p className="text-xs text-gray-500 mt-1">
+      Select a plugin type to load its configuration template.
+    </p>
+  </div>
+)}
           {/* Chain specific UI */}
           {type === 'chain' && (
             <div className="mb-4">
