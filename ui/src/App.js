@@ -15,6 +15,11 @@ const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }).then(res => res.json()),
+  assignMultipleMiddlewares: (resourceId, data) => fetch(`${API_URL}/resources/${resourceId}/middlewares/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(res => res.json()),
   removeMiddleware: (resourceId, middlewareId) => fetch(`${API_URL}/resources/${resourceId}/middlewares/${middlewareId}`, {
     method: 'DELETE'
   }).then(res => res.json()),
@@ -520,7 +525,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedMiddleware, setSelectedMiddleware] = useState('');
+  const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
   const [priority, setPriority] = useState(100);
 
   const fetchData = async () => {
@@ -555,24 +560,42 @@ const ResourceDetail = ({ id, navigateTo }) => {
     fetchData();
   }, [id]);
 
+  const handleMiddlewareSelection = (e) => {
+    const options = e.target.options;
+    const selected = [];
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selected.push(options[i].value);
+      }
+    }
+    setSelectedMiddlewares(selected);
+  };
+
   const handleAssignMiddleware = async (e) => {
     e.preventDefault();
-    if (!selectedMiddleware) return;
+    if (selectedMiddlewares.length === 0) {
+      alert('Please select at least one middleware');
+      return;
+    }
     
     try {
-      await api.assignMiddleware(id, {
-        middleware_id: selectedMiddleware,
+      const middlewaresToAdd = selectedMiddlewares.map(middlewareId => ({
+        middleware_id: middlewareId,
         priority: parseInt(priority)
+      }));
+      
+      await api.assignMultipleMiddlewares(id, {
+        middlewares: middlewaresToAdd
       });
       
       setShowModal(false);
-      setSelectedMiddleware('');
+      setSelectedMiddlewares([]);
       setPriority(100);
       
       // Refresh data
       fetchData();
     } catch (err) {
-      alert('Failed to assign middleware');
+      alert('Failed to assign middlewares');
       console.error(err);
     }
   };
@@ -788,7 +811,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold">Add Middleware to {resource.host}</h3>
+              <h3 className="text-lg font-semibold">Add Middlewares to {resource.host}</h3>
               <button 
                 onClick={() => setShowModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -812,21 +835,24 @@ const ResourceDetail = ({ id, navigateTo }) => {
                 <form onSubmit={handleAssignMiddleware}>
                   <div className="mb-4">
                     <label className="block text-gray-700 text-sm font-bold mb-2">
-                      Middleware
+                      Select Middlewares
                     </label>
                     <select
-                      value={selectedMiddleware}
-                      onChange={(e) => setSelectedMiddleware(e.target.value)}
+                      multiple
+                      value={selectedMiddlewares}
+                      onChange={handleMiddlewareSelection}
                       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
+                      size={5}
                     >
-                      <option value="">Select a middleware</option>
                       {availableMiddlewares.map(middleware => (
                         <option key={middleware.id} value={middleware.id}>
                           {middleware.name} ({middleware.type})
                         </option>
                       ))}
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Hold Ctrl (or Cmd) to select multiple middlewares. All selected middlewares will be assigned with the same priority.
+                    </p>
                   </div>
                   
                   <div className="mb-4">
@@ -858,8 +884,9 @@ const ResourceDetail = ({ id, navigateTo }) => {
                     <button
                       type="submit"
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      disabled={selectedMiddlewares.length === 0}
                     >
-                      Add Middleware
+                      Add Middlewares
                     </button>
                   </div>
                 </form>
@@ -1026,6 +1053,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'redirectRegex', label: 'Redirect Regex' },
     { value: 'redirectScheme', label: 'Redirect Scheme' },
     { value: 'chain', label: 'Middleware Chain' },
+    { value: 'replacepathregex', label: 'RegEx Path Replacement' },
   ];
 
   // Templates for different middleware types
@@ -1057,6 +1085,15 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     },
     chain: {
       middlewares: []
+    },
+    replacepathregex: {
+      regex: "^/path/to/replace",
+      replacement: "/new/path"
+    },
+    redirectRegex: {
+      regex: "^/path/to/redirect",
+      replacement: "/new/path",
+      permanent: false
     }
   };
 
@@ -1179,6 +1216,32 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     setSelectedMiddlewares(selected);
   };
 
+  // Helper text for middleware types
+  const getTypeHelperText = () => {
+    switch (type) {
+      case 'replacepathregex':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>The RegEx Path Replacement middleware rewrites the URL path based on regex match.</p>
+            <p>Common use cases:</p>
+            <ul className="list-disc pl-5 mt-1">
+              <li>WebDAV redirects: <code>^/.well-known/ca(l|rd)dav</code> → <code>/remote.php/dav/</code></li>
+              <li>Hiding paths: <code>^/api/internal/(.*)</code> → <code>/api/public/$1</code></li>
+            </ul>
+          </div>
+        );
+      case 'chain':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>The Chain middleware allows you to combine multiple middlewares together.</p>
+            <p>Order matters - middlewares are processed from top to bottom.</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -1281,6 +1344,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
             </select>
+            {getTypeHelperText()}
           </div>
           
           {/* Chain specific UI */}

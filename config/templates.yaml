@@ -92,3 +92,10 @@ middlewares:
       stsIncludeSubdomains: true
       stsPreload: true
       stsSeconds: 63072000
+      
+  - id: nextcloud-dav
+    name: Nextcloud WebDAV Redirect
+    type: replacepathregex
+    config:
+      regex: "^/.well-known/ca(l|rd)dav"
+      replacement: "/remote.php/dav/"
