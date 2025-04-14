@@ -1,14 +1,27 @@
 name: Build and Push to Docker Hub
 
-# Trigger the workflow on push to main branch or when creating a tag (release)
 on:
   push:
     branches:
       - main
       - master
+      - dev
+    paths:
+      - 'Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - 'Makefile'
+      - '.github/workflows/**'
+      - 'api/**'
+      - 'config/**'
+      - 'database/**'
+      - 'models/**'
+      - 'services/**'
+      - 'ui/**'
     tags:
       - 'v*'
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -45,18 +58,19 @@ jobs:
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/middleware-manager
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=sha,format=short
-            latest
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch,enable=${{ github.ref_type == 'branch' && github.ref != 'refs/heads/dev' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,format=short,enable=${{ github.ref_type == 'branch' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile  # Points to your Dockerfile
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
