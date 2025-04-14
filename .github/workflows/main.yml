@@ -1,65 +1,75 @@
-name: Build and Push to Docker Hub
+name: Build and Push Docker Image
 
-# Trigger the workflow on push to main branch or when creating a tag (release)
 on:
   push:
     branches:
       - main
       - master
+      - dev
+    paths:
+      - 'Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'main.go'
+      - 'Makefile'
+      - '.github/workflows/**'
+      - 'api/**'
+      - 'config/**'
+      - 'database/**'
+      - 'models/**'
+      - 'services/**'
+      - 'ui/**'
+      - 'docker-compose.yml'
     tags:
       - 'v*'
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+  workflow_dispatch:
+
+env:
+  DOCKERHUB_IMAGE_NAME: yourusername/yourimage
 
 jobs:
   build-and-push:
-    name: Build and Push Docker image
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Check out the repo
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for proper versioning
-      
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23.x'  # Match your go.mod version
-          cache: true
-      
-      - name: Verify dependencies
-        run: go mod verify
-      
+
+      - name: Debug trigger
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Ref name: ${{ github.ref_name }}"
+          echo "Branch: ${{ github.ref_type == 'branch' && github.ref_name || 'not a branch' }}"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
-      - name: Log in to Docker Hub
+
+      - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
-      - name: Extract metadata for Docker
+
+      - name: Docker Metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/middleware-manager
+          images: ${{ env.DOCKERHUB_IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=sha,format=short
-            latest
-      
-      - name: Build and push Docker image
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch,enable=${{ github.ref_type == 'branch' && github.ref_name != 'dev' }}
+            type=raw,value=dev,enable=${{ github.ref_name == 'dev' }}
+            type=sha,format=short,enable=${{ github.ref_type == 'branch' }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_name == 'master' }}
+
+      - name: Debug tags
+        run: echo "Tags: ${{ steps.meta.outputs.tags }}"
+
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile  # Points to your Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
