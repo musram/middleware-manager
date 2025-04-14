@@ -19,11 +19,7 @@ on:
       - 'models/**'
       - 'services/**'
       - 'ui/**'
-      - '.env.example'
-      - '.gitignore'
-      - 'LICENSE'
-      - 'README.md'
-      - 'docker-compose.yml'
+
     tags:
       - 'v*'
   workflow_dispatch:

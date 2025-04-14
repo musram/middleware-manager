@@ -99,3 +99,57 @@ middlewares:
     config:
       regex: "^/.well-known/ca(l|rd)dav"
       replacement: "/remote.php/dav/"
+  
+  - id: geoblock-eu
+    name: GeoBlock EU Whitelist
+    type: plugin
+    config:
+      plugin:
+        geoblock:
+          allowLocalRequests: true
+          blackListMode: false
+          countries:
+            - AT
+            - BE
+            - BG
+            - HR
+            - CY
+            - CZ
+            - DK
+            - EE
+            - FI
+            - FR
+            - DE
+            - GR
+            - HU
+            - IE
+            - IT
+            - LV
+            - LT
+            - LU
+            - MT
+            - NL
+            - PL
+            - PT
+            - RO
+            - SK
+            - SI
+            - ES
+            - SE
+
+  - id: crowdsec-base
+    name: CrowdSec Protection
+    type: plugin
+    config:
+      plugin:
+        crowdsec:
+          enabled: true
+          defaultDecisionSeconds: 60
+          crowdsecMode: "live"
+          crowdsecLapiKey: "your-lapi-key-here"
+          crowdsecLapiHost: "crowdsec:8080"
+          crowdsecLapiScheme: "http"
+          forwardedHeadersTrustedIPs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"

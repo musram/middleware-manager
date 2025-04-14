@@ -701,6 +701,7 @@ func isValidMiddlewareType(typ string) bool {
 		"redirectScheme":  true,
 		"chain":           true,
 		"replacepathregex": true,
+		"plugin":          true,
 	}
 	
 	return validTypes[typ]

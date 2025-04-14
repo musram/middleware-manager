@@ -1054,6 +1054,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'redirectScheme', label: 'Redirect Scheme' },
     { value: 'chain', label: 'Middleware Chain' },
     { value: 'replacepathregex', label: 'RegEx Path Replacement' },
+    { value: 'plugin', label: 'Traefik Plugin' },
   ];
 
   // Templates for different middleware types
@@ -1094,7 +1095,15 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
       regex: "^/path/to/redirect",
       replacement: "/new/path",
       permanent: false
-    }
+    },
+    plugin: {
+      plugin: {
+        // This is a placeholder to be replaced with specific plugin info
+        "pluginName": {
+          // Plugin-specific configuration here
+        }
+      }
+    }  
   };
 
   // Fetch middleware data when editing
@@ -1219,6 +1228,28 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   // Helper text for middleware types
   const getTypeHelperText = () => {
     switch (type) {
+case 'plugin':
+  return (
+    <div className="text-xs text-gray-500 mt-1">
+      <p>Configure a Traefik plugin middleware.</p>
+      <p>Structure your configuration like this:</p>
+      <pre className="bg-gray-100 p-2 rounded mt-1 overflow-x-auto">
+{`{
+  "plugin": {
+    "pluginName": {
+      // Plugin-specific configuration
+    }
+  }
+}`}
+      </pre>
+      <p className="mt-1">Common plugins include:</p>
+      <ul className="list-disc pl-5">
+        <li><strong>geoblock</strong>: Restrict access by country</li>
+        <li><strong>crowdsec</strong>: Protect against malicious activity</li>
+        <li><strong>rewrite-body</strong>: Modify response body content</li>
+      </ul>
+    </div>
+  );
       case 'replacepathregex':
         return (
           <div className="text-xs text-gray-500 mt-1">
@@ -1346,7 +1377,50 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
             </select>
             {getTypeHelperText()}
           </div>
-          
+          {/* Add this after the middleware type selector */}
+{type === 'plugin' && (
+  <div className="mb-4">
+    <label className="block text-gray-700 text-sm font-bold mb-2">
+      Plugin Template
+    </label>
+    <select
+      onChange={(e) => {
+        if (e.target.value === 'geoblock') {
+          setConfig(JSON.stringify({
+            plugin: {
+              geoblock: {
+                allowLocalRequests: true,
+                blackListMode: false,
+                countries: ["DE"]
+              }
+            }
+          }, null, 2));
+        } else if (e.target.value === 'crowdsec') {
+          setConfig(JSON.stringify({
+            plugin: {
+              crowdsec: {
+                enabled: true,
+                defaultDecisionSeconds: 60,
+                crowdsecMode: "live",
+                crowdsecLapiKey: "your-lapi-key-here",
+                crowdsecLapiHost: "crowdsec:8080",
+                crowdsecLapiScheme: "http"
+              }
+            }
+          }, null, 2));
+        }
+      }}
+      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">-- Select a plugin template --</option>
+      <option value="geoblock">GeoBlock</option>
+      <option value="crowdsec">CrowdSec</option>
+    </select>
+    <p className="text-xs text-gray-500 mt-1">
+      Select a template for common plugins, or configure manually in the JSON editor below.
+    </p>
+  </div>
+)}
           {/* Chain specific UI */}
           {type === 'chain' && (
             <div className="mb-4">
