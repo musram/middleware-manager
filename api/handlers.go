@@ -497,6 +497,7 @@ func isValidMiddlewareType(typ string) bool {
 		"addPrefix":      true,
 		"redirectRegex":  true,
 		"redirectScheme": true,
+		"chain":          true, // Added support for chain middleware type
 	}
 	
 	return validTypes[typ]

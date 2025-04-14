@@ -140,6 +140,22 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 			continue
 		}
 
+		// Special handling for chain middlewares to ensure proper provider prefixes
+		if typ == "chain" && middlewareConfig["middlewares"] != nil {
+			if middlewares, ok := middlewareConfig["middlewares"].([]interface{}); ok {
+				for i, middleware := range middlewares {
+					if middlewareStr, ok := middleware.(string); ok {
+						// If this is not already a fully qualified middleware reference
+						if !strings.Contains(middlewareStr, "@") {
+							// Assume it's from our file provider
+							middlewares[i] = fmt.Sprintf("%s@file", middlewareStr)
+						}
+					}
+				}
+				middlewareConfig["middlewares"] = middlewares
+			}
+		}
+
 		// Add middleware to config
 		config.HTTP.Middlewares[id] = map[string]interface{}{
 			typ: middlewareConfig,

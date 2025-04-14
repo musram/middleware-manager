@@ -46,6 +46,53 @@ const parseMiddlewares = (middlewaresStr) => {
     });
 };
 
+// Helper function to format middleware chains for display
+const formatMiddlewareDisplay = (middleware, allMiddlewares) => {
+  // Check if this is a chain middleware
+  const isChain = middleware.type === 'chain';
+  
+  // Get the config object
+  let configObj = middleware.config;
+  if (typeof configObj === 'string') {
+    try {
+      configObj = JSON.parse(configObj);
+    } catch (e) {
+      console.error('Error parsing middleware config:', e);
+      configObj = {};
+    }
+  }
+  
+  return (
+    <div className="py-2">
+      <div className="flex items-center">
+        <span className="font-medium">{middleware.name}</span>
+        <span className="px-2 py-1 ml-2 text-xs rounded-full bg-blue-100 text-blue-800">
+          {middleware.type}
+        </span>
+        {isChain && <span className="ml-2 text-gray-500 text-sm">(Middleware Chain)</span>}
+      </div>
+      
+      {/* Display chained middlewares if this is a chain */}
+      {isChain && configObj.middlewares && configObj.middlewares.length > 0 && (
+        <div className="ml-4 mt-1 border-l-2 border-gray-200 pl-3">
+          <div className="text-sm text-gray-600 mb-1">Chain contains:</div>
+          <ul className="space-y-1">
+            {configObj.middlewares.map((id, index) => {
+              const chainedMiddleware = allMiddlewares.find(m => m.id === id);
+              return (
+                <li key={index} className="text-sm">
+                  {index + 1}. {chainedMiddleware 
+                    ? <span className="font-medium">{chainedMiddleware.name} <span className="text-xs text-gray-500">({chainedMiddleware.type})</span></span> 
+                    : <span>{id} <span className="text-xs text-gray-500">(unknown middleware)</span></span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 // Main App Component
 const App = () => {
   const [page, setPage] = useState('dashboard');
@@ -263,7 +310,6 @@ const Dashboard = ({ navigateTo }) => {
     </div>
   );
 };
-
 // Resources List Component
 const ResourcesList = ({ navigateTo }) => {
   const [resources, setResources] = useState([]);
@@ -551,19 +597,24 @@ const ResourceDetail = ({ id, navigateTo }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Middleware</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {assignedMiddlewares.map(middleware => {
-                const middlewareDetails = middlewares.find(m => m.id === middleware.id);
+                const middlewareDetails = middlewares.find(m => m.id === middleware.id) || {
+                  id: middleware.id,
+                  name: middleware.name,
+                  type: 'unknown'
+                };
+                
                 return (
                   <tr key={middleware.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">{middleware.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{middlewareDetails ? middlewareDetails.type : 'Unknown'}</td>
+                    <td className="px-6 py-4">
+                      {formatMiddlewareDisplay(middlewareDetails, middlewares)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">{middleware.priority}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
@@ -669,7 +720,6 @@ const ResourceDetail = ({ id, navigateTo }) => {
     </div>
   );
 };
-
 // Middlewares List Component
 const MiddlewaresList = ({ navigateTo }) => {
   const [middlewares, setMiddlewares] = useState([]);
@@ -695,8 +745,7 @@ const MiddlewaresList = ({ navigateTo }) => {
     fetchMiddlewares();
   }, []);
 
-  // Around line 698 in MiddlewaresList component:
-const handleDeleteMiddleware = async (id, name) => {
+  const handleDeleteMiddleware = async (id, name) => {
     // eslint-disable-next-line no-restricted-globals
     if (!confirm(`Are you sure you want to delete the middleware "${name}"?`)) {
       return;
@@ -769,6 +818,9 @@ const handleDeleteMiddleware = async (id, name) => {
                     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {middleware.type}
                     </span>
+                    {middleware.type === 'chain' && (
+                      <span className="ml-2 text-xs text-gray-500">(Middleware Chain)</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
@@ -807,6 +859,8 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   const [loading, setLoading] = useState(id ? true : false);
   const [error, setError] = useState(null);
   const [jsonError, setJsonError] = useState(null);
+  const [availableMiddlewares, setAvailableMiddlewares] = useState([]);
+  const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
 
   // Middleware types
   const middlewareTypes = [
@@ -818,6 +872,8 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'stripPrefix', label: 'Strip Prefix' },
     { value: 'addPrefix', label: 'Add Prefix' },
     { value: 'redirectRegex', label: 'Redirect Regex' },
+    { value: 'redirectScheme', label: 'Redirect Scheme' },
+    { value: 'chain', label: 'Middleware Chain' },
   ];
 
   // Templates for different middleware types
@@ -836,9 +892,23 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     rateLimit: {
       average: 100,
       burst: 50
+    },
+    headers: {
+      accessControlAllowMethods: ["GET", "OPTIONS", "PUT"],
+      browserXssFilter: true,
+      contentTypeNosniff: true,
+      customFrameOptionsValue: "SAMEORIGIN",
+      customResponseHeaders: {
+        "X-Robots-Tag": "none,noarchive,nosnippet,notranslate,noimageindex",
+        "server": ""
+      }
+    },
+    chain: {
+      middlewares: []
     }
   };
 
+  // Fetch middleware data when editing
   useEffect(() => {
     if (id) {
       // Fetch middleware for editing
@@ -877,6 +947,43 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
       setConfig(JSON.stringify(templates[type] || {}, null, 2));
     }
   }, [type, id]);
+  
+  // Fetch available middlewares for chain type
+  useEffect(() => {
+    if (type === 'chain') {
+      api.getMiddlewares()
+        .then(data => {
+          // Filter out the current middleware if editing
+          const filtered = id ? data.filter(m => m.id !== id) : data;
+          setAvailableMiddlewares(filtered);
+          
+          // If editing, parse selected middlewares from config
+          if (id && config) {
+            try {
+              const configObj = JSON.parse(config);
+              if (configObj.middlewares) {
+                setSelectedMiddlewares(configObj.middlewares);
+              }
+            } catch (e) {
+              console.error('Error parsing chain config:', e);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch middlewares for chain:', err);
+        });
+    }
+  }, [type, id, config]);
+
+  // Update chain config when selectedMiddlewares changes
+  useEffect(() => {
+    if (type === 'chain') {
+      const chainConfig = {
+        middlewares: selectedMiddlewares
+      };
+      setConfig(JSON.stringify(chainConfig, null, 2));
+    }
+  }, [selectedMiddlewares, type]);
 
   // Validate JSON
   const validateJson = (json) => {
@@ -894,6 +1001,30 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     const newConfig = e.target.value;
     setConfig(newConfig);
     validateJson(newConfig);
+    
+    // If it's a chain type, update selected middlewares
+    if (type === 'chain') {
+      try {
+        const configObj = JSON.parse(newConfig);
+        if (configObj.middlewares) {
+          setSelectedMiddlewares(configObj.middlewares);
+        }
+      } catch (e) {
+        // Don't update selectedMiddlewares if JSON is invalid
+      }
+    }
+  };
+  
+  // Handle middleware selection for chain
+  const handleMiddlewareSelection = (e) => {
+    const options = e.target.options;
+    const selected = [];
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selected.push(options[i].value);
+      }
+    }
+    setSelectedMiddlewares(selected);
   };
 
   const handleSubmit = async (e) => {
@@ -1000,6 +1131,31 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
             </select>
           </div>
           
+          {/* Chain specific UI */}
+          {type === 'chain' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Select Middlewares for Chain
+              </label>
+              <select
+                multiple
+                value={selectedMiddlewares}
+                onChange={handleMiddlewareSelection}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                size={5}
+              >
+                {availableMiddlewares.map(middleware => (
+                  <option key={middleware.id} value={middleware.id}>
+                    {middleware.name} ({middleware.type})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Hold Ctrl (or Cmd) to select multiple middlewares. Order matters - middlewares are applied from top to bottom.
+              </p>
+            </div>
+          )}
+          
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Configuration (JSON)
@@ -1038,5 +1194,4 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     </div>
   );
 };
-
 export default App;
