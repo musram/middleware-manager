@@ -114,8 +114,10 @@ func (s *Server) setupRoutes(uiPath string) {
 		{
 			resources.GET("", s.getResources)
 			resources.GET("/:id", s.getResource)
+			resources.DELETE("/:id", s.deleteResource)
 			resources.POST("/:id/middlewares", s.assignMiddleware)
-			resources.DELETE("/:resourceId/middlewares/:middlewareId", s.removeMiddleware)
+			resources.POST("/:id/middlewares/bulk", s.assignMultipleMiddlewares) // New endpoint for bulk assignment
+			resources.DELETE("/:id/middlewares/:middlewareId", s.removeMiddleware)
 		}
 	}
 

@@ -58,3 +58,44 @@ middlewares:
     config:
       average: 100
       burst: 50
+
+  - id: security-chain
+    name: Security Chain
+    type: chain
+    config:
+      middlewares:
+        - rate-limit
+        - ip-whitelist
+
+  - id: headers-standard
+    name: Standard Security Headers
+    type: headers
+    config:
+      accessControlAllowMethods:
+        - GET
+        - OPTIONS
+        - PUT
+      browserXssFilter: true
+      contentTypeNosniff: true
+      customFrameOptionsValue: SAMEORIGIN
+      customResponseHeaders:
+        X-Forwarded-Proto: https
+        X-Robots-Tag: none,noarchive,nosnippet,notranslate,noimageindex
+        server: ""
+      forceSTSHeader: true
+      hostsProxyHeaders:
+        - X-Forwarded-Host
+      permissionsPolicy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()
+      referrerPolicy: same-origin
+      sslProxyHeaders:
+        X-Forwarded-Proto: https
+      stsIncludeSubdomains: true
+      stsPreload: true
+      stsSeconds: 63072000
+      
+  - id: nextcloud-dav
+    name: Nextcloud WebDAV Redirect
+    type: replacepathregex
+    config:
+      regex: "^/.well-known/ca(l|rd)dav"
+      replacement: "/remote.php/dav/"

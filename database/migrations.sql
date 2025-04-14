@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS resources (
     service_id TEXT NOT NULL,
     org_id TEXT NOT NULL,
     site_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -35,3 +36,7 @@ INSERT OR IGNORE INTO middlewares (id, name, type, config) VALUES
 ('authelia', 'Authelia', 'forwardAuth', '{"address":"http://authelia:9091/api/verify?rd=https://auth.yourdomain.com","trustForwardHeader":true,"authResponseHeaders":["Remote-User","Remote-Groups","Remote-Name","Remote-Email"]}'),
 ('authentik', 'Authentik', 'forwardAuth', '{"address":"http://authentik:9000/outpost.goauthentik.io/auth/traefik","trustForwardHeader":true,"authResponseHeaders":["X-authentik-username","X-authentik-groups","X-authentik-email","X-authentik-name","X-authentik-uid"]}'),
 ('basic-auth', 'Basic Auth', 'basicAuth', '{"users":["admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"]}');
+
+-- Add status column to existing resources if not already present
+-- SQLite doesn't support 'IF NOT EXISTS' for columns, so we need a different approach
+-- This will be handled through code to make it compatible with SQLite's ALTER TABLE limitations

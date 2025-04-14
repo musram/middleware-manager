@@ -7,7 +7,15 @@ const api = {
   // Resources
   getResources: () => fetch(`${API_URL}/resources`).then(res => res.json()),
   getResource: (id) => fetch(`${API_URL}/resources/${id}`).then(res => res.json()),
+  deleteResource: (id) => fetch(`${API_URL}/resources/${id}`, {
+    method: 'DELETE'
+  }).then(res => res.json()),
   assignMiddleware: (resourceId, data) => fetch(`${API_URL}/resources/${resourceId}/middlewares`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).then(res => res.json()),
+  assignMultipleMiddlewares: (resourceId, data) => fetch(`${API_URL}/resources/${resourceId}/middlewares/bulk`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -44,6 +52,54 @@ const parseMiddlewares = (middlewaresStr) => {
       const [id, name, priority] = item.split(':');
       return { id, name, priority: parseInt(priority) || 100 };
     });
+};
+
+// Helper function to format middleware chains for display
+const formatMiddlewareDisplay = (middleware, allMiddlewares) => {
+  // Check if this is a chain middleware
+  const isChain = middleware.type === 'chain';
+  
+  // Get the config object
+  let configObj = middleware.config;
+  if (typeof configObj === 'string') {
+    try {
+      configObj = JSON.parse(configObj);
+    } catch (e) {
+      console.error('Error parsing middleware config:', e);
+      configObj = {};
+    }
+  }
+  
+  return (
+    <div className="py-2">
+      <div className="flex items-center">
+        <span className="font-medium">{middleware.name}</span>
+        <span className="px-2 py-1 ml-2 text-xs rounded-full bg-blue-100 text-blue-800">
+          {middleware.type}
+        </span>
+        {isChain && <span className="ml-2 text-gray-500 text-sm">(Middleware Chain)</span>}
+      </div>
+      
+      {/* Display chained middlewares if this is a chain */}
+      {isChain && configObj.middlewares && configObj.middlewares.length > 0 && (
+        <div className="ml-4 mt-1 border-l-2 border-gray-200 pl-3">
+          <div className="text-sm text-gray-600 mb-1">Chain contains:</div>
+          <ul className="space-y-1">
+            {configObj.middlewares.map((id, index) => {
+              const chainedMiddleware = allMiddlewares.find(m => m.id === id);
+              return (
+                <li key={index} className="text-sm">
+                  {index + 1}. {chainedMiddleware 
+                    ? <span className="font-medium">{chainedMiddleware.name} <span className="text-xs text-gray-500">({chainedMiddleware.type})</span></span> 
+                    : <span>{id} <span className="text-xs text-gray-500">(unknown middleware)</span></span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // Main App Component
@@ -163,8 +219,10 @@ const Dashboard = ({ navigateTo }) => {
   }
 
   // Calculate stats
-  const protectedResources = resources.filter(r => r.middlewares && r.middlewares.length > 0).length;
-  const unprotectedResources = resources.length - protectedResources;
+  const protectedResources = resources.filter(r => r.status !== 'disabled' && r.middlewares && r.middlewares.length > 0).length;
+  const activeResources = resources.filter(r => r.status !== 'disabled').length;
+  const disabledResources = resources.filter(r => r.status === 'disabled').length;
+  const unprotectedResources = activeResources - protectedResources;
 
   return (
     <div>
@@ -174,7 +232,12 @@ const Dashboard = ({ navigateTo }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Resources</h3>
-          <p className="text-3xl font-bold">{resources.length}</p>
+          <p className="text-3xl font-bold">{activeResources}</p>
+          {disabledResources > 0 && (
+            <p className="text-sm text-gray-500 mt-1">
+              {disabledResources} disabled resources
+            </p>
+          )}
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Middlewares</h3>
@@ -182,7 +245,7 @@ const Dashboard = ({ navigateTo }) => {
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-2">Protected Resources</h3>
-          <p className="text-3xl font-bold">{protectedResources} / {resources.length}</p>
+          <p className="text-3xl font-bold">{protectedResources} / {activeResources}</p>
         </div>
       </div>
       
@@ -212,23 +275,54 @@ const Dashboard = ({ navigateTo }) => {
               {resources.slice(0, 5).map(resource => {
                 const middlewaresList = parseMiddlewares(resource.middlewares);
                 const isProtected = middlewaresList.length > 0;
+                const isDisabled = resource.status === 'disabled';
                 
                 return (
-                  <tr key={resource.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">{resource.host}</td>
+                  <tr key={resource.id} className={isDisabled ? 'bg-gray-100' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${isProtected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                        {isProtected ? 'Protected' : 'Not Protected'}
+                      {resource.host}
+                      {isDisabled && (
+                        <span className="ml-2 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                          Removed from Pangolin
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        isDisabled ? 'bg-gray-100 text-gray-800' :
+                        isProtected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {isDisabled ? 'Disabled' : isProtected ? 'Protected' : 'Not Protected'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{middlewaresList.length > 0 ? middlewaresList.length : 'None'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button 
                         onClick={() => navigateTo('resource-detail', resource.id)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-blue-600 hover:text-blue-900 mr-3"
                       >
-                        Manage
+                        {isDisabled ? 'View' : 'Manage'}
                       </button>
+                      {isDisabled && (
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete the resource "${resource.host}"? This cannot be undone.`)) {
+                              api.deleteResource(resource.id)
+                                .then(() => {
+                                  // Refresh dashboard data
+                                  setResources(resources.filter(r => r.id !== resource.id));
+                                })
+                                .catch(error => {
+                                  console.error('Error deleting resource:', error);
+                                  alert('Failed to delete resource');
+                                });
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -254,7 +348,25 @@ const Dashboard = ({ navigateTo }) => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
-                You have {unprotectedResources} resources that are not protected with any middleware.
+                You have {unprotectedResources} active resources that are not protected with any middleware.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Warning for disabled resources */}
+      {disabledResources > 0 && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-700">
+                You have {disabledResources} disabled resources that were removed from Pangolin. <a className="underline" onClick={() => navigateTo('resources')}>View all resources</a> to delete them.
               </p>
             </div>
           </div>
@@ -288,6 +400,22 @@ const ResourcesList = ({ navigateTo }) => {
   useEffect(() => {
     fetchResources();
   }, []);
+
+  const handleDeleteResource = async (id, host) => {
+    // eslint-disable-next-line no-restricted-globals
+    if (!confirm(`Are you sure you want to delete the resource "${host}"? This cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      await api.deleteResource(id);
+      alert('Resource deleted successfully');
+      fetchResources();
+    } catch (err) {
+      alert(`Failed to delete resource: ${err.message || 'Unknown error'}`);
+      console.error(err);
+    }
+  };
 
   const filteredResources = resources.filter(resource => 
     resource.host.toLowerCase().includes(searchTerm.toLowerCase())
@@ -335,23 +463,42 @@ const ResourcesList = ({ navigateTo }) => {
               {filteredResources.map(resource => {
                 const middlewaresList = parseMiddlewares(resource.middlewares);
                 const isProtected = middlewaresList.length > 0;
+                const isDisabled = resource.status === 'disabled';
                 
                 return (
-                  <tr key={resource.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">{resource.host}</td>
+                  <tr key={resource.id} className={isDisabled ? 'bg-gray-100' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${isProtected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                        {isProtected ? 'Protected' : 'Not Protected'}
+                      {resource.host}
+                      {isDisabled && (
+                        <span className="ml-2 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                          Removed from Pangolin
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        isDisabled ? 'bg-gray-100 text-gray-800' :
+                        isProtected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {isDisabled ? 'Disabled' : isProtected ? 'Protected' : 'Not Protected'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{middlewaresList.length > 0 ? middlewaresList.length : 'None'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap flex space-x-2">
                       <button 
                         onClick={() => navigateTo('resource-detail', resource.id)}
                         className="text-blue-600 hover:text-blue-900"
                       >
-                        Manage
+                        {isDisabled ? 'View' : 'Manage'}
                       </button>
+                      {isDisabled && (
+                        <button 
+                          onClick={() => handleDeleteResource(resource.id, resource.host)}
+                          className="text-red-600 hover:text-red-900 ml-3"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -378,7 +525,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [selectedMiddleware, setSelectedMiddleware] = useState('');
+  const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
   const [priority, setPriority] = useState(100);
 
   const fetchData = async () => {
@@ -413,24 +560,42 @@ const ResourceDetail = ({ id, navigateTo }) => {
     fetchData();
   }, [id]);
 
+  const handleMiddlewareSelection = (e) => {
+    const options = e.target.options;
+    const selected = [];
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selected.push(options[i].value);
+      }
+    }
+    setSelectedMiddlewares(selected);
+  };
+
   const handleAssignMiddleware = async (e) => {
     e.preventDefault();
-    if (!selectedMiddleware) return;
+    if (selectedMiddlewares.length === 0) {
+      alert('Please select at least one middleware');
+      return;
+    }
     
     try {
-      await api.assignMiddleware(id, {
-        middleware_id: selectedMiddleware,
+      const middlewaresToAdd = selectedMiddlewares.map(middlewareId => ({
+        middleware_id: middlewareId,
         priority: parseInt(priority)
+      }));
+      
+      await api.assignMultipleMiddlewares(id, {
+        middlewares: middlewaresToAdd
       });
       
       setShowModal(false);
-      setSelectedMiddleware('');
+      setSelectedMiddlewares([]);
       setPriority(100);
       
       // Refresh data
       fetchData();
     } catch (err) {
-      alert('Failed to assign middleware');
+      alert('Failed to assign middlewares');
       console.error(err);
     }
   };
@@ -480,6 +645,8 @@ const ResourceDetail = ({ id, navigateTo }) => {
     );
   }
 
+  const isDisabled = resource.status === 'disabled';
+
   return (
     <div>
       <div className="mb-6 flex items-center">
@@ -490,7 +657,56 @@ const ResourceDetail = ({ id, navigateTo }) => {
           Back
         </button>
         <h1 className="text-2xl font-bold">Resource: {resource.host}</h1>
+        {isDisabled && (
+          <span className="ml-3 px-2 py-1 text-sm rounded-full bg-red-100 text-red-800">
+            Removed from Pangolin
+          </span>
+        )}
       </div>
+      
+      {/* Warning for disabled resources */}
+      {isDisabled && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                This resource has been removed from Pangolin and is now disabled. Any changes to middleware will not take effect.
+              </p>
+              <div className="mt-2 flex space-x-4">
+                <button
+                  onClick={() => navigateTo('resources')}
+                  className="text-sm text-red-700 underline"
+                >
+                  Return to resources list
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete the resource "${resource.host}"? This cannot be undone.`)) {
+                      api.deleteResource(id)
+                        .then(() => {
+                          alert('Resource deleted successfully');
+                          navigateTo('resources');
+                        })
+                        .catch(error => {
+                          console.error('Error deleting resource:', error);
+                          alert('Failed to delete resource');
+                        });
+                    }
+                  }}
+                  className="text-sm text-red-700 underline"
+                >
+                  Delete this resource
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Resource details */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
@@ -517,8 +733,11 @@ const ResourceDetail = ({ id, navigateTo }) => {
           <div>
             <p className="text-sm text-gray-500">Status</p>
             <p>
-              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${assignedMiddlewares.length > 0 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                {assignedMiddlewares.length > 0 ? 'Protected' : 'Not Protected'}
+              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                isDisabled ? 'bg-red-100 text-red-800' :
+                assignedMiddlewares.length > 0 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {isDisabled ? 'Disabled' : assignedMiddlewares.length > 0 ? 'Protected' : 'Not Protected'}
               </span>
             </p>
           </div>
@@ -535,7 +754,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           <h2 className="text-xl font-semibold">Attached Middlewares</h2>
           <button
             onClick={() => setShowModal(true)}
-            disabled={availableMiddlewares.length === 0}
+            disabled={isDisabled || availableMiddlewares.length === 0}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Add Middleware
@@ -551,24 +770,30 @@ const ResourceDetail = ({ id, navigateTo }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Middleware</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {assignedMiddlewares.map(middleware => {
-                const middlewareDetails = middlewares.find(m => m.id === middleware.id);
+                const middlewareDetails = middlewares.find(m => m.id === middleware.id) || {
+                  id: middleware.id,
+                  name: middleware.name,
+                  type: 'unknown'
+                };
+                
                 return (
                   <tr key={middleware.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">{middleware.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{middlewareDetails ? middlewareDetails.type : 'Unknown'}</td>
+                    <td className="px-6 py-4">
+                      {formatMiddlewareDisplay(middlewareDetails, middlewares)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">{middleware.priority}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => handleRemoveMiddleware(middleware.id)}
                         className="text-red-600 hover:text-red-900"
+                        disabled={isDisabled}
                       >
                         Remove
                       </button>
@@ -586,7 +811,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold">Add Middleware to {resource.host}</h3>
+              <h3 className="text-lg font-semibold">Add Middlewares to {resource.host}</h3>
               <button 
                 onClick={() => setShowModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -610,21 +835,24 @@ const ResourceDetail = ({ id, navigateTo }) => {
                 <form onSubmit={handleAssignMiddleware}>
                   <div className="mb-4">
                     <label className="block text-gray-700 text-sm font-bold mb-2">
-                      Middleware
+                      Select Middlewares
                     </label>
                     <select
-                      value={selectedMiddleware}
-                      onChange={(e) => setSelectedMiddleware(e.target.value)}
+                      multiple
+                      value={selectedMiddlewares}
+                      onChange={handleMiddlewareSelection}
                       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
+                      size={5}
                     >
-                      <option value="">Select a middleware</option>
                       {availableMiddlewares.map(middleware => (
                         <option key={middleware.id} value={middleware.id}>
                           {middleware.name} ({middleware.type})
                         </option>
                       ))}
                     </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Hold Ctrl (or Cmd) to select multiple middlewares. All selected middlewares will be assigned with the same priority.
+                    </p>
                   </div>
                   
                   <div className="mb-4">
@@ -656,8 +884,9 @@ const ResourceDetail = ({ id, navigateTo }) => {
                     <button
                       type="submit"
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      disabled={selectedMiddlewares.length === 0}
                     >
-                      Add Middleware
+                      Add Middlewares
                     </button>
                   </div>
                 </form>
@@ -695,8 +924,7 @@ const MiddlewaresList = ({ navigateTo }) => {
     fetchMiddlewares();
   }, []);
 
-  // Around line 698 in MiddlewaresList component:
-const handleDeleteMiddleware = async (id, name) => {
+  const handleDeleteMiddleware = async (id, name) => {
     // eslint-disable-next-line no-restricted-globals
     if (!confirm(`Are you sure you want to delete the middleware "${name}"?`)) {
       return;
@@ -769,6 +997,9 @@ const handleDeleteMiddleware = async (id, name) => {
                     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {middleware.type}
                     </span>
+                    {middleware.type === 'chain' && (
+                      <span className="ml-2 text-xs text-gray-500">(Middleware Chain)</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
@@ -807,6 +1038,8 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   const [loading, setLoading] = useState(id ? true : false);
   const [error, setError] = useState(null);
   const [jsonError, setJsonError] = useState(null);
+  const [availableMiddlewares, setAvailableMiddlewares] = useState([]);
+  const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
 
   // Middleware types
   const middlewareTypes = [
@@ -818,6 +1051,9 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'stripPrefix', label: 'Strip Prefix' },
     { value: 'addPrefix', label: 'Add Prefix' },
     { value: 'redirectRegex', label: 'Redirect Regex' },
+    { value: 'redirectScheme', label: 'Redirect Scheme' },
+    { value: 'chain', label: 'Middleware Chain' },
+    { value: 'replacepathregex', label: 'RegEx Path Replacement' },
   ];
 
   // Templates for different middleware types
@@ -836,9 +1072,32 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     rateLimit: {
       average: 100,
       burst: 50
+    },
+    headers: {
+      accessControlAllowMethods: ["GET", "OPTIONS", "PUT"],
+      browserXssFilter: true,
+      contentTypeNosniff: true,
+      customFrameOptionsValue: "SAMEORIGIN",
+      customResponseHeaders: {
+        "X-Robots-Tag": "none,noarchive,nosnippet,notranslate,noimageindex",
+        "server": ""
+      }
+    },
+    chain: {
+      middlewares: []
+    },
+    replacepathregex: {
+      regex: "^/path/to/replace",
+      replacement: "/new/path"
+    },
+    redirectRegex: {
+      regex: "^/path/to/redirect",
+      replacement: "/new/path",
+      permanent: false
     }
   };
 
+  // Fetch middleware data when editing
   useEffect(() => {
     if (id) {
       // Fetch middleware for editing
@@ -877,6 +1136,43 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
       setConfig(JSON.stringify(templates[type] || {}, null, 2));
     }
   }, [type, id]);
+  
+  // Fetch available middlewares for chain type
+  useEffect(() => {
+    if (type === 'chain') {
+      api.getMiddlewares()
+        .then(data => {
+          // Filter out the current middleware if editing
+          const filtered = id ? data.filter(m => m.id !== id) : data;
+          setAvailableMiddlewares(filtered);
+          
+          // If editing, parse selected middlewares from config
+          if (id && config) {
+            try {
+              const configObj = JSON.parse(config);
+              if (configObj.middlewares) {
+                setSelectedMiddlewares(configObj.middlewares);
+              }
+            } catch (e) {
+              console.error('Error parsing chain config:', e);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch middlewares for chain:', err);
+        });
+    }
+  }, [type, id, config]);
+
+  // Update chain config when selectedMiddlewares changes
+  useEffect(() => {
+    if (type === 'chain') {
+      const chainConfig = {
+        middlewares: selectedMiddlewares
+      };
+      setConfig(JSON.stringify(chainConfig, null, 2));
+    }
+  }, [selectedMiddlewares, type]);
 
   // Validate JSON
   const validateJson = (json) => {
@@ -894,6 +1190,56 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     const newConfig = e.target.value;
     setConfig(newConfig);
     validateJson(newConfig);
+    
+    // If it's a chain type, update selected middlewares
+    if (type === 'chain') {
+      try {
+        const configObj = JSON.parse(newConfig);
+        if (configObj.middlewares) {
+          setSelectedMiddlewares(configObj.middlewares);
+        }
+      } catch (e) {
+        // Don't update selectedMiddlewares if JSON is invalid
+      }
+    }
+  };
+  
+  // Handle middleware selection for chain
+  const handleMiddlewareSelection = (e) => {
+    const options = e.target.options;
+    const selected = [];
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selected.push(options[i].value);
+      }
+    }
+    setSelectedMiddlewares(selected);
+  };
+
+  // Helper text for middleware types
+  const getTypeHelperText = () => {
+    switch (type) {
+      case 'replacepathregex':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>The RegEx Path Replacement middleware rewrites the URL path based on regex match.</p>
+            <p>Common use cases:</p>
+            <ul className="list-disc pl-5 mt-1">
+              <li>WebDAV redirects: <code>^/.well-known/ca(l|rd)dav</code> → <code>/remote.php/dav/</code></li>
+              <li>Hiding paths: <code>^/api/internal/(.*)</code> → <code>/api/public/$1</code></li>
+            </ul>
+          </div>
+        );
+      case 'chain':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>The Chain middleware allows you to combine multiple middlewares together.</p>
+            <p>Order matters - middlewares are processed from top to bottom.</p>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -998,7 +1344,33 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
                 <option key={type.value} value={type.value}>{type.label}</option>
               ))}
             </select>
+            {getTypeHelperText()}
           </div>
+          
+          {/* Chain specific UI */}
+          {type === 'chain' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Select Middlewares for Chain
+              </label>
+              <select
+                multiple
+                value={selectedMiddlewares}
+                onChange={handleMiddlewareSelection}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                size={5}
+              >
+                {availableMiddlewares.map(middleware => (
+                  <option key={middleware.id} value={middleware.id}>
+                    {middleware.name} ({middleware.type})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Hold Ctrl (or Cmd) to select multiple middlewares. Order matters - middlewares are applied from top to bottom.
+              </p>
+            </div>
+          )}
           
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">

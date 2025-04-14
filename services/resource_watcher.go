@@ -93,6 +93,26 @@ func (rw *ResourceWatcher) checkResources() error {
 		return fmt.Errorf("failed to fetch Traefik config: %w", err)
 	}
 
+	// Get all existing resources from the database
+	var existingResources []string
+	rows, err := rw.db.Query("SELECT id FROM resources WHERE status = 'active'")
+	if err != nil {
+		return fmt.Errorf("failed to query existing resources: %w", err)
+	}
+	
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			log.Printf("Error scanning resource ID: %v", err)
+			continue
+		}
+		existingResources = append(existingResources, id)
+	}
+	rows.Close()
+	
+	// Keep track of resources we find in Pangolin
+	foundResources := make(map[string]bool)
+
 	// Process routers to find resources
 	for routerID, router := range config.HTTP.Routers {
 		// Skip non-SSL routers (usually HTTP redirects)
@@ -119,6 +139,23 @@ func (rw *ResourceWatcher) checkResources() error {
 			// Continue processing other resources even if one fails
 			continue
 		}
+		
+		// Mark this resource as found
+		foundResources[routerID] = true
+	}
+	
+	// Mark resources as disabled if they no longer exist in Pangolin
+	for _, resourceID := range existingResources {
+		if !foundResources[resourceID] {
+			log.Printf("Resource %s no longer exists in Pangolin, marking as disabled", resourceID)
+			_, err := rw.db.Exec(
+				"UPDATE resources SET status = 'disabled', updated_at = ? WHERE id = ?",
+				time.Now(), resourceID,
+			)
+			if err != nil {
+				log.Printf("Error marking resource as disabled: %v", err)
+			}
+		}
 	}
 	
 	return nil
@@ -128,22 +165,28 @@ func (rw *ResourceWatcher) checkResources() error {
 func (rw *ResourceWatcher) updateOrCreateResource(resourceID, host, serviceID string) error {
 	// Check if resource already exists
 	var exists int
-	err := rw.db.QueryRow("SELECT 1 FROM resources WHERE id = ?", resourceID).Scan(&exists)
+	var status string
+	err := rw.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", resourceID).Scan(&exists, &status)
 	if err == nil {
-		// Resource exists, update if needed
+		// Resource exists, update if needed and ensure status is active
 		_, err = rw.db.Exec(
-			"UPDATE resources SET host = ?, service_id = ?, updated_at = ? WHERE id = ?",
+			"UPDATE resources SET host = ?, service_id = ?, status = 'active', updated_at = ? WHERE id = ?",
 			host, serviceID, time.Now(), resourceID,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to update resource %s: %w", resourceID, err)
 		}
+		
+		if status == "disabled" {
+			log.Printf("Resource %s was disabled but is now active again", resourceID)
+		}
+		
 		return nil
 	}
 
 	// Create new resource (with placeholder org_id and site_id)
 	_, err = rw.db.Exec(
-		"INSERT INTO resources (id, host, service_id, org_id, site_id) VALUES (?, ?, ?, ?, ?)",
+		"INSERT INTO resources (id, host, service_id, org_id, site_id, status) VALUES (?, ?, ?, ?, ?, 'active')",
 		resourceID, host, serviceID, "unknown", "unknown",
 	)
 	if err != nil {
