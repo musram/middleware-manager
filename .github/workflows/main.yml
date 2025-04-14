@@ -19,6 +19,11 @@ on:
       - 'models/**'
       - 'services/**'
       - 'ui/**'
+      - '.env.example'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'README.md'
+      - 'docker-compose.yml'
     tags:
       - 'v*'
   workflow_dispatch:
@@ -49,26 +54,56 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker Metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKERHUB_IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=ref,event=branch,enable=${{ github.ref_type == 'branch' && github.ref_name != 'dev' }}
-            type=raw,value=dev,enable=${{ github.ref_name == 'dev' }}
-            type=sha,format=short,enable=${{ github.ref_type == 'branch' }}
-            type=raw,value=latest,enable=${{ github.ref_name == 'main' || github.ref_name == 'master' }}
-
-      - name: Debug tags
-        run: echo "Tags: ${{ steps.meta.outputs.tags }}"
+      # Get current date for image tags
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+      
+      # Prepare tags based on branch and version
+      - name: Prepare Docker tags
+        id: docker_tags
+        run: |
+          TAGS=""
+          
+          # Add branch-specific tags
+          if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            # For main/master branch, add latest tag
+            TAGS="$TAGS ${{ env.DOCKERHUB_IMAGE_NAME }}:latest"
+          elif [[ "${{ github.ref_name }}" == "dev" ]]; then
+            # For dev branch
+            TAGS="$TAGS ${{ env.DOCKERHUB_IMAGE_NAME }}:dev"
+          elif [[ "${{ github.ref_type }}" == "branch" ]]; then
+            # For other branches
+            TAGS="$TAGS ${{ env.DOCKERHUB_IMAGE_NAME }}:${{ github.ref_name }}"
+          fi
+          
+          # Add sha tag for all branches
+          if [[ "${{ github.ref_type }}" == "branch" ]]; then
+            TAGS="$TAGS,${{ env.DOCKERHUB_IMAGE_NAME }}:sha-${GITHUB_SHA::7}"
+          fi
+          
+          # Add version tag for tagged releases
+          if [[ "${{ github.ref_type }}" == "tag" && "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            
+            # Add full version tag
+            TAGS="$TAGS,${{ env.DOCKERHUB_IMAGE_NAME }}:$VERSION"
+          fi
+          
+          # Add date tag for all builds
+          TAGS="$TAGS,${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.date.outputs.date }}"
+          
+          # Remove leading space or comma if present
+          TAGS=$(echo "$TAGS" | sed 's/^[ ,]*//')
+          
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "Docker tags: $TAGS"
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.docker_tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
