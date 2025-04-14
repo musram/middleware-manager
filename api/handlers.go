@@ -505,61 +505,63 @@ func (s *Server) assignMiddleware(c *gin.Context) {
 }
 
 // removeMiddleware removes a middleware from a resource
+// removeMiddleware removes a middleware from a resource
 func (s *Server) removeMiddleware(c *gin.Context) {
-	resourceID := c.Param("resourceId")
-	middlewareID := c.Param("middlewareId")
-	
-	if resourceID == "" || middlewareID == "" {
-		ResponseWithError(c, http.StatusBadRequest, "Resource ID and Middleware ID are required")
-		return
-	}
+    // Updated to use "id" parameter instead of "resourceId" to match route definition
+    resourceID := c.Param("id")
+    middlewareID := c.Param("middlewareId")
+    
+    if resourceID == "" || middlewareID == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID and Middleware ID are required")
+        return
+    }
 
-	// Delete the relationship using a transaction
-	tx, err := s.db.Begin()
-	if err != nil {
-		log.Printf("Error beginning transaction: %v", err)
-		ResponseWithError(c, http.StatusInternalServerError, "Database error")
-		return
-	}
-	
-	// If something goes wrong, rollback
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
-	
-	result, err := tx.Exec(
-		"DELETE FROM resource_middlewares WHERE resource_id = ? AND middleware_id = ?",
-		resourceID, middlewareID,
-	)
-	
-	if err != nil {
-		log.Printf("Error removing middleware: %v", err)
-		ResponseWithError(c, http.StatusInternalServerError, "Failed to remove middleware")
-		return
-	}
+    // Delete the relationship using a transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        log.Printf("Error beginning transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // If something goes wrong, rollback
+    defer func() {
+        if err != nil {
+            tx.Rollback()
+        }
+    }()
+    
+    result, err := tx.Exec(
+        "DELETE FROM resource_middlewares WHERE resource_id = ? AND middleware_id = ?",
+        resourceID, middlewareID,
+    )
+    
+    if err != nil {
+        log.Printf("Error removing middleware: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to remove middleware")
+        return
+    }
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		log.Printf("Error getting rows affected: %v", err)
-		ResponseWithError(c, http.StatusInternalServerError, "Database error")
-		return
-	}
-	
-	if rowsAffected == 0 {
-		ResponseWithError(c, http.StatusNotFound, "Resource middleware relationship not found")
-		return
-	}
-	
-	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
-		ResponseWithError(c, http.StatusInternalServerError, "Database error")
-		return
-	}
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        log.Printf("Error getting rows affected: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    if rowsAffected == 0 {
+        ResponseWithError(c, http.StatusNotFound, "Resource middleware relationship not found")
+        return
+    }
+    
+    // Commit the transaction
+    if err = tx.Commit(); err != nil {
+        log.Printf("Error committing transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{"message": "Middleware removed from resource successfully"})
+    c.JSON(http.StatusOK, gin.H{"message": "Middleware removed from resource successfully"})
 }
 
 // generateID generates a random 16-character hex string
