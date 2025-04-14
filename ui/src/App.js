@@ -1097,13 +1097,55 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
       permanent: false
     },
     plugin: {
-      plugin: {
-        // This is a placeholder to be replaced with specific plugin info
-        "pluginName": {
-          // Plugin-specific configuration here
-        }
+      // Empty template to be filled when selecting a specific plugin
+    },
+    
+    // Specific plugin templates - will be set when user chooses a plugin type
+    geoblock: {
+      geoblock: {
+        silentStartUp: false,
+        allowLocalRequests: false,
+        logLocalRequests: false,
+        logAllowedRequests: false,
+        logApiRequests: false,
+        api: "https://get.geojs.io/v1/ip/country/{ip}",
+        apiTimeoutMs: 750,
+        cacheSize: 15,
+        forceMonthlyUpdate: false,
+        allowUnknownCountries: false,
+        unknownCountryApiResponse: "nil",
+        blackListMode: false,
+        addCountryHeader: false,
+        countries: ["DE"]
       }
-    }  
+    },
+    
+    crowdsec: {
+      crowdsec: {
+        enabled: true,
+        logLevel: "INFO",
+        updateIntervalSeconds: 15,
+        updateMaxFailure: 0,
+        defaultDecisionSeconds: 15,
+        httpTimeoutSeconds: 10,
+        crowdsecMode: "live",
+        crowdsecAppsecEnabled: true,
+        crowdsecAppsecHost: "crowdsec:7422",
+        crowdsecAppsecFailureBlock: true,
+        crowdsecAppsecUnreachableBlock: true,
+        crowdsecAppsecBodyLimit: 10485760,
+        crowdsecLapiKey: "PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK",
+        crowdsecLapiHost: "crowdsec:8080",
+        crowdsecLapiScheme: "http",
+        forwardedHeadersTrustedIPs: ["0.0.0.0/0"],
+        clientTrustedIPs: [
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16",
+          "100.89.137.0/20"
+        ]
+      }
+    }
   };
 
   // Fetch middleware data when editing
@@ -1228,26 +1270,32 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   // Helper text for middleware types
   const getTypeHelperText = () => {
     switch (type) {
+// In the getTypeHelperText function in MiddlewareForm
 case 'plugin':
   return (
     <div className="text-xs text-gray-500 mt-1">
       <p>Configure a Traefik plugin middleware.</p>
-      <p>Structure your configuration like this:</p>
-      <pre className="bg-gray-100 p-2 rounded mt-1 overflow-x-auto">
-{`{
-  "plugin": {
-    "pluginName": {
-      // Plugin-specific configuration
-    }
-  }
-}`}
-      </pre>
-      <p className="mt-1">Common plugins include:</p>
-      <ul className="list-disc pl-5">
-        <li><strong>geoblock</strong>: Restrict access by country</li>
-        <li><strong>crowdsec</strong>: Protect against malicious activity</li>
-        <li><strong>rewrite-body</strong>: Modify response body content</li>
-      </ul>
+      <div className="mt-2">
+        <h4 className="font-semibold">GeoBlock Configuration</h4>
+        <ul className="list-disc pl-5">
+          <li><strong>blackListMode</strong>: When false, countries list is a whitelist; when true, it's a blacklist</li>
+          <li><strong>countries</strong>: Array of two-letter ISO country codes</li>
+          <li><strong>allowLocalRequests</strong>: When true, allows requests from private IP ranges</li>
+          <li><strong>api</strong>: Geolocation API endpoint for IP lookups</li>
+        </ul>
+      </div>
+      
+      <div className="mt-2">
+        <h4 className="font-semibold">CrowdSec Configuration</h4>
+        <ul className="list-disc pl-5">
+          <li><strong>crowdsecLapiKey</strong>: Your CrowdSec bouncer API key</li>
+          <li><strong>crowdsecLapiHost</strong>: CrowdSec service address (e.g., "crowdsec:8080")</li>
+          <li><strong>forwardedHeadersTrustedIPs</strong>: IP ranges to trust for forwarded headers</li>
+          <li><strong>clientTrustedIPs</strong>: IP ranges to exempt from CrowdSec checks</li>
+        </ul>
+      </div>
+      
+      <p className="mt-2 italic">Note: Plugins must be installed on your Traefik instances for this configuration to work.</p>
     </div>
   );
       case 'replacepathregex':
@@ -1377,47 +1425,29 @@ case 'plugin':
             </select>
             {getTypeHelperText()}
           </div>
-          {/* Add this after the middleware type selector */}
+{/* Add this after the middleware type selector in the MiddlewareForm component */}
 {type === 'plugin' && (
   <div className="mb-4">
     <label className="block text-gray-700 text-sm font-bold mb-2">
-      Plugin Template
+      Plugin Type
     </label>
     <select
       onChange={(e) => {
-        if (e.target.value === 'geoblock') {
-          setConfig(JSON.stringify({
-            plugin: {
-              geoblock: {
-                allowLocalRequests: true,
-                blackListMode: false,
-                countries: ["DE"]
-              }
-            }
-          }, null, 2));
-        } else if (e.target.value === 'crowdsec') {
-          setConfig(JSON.stringify({
-            plugin: {
-              crowdsec: {
-                enabled: true,
-                defaultDecisionSeconds: 60,
-                crowdsecMode: "live",
-                crowdsecLapiKey: "your-lapi-key-here",
-                crowdsecLapiHost: "crowdsec:8080",
-                crowdsecLapiScheme: "http"
-              }
-            }
-          }, null, 2));
+        const pluginType = e.target.value;
+        if (pluginType === 'geoblock') {
+          setConfig(JSON.stringify(templates.geoblock, null, 2));
+        } else if (pluginType === 'crowdsec') {
+          setConfig(JSON.stringify(templates.crowdsec, null, 2));
         }
       }}
       className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
     >
-      <option value="">-- Select a plugin template --</option>
-      <option value="geoblock">GeoBlock</option>
-      <option value="crowdsec">CrowdSec</option>
+      <option value="">-- Select a plugin --</option>
+      <option value="geoblock">GeoBlock - Geographic Access Control</option>
+      <option value="crowdsec">CrowdSec - Threat Protection</option>
     </select>
     <p className="text-xs text-gray-500 mt-1">
-      Select a template for common plugins, or configure manually in the JSON editor below.
+      Select a plugin type to load its configuration template.
     </p>
   </div>
 )}
