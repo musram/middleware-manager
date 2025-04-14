@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKERHUB_IMAGE_NAME: yourusername/yourimage
+  DOCKERHUB_IMAGE_NAME: hhftechnology/middleware-manager
 
 jobs:
   build-and-push:
