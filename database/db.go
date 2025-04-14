@@ -50,6 +50,11 @@ func InitDB(dbPath string) (*DB, error) {
 		db.Close() // Close the connection on failure
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
+	
+	// Run post-migration updates
+	if err := runPostMigrationUpdates(db); err != nil {
+		log.Printf("Warning: Error running post-migration updates: %v", err)
+	}
 
 	return &DB{db}, nil
 }
@@ -92,6 +97,32 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	log.Println("Migrations completed successfully")
+	return nil
+}
+
+// runPostMigrationUpdates handles migrations that SQLite can't do easily in schema migrations
+func runPostMigrationUpdates(db *sql.DB) error {
+	// Check if we need to add the status column to the resources table
+	// SQLite doesn't support ALTER TABLE IF NOT EXISTS, so we need to check first
+	var hasStatusColumn bool
+	err := db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM pragma_table_info('resources') 
+		WHERE name = 'status'
+	`).Scan(&hasStatusColumn)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check if status column exists: %w", err)
+	}
+	
+	if !hasStatusColumn {
+		log.Println("Adding status column to resources table")
+		_, err := db.Exec("ALTER TABLE resources ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+		if err != nil {
+			return fmt.Errorf("failed to add status column: %w", err)
+		}
+	}
+	
 	return nil
 }
 
@@ -161,7 +192,7 @@ func (db *DB) GetMiddlewares() ([]map[string]interface{}, error) {
 // GetResources fetches all resources
 func (db *DB) GetResources() ([]map[string]interface{}, error) {
 	rows, err := db.Query(`
-		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id,
+		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -175,9 +206,9 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 	var resources []map[string]interface{}
 	for rows.Next() {
-		var id, host, serviceID, orgID, siteID string
+		var id, host, serviceID, orgID, siteID, status string
 		var middlewares sql.NullString
-		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &middlewares); err != nil {
+		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, &middlewares); err != nil {
 			return nil, fmt.Errorf("row scan failed: %w", err)
 		}
 		
@@ -187,6 +218,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 			"service_id": serviceID,
 			"org_id":     orgID,
 			"site_id":    siteID,
+			"status":     status,
 		}
 		
 		if middlewares.Valid {
@@ -207,18 +239,18 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 // GetResource fetches a specific resource by ID
 func (db *DB) GetResource(id string) (map[string]interface{}, error) {
-	var host, serviceID, orgID, siteID string
+	var host, serviceID, orgID, siteID, status string
 	var middlewares sql.NullString
 
 	err := db.QueryRow(`
-		SELECT r.host, r.service_id, r.org_id, r.site_id,
+		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
 			   GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
 		LEFT JOIN middlewares m ON rm.middleware_id = m.id
 		WHERE r.id = ?
 		GROUP BY r.id
-	`, id).Scan(&host, &serviceID, &orgID, &siteID, &middlewares)
+	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, &middlewares)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("resource not found: %s", id)
@@ -232,6 +264,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		"service_id": serviceID,
 		"org_id":     orgID,
 		"site_id":    siteID,
+		"status":     status,
 	}
 
 	if middlewares.Valid {

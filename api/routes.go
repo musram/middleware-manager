@@ -114,6 +114,7 @@ func (s *Server) setupRoutes(uiPath string) {
 		{
 			resources.GET("", s.getResources)
 			resources.GET("/:id", s.getResource)
+			resources.DELETE("/:id", s.deleteResource) // New endpoint for deleting resources
 			resources.POST("/:id/middlewares", s.assignMiddleware)
 			resources.DELETE("/:resourceId/middlewares/:middlewareId", s.removeMiddleware)
 		}
