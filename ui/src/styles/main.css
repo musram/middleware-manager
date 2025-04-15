@@ -644,3 +644,64 @@ button:active {
   transform: translateY(1px);
   box-shadow: none;
 }
+/* Fix for destructive action buttons (Delete, Remove) */
+button.text-red-600,
+button.text-red-700,
+button.text-red-800,
+button.text-red-900,
+a.text-red-600,
+a.text-red-700,
+a.text-red-800,
+a.text-red-900,
+.text-red-600,
+.text-red-700,
+.text-red-800,
+.text-red-900 {
+  /* Use the orange accent color from your theme instead of red */
+  color: var(--accent-color) !important;
+}
+
+/* Style for destructive action buttons in light mode */
+:root:not(.dark-mode) .bg-blue-600 .text-red-600,
+:root:not(.dark-mode) .bg-blue-600 .text-red-700,
+:root:not(.dark-mode) .bg-blue-600 .text-red-800,
+:root:not(.dark-mode) .bg-blue-600 .text-red-900 {
+  /* For buttons with blue background in light mode, use white text */
+  color: white !important;
+}
+
+/* Style for standalone destructive buttons */
+.bg-red-600,
+.bg-red-700 {
+  background-color: var(--button-primary-bg) !important;
+}
+
+/* Ensure consistent styling for Remove buttons */
+button:contains("Remove"),
+a:contains("Remove") {
+  background-color: var(--button-primary-bg) !important;
+  color: white !important;
+}
+
+/* Ensure consistent styling for Delete buttons */
+button:contains("Delete"),
+a:contains("Delete") {
+  background-color: var(--button-primary-bg) !important;
+  color: white !important;
+}
+
+/* Override any lingering red text styling */
+.text-red-600, 
+.text-red-700, 
+.text-red-800, 
+.hover\\:text-red-900:hover {
+  color: var(--accent-color) !important;
+}
+
+/* For buttons with dark backgrounds, ensure text is white for contrast */
+.bg-blue-600 .text-red-600,
+.bg-blue-700 .text-red-600,
+.bg-red-600 *,
+.bg-red-700 * {
+  color: white !important;
+}
