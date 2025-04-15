@@ -511,3 +511,60 @@ input:focus, textarea:focus, select:focus {
 .light-mode-icon {
   transform: rotate(360deg);
 }
+/* Action button styling */
+.text-blue-600, .text-blue-900, .hover\:text-blue-900, .text-red-600, .hover\:text-red-900 {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+/* Manage button specific styling */
+td .text-blue-600, td .text-blue-900 {
+  background-color: var(--button-primary-bg);
+  color: white !important;
+  text-align: center;
+  min-width: 5rem;
+}
+
+/* Hover effect */
+td .text-blue-600:hover, td .text-blue-900:hover, td .hover\:text-blue-900:hover {
+  background-color: var(--button-primary-hover);
+  transform: translateY(-1px);
+  text-decoration: none !important;
+}
+
+/* Active effect */
+td .text-blue-600:active, td .text-blue-900:active {
+  transform: translateY(1px);
+}
+
+/* Align the Actions column content to the center */
+td:last-child {
+  text-align: center;
+}
+
+/* For the table headers */
+th:last-child {
+  text-align: center;
+}
+
+/* Status badges refinement */
+.bg-green-100 {
+  background-color: rgba(52, 211, 153, 0.2) !important;
+  border: 1px solid var(--success-text);
+}
+
+.bg-yellow-100, .bg-yellow-50 {
+  background-color: rgba(253, 186, 116, 0.2) !important;
+  border: 1px solid var(--warning-text);
+}
+
+/* Make the status badges a bit more distinct */
+span.px-2.py-1.inline-flex.text-xs.leading-5.font-semibold.rounded-full {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
