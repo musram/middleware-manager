@@ -28,15 +28,42 @@ const initializeDarkMode = () => {
 };
 
 // Dark mode toggle functionality
+// Enhanced toggleDarkMode function to ensure all labels render correctly
+// Replace the existing toggleDarkMode function with this one
+
 const toggleDarkMode = (isDark, setIsDark) => {
   if (isDark) {
     document.documentElement.classList.remove('dark-mode');
     localStorage.setItem('theme', 'light');
     setIsDark(false);
+    
+    // Force re-render of labels
+    setTimeout(() => {
+      const labels = document.querySelectorAll('span[class*="rounded-full"]');
+      labels.forEach(label => {
+        // Trigger a reflow
+        label.style.display = 'none';
+        // Force repaint
+        label.offsetHeight;
+        label.style.display = '';
+      });
+    }, 50);
   } else {
     document.documentElement.classList.add('dark-mode');
     localStorage.setItem('theme', 'dark');
     setIsDark(true);
+    
+    // Force re-render of labels
+    setTimeout(() => {
+      const labels = document.querySelectorAll('span[class*="rounded-full"]');
+      labels.forEach(label => {
+        // Trigger a reflow
+        label.style.display = 'none';
+        // Force repaint
+        label.offsetHeight;
+        label.style.display = '';
+      });
+    }, 50);
   }
 };
 
