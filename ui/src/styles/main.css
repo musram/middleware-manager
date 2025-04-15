@@ -629,3 +629,52 @@ td button:empty:before {
       height: 180px;
     }
   }
+
+  /* Add this new section at the end of your CSS file */
+/* =====================
+   DARK MODE TEXT VISIBILITY FIXES
+   ===================== */
+.dark-mode button,
+.dark-mode .btn,
+.dark-mode a[role="button"],
+.dark-mode [class*="btn"],
+.dark-mode td a,
+.dark-mode td button {
+  color: var(--text-on-primary) !important;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+/* First button in each row - often "Visit" */
+.dark-mode a:first-child,
+.dark-mode button:first-child,
+.dark-mode .dark-mode td > *:first-child {
+  color: var(--text-on-primary) !important;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Fix specifically for Visit button */
+.dark-mode a:empty:before,
+.dark-mode button:empty:before {
+  content: "Visit";
+  display: inline;
+  color: var(--text-on-primary) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Fix for other buttons in various contexts */
+.dark-mode td a:nth-child(2):empty:before,
+.dark-mode td button:nth-child(2):empty:before {
+  content: "Remove";
+  color: var(--text-on-primary) !important;
+}
+
+/* Fix modal buttons */
+.dark-mode .modal-overlay button,
+.dark-mode .fixed button,
+.dark-mode [role="dialog"] button {
+  color: var(--text-on-primary) !important;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+}
