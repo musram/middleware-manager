@@ -177,10 +177,10 @@ To use Traefik plugins like CrowdSec, GeoBlock, or CloudflareWarp:
      plugins:
        crowdsec:
          moduleName: github.com/crowdsecurity/traefik-plugin-crowdsec
-         version: v1.1.0
+         version: v1.4.2
        geoblock:
-         moduleName: github.com/hazcod/traefik-plugin-geoip
-         version: v1.3.0
+         moduleName: github.com/PascalMinder/geoblock
+         version: v0.3.2
    ```
 
 2. Add the plugin middleware template to your templates.yaml:
