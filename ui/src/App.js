@@ -236,24 +236,55 @@ const Dashboard = ({ navigateTo }) => {
   const [middlewares, setMiddlewares] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [initializationPhase, setInitializationPhase] = useState('Starting system...');
+  const maxRetries = 10; // Maximum number of retry attempts
+  const retryDelay = 3000; // 3 seconds between retries
 
   // Fetch initial dashboard data
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // Update initialization phase message based on retry count
+        if (retryCount === 1) setInitializationPhase('Connecting to database...');
+        if (retryCount === 2) setInitializationPhase('Checking for resources...');
+        if (retryCount === 3) setInitializationPhase('Generating configurations...');
+        if (retryCount > 3) setInitializationPhase('Waiting for background services to complete...');
+        
         const [resourcesData, middlewaresData] = await Promise.all([
           api.getResources(),
           api.getMiddlewares(),
         ]);
-        setResources(resourcesData);
-        setMiddlewares(middlewaresData);
+        
+        // Check if we got meaningful data
+        const hasResources = resourcesData && Array.isArray(resourcesData) && resourcesData.length > 0;
+        const hasMiddlewares = middlewaresData && Array.isArray(middlewaresData) && middlewaresData.length > 0;
+        
+        // If we have no data and haven't exceeded max retries, retry after delay
+        if ((!hasResources && !hasMiddlewares) && retryCount < maxRetries) {
+          setRetryCount(retryCount + 1);
+          setTimeout(() => fetchData(), retryDelay);
+          return;
+        }
+        
+        setResources(resourcesData || []);
+        setMiddlewares(middlewaresData || []);
         setError(null);
-      } catch (err) {
-        setError('Failed to load dashboard data');
-        console.error('Dashboard fetch error:', err);
-      } finally {
         setLoading(false);
+      } catch (err) {
+        console.error('Dashboard fetch error:', err);
+        
+        // If API call failed but we haven't exceeded max retries, retry after delay
+        if (retryCount < maxRetries) {
+          setRetryCount(retryCount + 1);
+          setInitializationPhase(`Connection attempt ${retryCount + 1}/${maxRetries} failed. Retrying...`);
+          setTimeout(() => fetchData(), retryDelay);
+        } else {
+          setError('Failed to load dashboard data after multiple attempts. The server might be unavailable.');
+          setLoading(false);
+        }
       }
     };
 
@@ -261,12 +292,33 @@ const Dashboard = ({ navigateTo }) => {
   }, []);
 
   if (loading) {
-    return <div className="flex justify-center p-12">Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-12">
+        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 className="text-xl font-semibold mb-2">Initializing Middleware Manager</h2>
+        <p className="text-gray-600 mb-4">{initializationPhase}</p>
+        {retryCount > 0 && (
+          <div className="text-sm text-gray-500">
+            <p>Attempt {retryCount} of {maxRetries}</p>
+            <p className="mt-2">The initial startup may take a moment while background services initialize.</p>
+          </div>
+        )}
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="bg-red-100 text-red-700 p-4 rounded">{error}</div>
+      <div className="bg-red-100 text-red-700 p-6 rounded-lg border border-red-300">
+        <h2 className="text-xl font-semibold mb-2">Error Loading Dashboard</h2>
+        <p className="mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+        >
+          Retry
+        </button>
+      </div>
     );
   }
 
@@ -1422,46 +1474,65 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     }
   }, [type, id]);
 
-  // Fetch available middlewares for chain type
-  useEffect(() => {
-    if (type === 'chain') {
-      // Fetch all middlewares for chain configuration
-      api
-        .getMiddlewares()
-        .then((data) => {
-          // Exclude current middleware when editing to prevent self-referencing
-          const filtered = id ? data.filter((m) => m.id !== id) : data;
-          setAvailableMiddlewares(filtered);
+// Fetch available middlewares for chain type
+useEffect(() => {
+  if (type === 'chain') {
+    // Fetch all middlewares for chain configuration
+    api
+      .getMiddlewares()
+      .then((data) => {
+        // Exclude current middleware when editing to prevent self-referencing
+        const filtered = id ? data.filter((m) => m.id !== id) : data;
+        setAvailableMiddlewares(filtered);
 
-          // Initialize selected middlewares from config when editing
-          if (id && config) {
-            try {
-              const configObj = JSON.parse(config);
-              if (Array.isArray(configObj.middlewares)) {
+        // Initialize selected middlewares from config when editing
+        if (id && config) {
+          try {
+            const configObj = JSON.parse(config);
+            if (Array.isArray(configObj.middlewares)) {
+              // Add a check to prevent unnecessary updates
+              const currentMiddlewares = JSON.stringify(configObj.middlewares);
+              const selectedMiddlewaresStr = JSON.stringify(selectedMiddlewares);
+              if (currentMiddlewares !== selectedMiddlewaresStr) {
                 setSelectedMiddlewares(configObj.middlewares);
               }
-            } catch (e) {
-              console.error('Error parsing chain config:', e);
             }
+          } catch (e) {
+            console.error('Error parsing chain config:', e);
           }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch middlewares for chain:', err);
-          setError('Failed to load available middlewares');
-        });
-    }
-  }, [type, id, config]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch middlewares for chain:', err);
+        setError('Failed to load available middlewares');
+      });
+  }
+}, [type, id, config]);
 
-  // Synchronize chain config with selected middlewares
-  useEffect(() => {
-    if (type === 'chain') {
-      // Update config to reflect selected middlewares
+// Synchronize chain config with selected middlewares
+useEffect(() => {
+  if (type === 'chain') {
+    // Add a check to prevent unnecessary updates
+    try {
+      const currentConfig = JSON.parse(config);
+      const currentMiddlewares = currentConfig.middlewares || [];
+      
+      // Only update if the arrays are different
+      if (JSON.stringify(currentMiddlewares) !== JSON.stringify(selectedMiddlewares)) {
+        const chainConfig = {
+          middlewares: selectedMiddlewares,
+        };
+        setConfig(JSON.stringify(chainConfig, null, 2));
+      }
+    } catch (e) {
+      // If parsing fails, update the config anyway
       const chainConfig = {
         middlewares: selectedMiddlewares,
       };
       setConfig(JSON.stringify(chainConfig, null, 2));
     }
-  }, [selectedMiddlewares, type]);
+  }
+}, [selectedMiddlewares, type]);
 
   // Validate JSON configuration
   const validateJson = (json) => {
