@@ -113,6 +113,23 @@ func (rw *ResourceWatcher) checkResources() error {
 	// Keep track of resources we find in Pangolin
 	foundResources := make(map[string]bool)
 
+	// Check if there are any routers configured in Pangolin
+	if config.HTTP.Routers == nil || len(config.HTTP.Routers) == 0 {
+		log.Println("No routers found in Pangolin configuration")
+		// Mark all existing resources as disabled since there are no active resources
+		for _, resourceID := range existingResources {
+			log.Printf("No active routers in Pangolin, marking resource %s as disabled", resourceID)
+			_, err := rw.db.Exec(
+				"UPDATE resources SET status = 'disabled', updated_at = ? WHERE id = ?",
+				time.Now(), resourceID,
+			)
+			if err != nil {
+				log.Printf("Error marking resource as disabled: %v", err)
+			}
+		}
+		return nil
+	}
+
 	// Process routers to find resources
 	for routerID, router := range config.HTTP.Routers {
 		// Skip non-SSL routers (usually HTTP redirects)
@@ -230,6 +247,14 @@ func (rw *ResourceWatcher) fetchTraefikConfig(ctx context.Context) (*models.Pang
 	var config models.PangolinTraefikConfig
 	if err := json.Unmarshal(body, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	// Initialize empty maps if they're nil to prevent nil pointer dereferences
+	if config.HTTP.Routers == nil {
+		config.HTTP.Routers = make(map[string]models.PangolinRouter)
+	}
+	if config.HTTP.Services == nil {
+		config.HTTP.Services = make(map[string]models.PangolinService)
 	}
 
 	return &config, nil

@@ -1422,46 +1422,65 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     }
   }, [type, id]);
 
-  // Fetch available middlewares for chain type
-  useEffect(() => {
-    if (type === 'chain') {
-      // Fetch all middlewares for chain configuration
-      api
-        .getMiddlewares()
-        .then((data) => {
-          // Exclude current middleware when editing to prevent self-referencing
-          const filtered = id ? data.filter((m) => m.id !== id) : data;
-          setAvailableMiddlewares(filtered);
+// Fetch available middlewares for chain type
+useEffect(() => {
+  if (type === 'chain') {
+    // Fetch all middlewares for chain configuration
+    api
+      .getMiddlewares()
+      .then((data) => {
+        // Exclude current middleware when editing to prevent self-referencing
+        const filtered = id ? data.filter((m) => m.id !== id) : data;
+        setAvailableMiddlewares(filtered);
 
-          // Initialize selected middlewares from config when editing
-          if (id && config) {
-            try {
-              const configObj = JSON.parse(config);
-              if (Array.isArray(configObj.middlewares)) {
+        // Initialize selected middlewares from config when editing
+        if (id && config) {
+          try {
+            const configObj = JSON.parse(config);
+            if (Array.isArray(configObj.middlewares)) {
+              // Add a check to prevent unnecessary updates
+              const currentMiddlewares = JSON.stringify(configObj.middlewares);
+              const selectedMiddlewaresStr = JSON.stringify(selectedMiddlewares);
+              if (currentMiddlewares !== selectedMiddlewaresStr) {
                 setSelectedMiddlewares(configObj.middlewares);
               }
-            } catch (e) {
-              console.error('Error parsing chain config:', e);
             }
+          } catch (e) {
+            console.error('Error parsing chain config:', e);
           }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch middlewares for chain:', err);
-          setError('Failed to load available middlewares');
-        });
-    }
-  }, [type, id, config]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch middlewares for chain:', err);
+        setError('Failed to load available middlewares');
+      });
+  }
+}, [type, id, config]);
 
-  // Synchronize chain config with selected middlewares
-  useEffect(() => {
-    if (type === 'chain') {
-      // Update config to reflect selected middlewares
+// Synchronize chain config with selected middlewares
+useEffect(() => {
+  if (type === 'chain') {
+    // Add a check to prevent unnecessary updates
+    try {
+      const currentConfig = JSON.parse(config);
+      const currentMiddlewares = currentConfig.middlewares || [];
+      
+      // Only update if the arrays are different
+      if (JSON.stringify(currentMiddlewares) !== JSON.stringify(selectedMiddlewares)) {
+        const chainConfig = {
+          middlewares: selectedMiddlewares,
+        };
+        setConfig(JSON.stringify(chainConfig, null, 2));
+      }
+    } catch (e) {
+      // If parsing fails, update the config anyway
       const chainConfig = {
         middlewares: selectedMiddlewares,
       };
       setConfig(JSON.stringify(chainConfig, null, 2));
     }
-  }, [selectedMiddlewares, type]);
+  }
+}, [selectedMiddlewares, type]);
 
   // Validate JSON configuration
   const validateJson = (json) => {
