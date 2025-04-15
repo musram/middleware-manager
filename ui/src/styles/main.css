@@ -224,17 +224,35 @@
     font-weight: 500;
   }
   
-  /* Ensure button text is always visible */
-  td button span, 
-  td a span,
-  td button, 
-  td a {
-    color: var(--text-on-primary) !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 2;
-    position: relative;
-  }
+  /* Additional button targeting */
+td button:first-child, 
+td a:first-child {
+  background-color: var(--button-primary-bg);
+  color: var(--text-on-primary) !important;
+  text-align: center;
+  min-width: 5rem;
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  text-decoration: none !important;
+  font-weight: 500;
+}
+
+/* Ensure button text is always visible */
+td button span, 
+td a span,
+td button, 
+td a,
+td button:first-child span, 
+td a:first-child span,
+td button:first-child, 
+td a:first-child {
+  color: var(--text-on-primary) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 2;
+  position: relative;
+}
   
   /* Link-style buttons */
   .text-blue-600, .text-blue-900 {
@@ -283,12 +301,19 @@
     min-width: 5rem;
   }
   
-  /* Fix for empty buttons */
-  td a:empty:before,
-  td button:empty:before {
-    content: "Remove";
-    color: var(--text-on-primary) !important;
-  }
+/* Fix for empty buttons */
+td a:empty:before {
+  content: "Remove";
+  color: var(--text-on-primary) !important;
+}
+
+td button:empty:before {
+  content: "View";
+  display: inline-block;
+  color: var(--text-on-primary) !important;
+  visibility: visible;
+  opacity: 1;
+}
   
   /* =====================
      STATUS INDICATORS
