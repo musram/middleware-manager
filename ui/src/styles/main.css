@@ -678,3 +678,64 @@ td button:empty:before {
   color: var(--text-on-primary) !important;
   text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
 }
+
+/* =====================
+   DARK MODE TEXT VISIBILITY FIXES
+   ===================== */
+   .dark-mode {
+    /* Add stronger text contrast settings */
+    --text-color: #ffffff !important;
+    --text-secondary: #e2e8f0 !important;
+    --text-on-primary: #ffffff !important;
+  }
+  
+  /* Force all text elements to use proper color in dark mode */
+  .dark-mode p,
+  .dark-mode h1,
+  .dark-mode h2,
+  .dark-mode h3,
+  .dark-mode h4,
+  .dark-mode h5,
+  .dark-mode h6,
+  .dark-mode span,
+  .dark-mode div,
+  .dark-mode label,
+  .dark-mode button,
+  .dark-mode a,
+  .dark-mode li,
+  .dark-mode td,
+  .dark-mode th,
+  .dark-mode input,
+  .dark-mode select,
+  .dark-mode textarea {
+    color: var(--text-color) !important;
+  }
+  
+  /* Ensure input text is visible against input backgrounds */
+  .dark-mode input,
+  .dark-mode select,
+  .dark-mode textarea {
+    background-color: #333 !important;
+    color: #fff !important;
+  }
+  
+  /* Fix for dropdowns and modal content */
+  .dark-mode .dropdown-content,
+  .dark-mode [role="listbox"],
+  .dark-mode [role="menu"],
+  .dark-mode [role="dialog"] {
+    color: var(--text-color) !important;
+    background-color: var(--card-background) !important;
+  }
+  
+  /* Ensure text in status indicators remains visible */
+  .dark-mode .status-badge.protected,
+  .dark-mode .bg-green-100 {
+    color: #34d399 !important; /* Brighter green for dark mode */
+  }
+  
+  .dark-mode .status-badge.not-protected,
+  .dark-mode .bg-yellow-100,
+  .dark-mode .bg-yellow-50 {
+    color: #fdba74 !important; /* Brighter orange for dark mode */
+  }
