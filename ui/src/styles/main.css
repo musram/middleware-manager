@@ -322,3 +322,192 @@
       overflow-y: auto;
     }
   }
+  /* Dark Mode Support */
+:root {
+  --background-color: #f5f7f9;
+  --card-background: #ffffff;
+  --text-color: #333333;
+  --text-secondary: #6b7280;
+  --border-color: #e2e8f0;
+  --accent-color: #1677ff;
+  --hover-color: #0055cc;
+  --success-bg: #ecfdf5;
+  --success-text: #047857;
+  --warning-bg: #ffedd5;
+  --warning-text: #c2410c;
+  --error-bg: #fee2e2;
+  --error-text: #b91c1c;
+  --button-bg: #e5e7eb;
+  --button-hover: #d1d5db;
+  --button-primary-bg: #1677ff;
+  --button-primary-hover: #0055cc;
+  --table-header-bg: #f9fafb;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode {
+  --background-color: #000000;
+  --card-background: #121212;
+  --text-color: #ffffff;
+  --text-secondary: #9ca3af;
+  --border-color: #333333;
+  --accent-color: #ff6b00; /* Orange */
+  --hover-color: #ff8c33; /* Lighter orange */
+  --success-bg: #052e16;
+  --success-text: #34d399;
+  --warning-bg: #451a03;
+  --warning-text: #fdba74;
+  --error-bg: #450a0a;
+  --error-text: #fca5a5;
+  --button-bg: #333333;
+  --button-hover: #4b5563;
+  --button-primary-bg: #ff6b00; /* Orange */
+  --button-primary-hover: #ff8c33; /* Lighter orange */
+  --table-header-bg: #1f1f1f;
+  --shadow-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Apply CSS variables to elements */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.bg-white {
+  background-color: var(--card-background) !important;
+}
+
+.bg-gray-50, .bg-gray-100 {
+  background-color: var(--table-header-bg) !important;
+}
+
+.text-gray-500, .text-gray-600, .text-gray-700 {
+  color: var(--text-secondary) !important;
+}
+
+.border, .border-gray-200 {
+  border-color: var(--border-color) !important;
+}
+
+.divide-gray-200 > * + * {
+  border-color: var(--border-color) !important;
+}
+
+.shadow {
+  box-shadow: 0 1px 3px 0 var(--shadow-color) !important;
+}
+
+/* Buttons */
+.bg-blue-600, .bg-blue-700 {
+  background-color: var(--button-primary-bg) !important;
+}
+
+.hover\:bg-blue-700:hover {
+  background-color: var(--button-primary-hover) !important;
+}
+
+.bg-gray-200, .bg-gray-300 {
+  background-color: var(--button-bg) !important;
+}
+
+.hover\:bg-gray-300:hover {
+  background-color: var(--button-hover) !important;
+}
+
+/* Links */
+.text-blue-600, .text-blue-900 {
+  color: var(--accent-color) !important;
+}
+
+.hover\:text-blue-900:hover {
+  color: var(--hover-color) !important;
+}
+
+/* Forms */
+input, textarea, select {
+  background-color: var(--card-background);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent-color);
+  outline-color: var(--accent-color);
+}
+
+/* Status indicators */
+.bg-green-100 {
+  background-color: var(--success-bg) !important;
+}
+
+.text-green-800 {
+  color: var(--success-text) !important;
+}
+
+.bg-yellow-100, .bg-yellow-50 {
+  background-color: var(--warning-bg) !important;
+}
+
+.text-yellow-800, .text-yellow-700 {
+  color: var(--warning-text) !important;
+}
+
+.bg-red-100, .bg-red-50 {
+  background-color: var(--error-bg) !important;
+}
+
+.text-red-700, .text-red-800, .text-red-600 {
+  color: var(--error-text) !important;
+}
+
+.border-red-300, .border-red-400 {
+  border-color: var(--error-text) !important;
+}
+
+.border-yellow-400 {
+  border-color: var(--warning-text) !important;
+}
+
+.border-blue-400 {
+  border-color: var(--accent-color) !important;
+}
+
+/* Modal */
+.bg-gray-600.bg-opacity-50 {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Dark mode toggle */
+.dark-mode-toggle {
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--button-bg);
+  color: var(--text-color);
+  transition: background-color 0.3s;
+  width: 2rem;
+  height: 2rem;
+}
+
+.dark-mode-toggle:hover {
+  background-color: var(--button-hover);
+}
+
+/* Dark mode icon animations */
+.dark-mode-icon, .light-mode-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  transition: transform 0.3s;
+}
+
+.dark-mode-icon {
+  transform: rotate(0deg);
+}
+
+.light-mode-icon {
+  transform: rotate(360deg);
+}

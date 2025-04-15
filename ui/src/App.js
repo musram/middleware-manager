@@ -1,5 +1,59 @@
 import React, { useState, useEffect } from 'react';
 
+// Dark mode icons as inline SVG
+const MoonIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="dark-mode-icon">
+    <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clipRule="evenodd" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="light-mode-icon">
+    <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
+  </svg>
+);
+
+// Dark mode initializer
+const initializeDarkMode = () => {
+  // Check for saved preference or use system preference
+  const savedTheme = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+    document.documentElement.classList.add('dark-mode');
+    return true;
+  }
+  
+  return false;
+};
+
+// Dark mode toggle functionality
+const toggleDarkMode = (isDark, setIsDark) => {
+  if (isDark) {
+    document.documentElement.classList.remove('dark-mode');
+    localStorage.setItem('theme', 'light');
+    setIsDark(false);
+  } else {
+    document.documentElement.classList.add('dark-mode');
+    localStorage.setItem('theme', 'dark');
+    setIsDark(true);
+  }
+};
+
+// Dark mode toggle component
+const DarkModeToggle = ({ isDark, setIsDark }) => {
+  return (
+    <button 
+      onClick={() => toggleDarkMode(isDark, setIsDark)}
+      className="dark-mode-toggle ml-4"
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {isDark ? <SunIcon /> : <MoonIcon />}
+    </button>
+  );
+};
+
 // --- API Service Configuration ---
 const API_URL = '/api';
 
@@ -144,6 +198,12 @@ const App = () => {
   const [resourceId, setResourceId] = useState(null);
   const [middlewareId, setMiddlewareId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Initialize dark mode on component mount
+  useEffect(() => {
+    setIsDarkMode(initializeDarkMode());
+  }, []);
 
   // Handles navigation between pages
   const navigateTo = (pageId, id = null) => {
@@ -190,35 +250,38 @@ const App = () => {
             <div className="text-xl font-semibold text-gray-700">
               Pangolin Middleware Manager
             </div>
-            <div className="space-x-4">
-              <button
-                onClick={() => navigateTo('dashboard')}
-                className={`px-3 py-2 rounded hover:bg-gray-100 ${
-                  page === 'dashboard' ? 'bg-gray-100' : ''
-                }`}
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => navigateTo('resources')}
-                className={`px-3 py-2 rounded hover:bg-gray-100 ${
-                  page === 'resources' || page === 'resource-detail'
-                    ? 'bg-gray-100'
-                    : ''
-                }`}
-              >
-                Resources
-              </button>
-              <button
-                onClick={() => navigateTo('middlewares')}
-                className={`px-3 py-2 rounded hover:bg-gray-100 ${
-                  page === 'middlewares' || page === 'middleware-form'
-                    ? 'bg-gray-100'
-                    : ''
-                }`}
-              >
-                Middlewares
-              </button>
+            <div className="flex items-center">
+              <div className="space-x-4">
+                <button
+                  onClick={() => navigateTo('dashboard')}
+                  className={`px-3 py-2 rounded hover:bg-gray-100 ${
+                    page === 'dashboard' ? 'bg-gray-100' : ''
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => navigateTo('resources')}
+                  className={`px-3 py-2 rounded hover:bg-gray-100 ${
+                    page === 'resources' || page === 'resource-detail'
+                      ? 'bg-gray-100'
+                      : ''
+                  }`}
+                >
+                  Resources
+                </button>
+                <button
+                  onClick={() => navigateTo('middlewares')}
+                  className={`px-3 py-2 rounded hover:bg-gray-100 ${
+                    page === 'middlewares' || page === 'middleware-form'
+                      ? 'bg-gray-100'
+                      : ''
+                  }`}
+                >
+                  Middlewares
+                </button>
+              </div>
+              <DarkModeToggle isDark={isDarkMode} setIsDark={setIsDarkMode} />
             </div>
           </div>
         </div>
