@@ -16,11 +16,13 @@ import (
 
 // ConfigGenerator generates Traefik configuration files
 type ConfigGenerator struct {
-	db            *database.DB
-	confDir       string
-	stopChan      chan struct{}
-	isRunning     bool
-	mutex         sync.Mutex // Protects isRunning
+	db             *database.DB
+	confDir        string
+	stopChan       chan struct{}
+	isRunning      bool
+	mutex          sync.Mutex // Protects isRunning
+	lastConfig     []byte     // Stores the last written configuration for comparison
+	lastConfigHash string     // Hash of the last configuration for quicker comparison
 }
 
 // TraefikConfig represents the structure of the Traefik configuration
@@ -34,10 +36,12 @@ type TraefikConfig struct {
 // NewConfigGenerator creates a new config generator
 func NewConfigGenerator(db *database.DB, confDir string) *ConfigGenerator {
 	return &ConfigGenerator{
-		db:       db,
-		confDir:  confDir,
-		stopChan: make(chan struct{}),
-		isRunning: false,
+		db:             db,
+		confDir:        confDir,
+		stopChan:       make(chan struct{}),
+		isRunning:      false,
+		lastConfig:     nil,
+		lastConfigHash: "",
 	}
 }
 
@@ -51,7 +55,7 @@ func (cg *ConfigGenerator) Start(interval time.Duration) {
 	cg.isRunning = true
 	cg.mutex.Unlock()
 	
-	log.Printf("Config generator started, generating every %v", interval)
+	log.Printf("Config generator started, checking every %v", interval)
 
 	// Create conf directory if it doesn't exist
 	if err := os.MkdirAll(cg.confDir, 0755); err != nil {
@@ -112,8 +116,66 @@ func (cg *ConfigGenerator) generateConfig() error {
 		return fmt.Errorf("failed to process resources: %w", err)
 	}
 
-	// Write configuration to file
-	return cg.writeConfigToFile(&config)
+	// Convert to YAML
+	yamlData, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to convert config to YAML: %w", err)
+	}
+
+	// Check if configuration has changed
+	if cg.hasConfigurationChanged(yamlData) {
+		// Write configuration to file
+		if err := cg.writeConfigToFile(yamlData); err != nil {
+			return fmt.Errorf("failed to write config to file: %w", err)
+		}
+		log.Printf("Generated new Traefik configuration at %s", filepath.Join(cg.confDir, "resource-overrides.yml"))
+	} else {
+		log.Println("Configuration unchanged, skipping file write")
+	}
+
+	return nil
+}
+
+// hasConfigurationChanged checks if the configuration has changed
+func (cg *ConfigGenerator) hasConfigurationChanged(newConfig []byte) bool {
+	// If we don't have a previous configuration, this is the first run
+	if cg.lastConfig == nil {
+		cg.lastConfig = newConfig
+		return true
+	}
+
+	// Quick length check before doing a full comparison
+	if len(cg.lastConfig) != len(newConfig) {
+		cg.lastConfig = newConfig
+		return true
+	}
+
+	// Do a full byte-by-byte comparison
+	if string(cg.lastConfig) != string(newConfig) {
+		cg.lastConfig = newConfig
+		return true
+	}
+
+	return false
+}
+
+// writeConfigToFile writes the configuration to a file
+func (cg *ConfigGenerator) writeConfigToFile(yamlData []byte) error {
+	// Create temporary file first to ensure atomic write
+	configFile := filepath.Join(cg.confDir, "resource-overrides.yml")
+	tempFile := configFile + ".tmp"
+
+	// Write to temporary file
+	if err := os.WriteFile(tempFile, yamlData, 0644); err != nil {
+		return fmt.Errorf("failed to write temp config file: %w", err)
+	}
+
+	// Rename temp file to final file (atomic operation)
+	if err := os.Rename(tempFile, configFile); err != nil {
+		return fmt.Errorf("failed to rename temp config file: %w", err)
+	}
+
+	return nil
 }
 
 // processMiddlewares fetches and processes all middleware definitions
@@ -249,32 +311,6 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
 		}
 	}
 
-	return nil
-}
-
-// writeConfigToFile writes the configuration to a file
-func (cg *ConfigGenerator) writeConfigToFile(config *TraefikConfig) error {
-	// Create temporary file first to ensure atomic write
-	configFile := filepath.Join(cg.confDir, "resource-overrides.yml")
-	tempFile := configFile + ".tmp"
-	
-	// Convert to YAML
-	yamlData, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("failed to convert config to YAML: %w", err)
-	}
-
-	// Write to temporary file
-	if err := os.WriteFile(tempFile, yamlData, 0644); err != nil {
-		return fmt.Errorf("failed to write temp config file: %w", err)
-	}
-
-	// Rename temp file to final file (atomic operation)
-	if err := os.Rename(tempFile, configFile); err != nil {
-		return fmt.Errorf("failed to rename temp config file: %w", err)
-	}
-
-	log.Printf("Generated Traefik configuration at %s", configFile)
 	return nil
 }
 
