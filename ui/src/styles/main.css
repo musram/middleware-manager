@@ -1,5 +1,7 @@
-/* Base reset and font settings */
-* {
+/* =====================
+   BASE STYLES
+   ===================== */
+   * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -8,8 +10,6 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     line-height: 1.5;
-    color: #333;
-    background-color: #f5f7f9;
   }
   
   /* Typography basics */
@@ -25,33 +25,11 @@
   
   /* Links */
   a {
-    color: #1677ff;
     text-decoration: none;
   }
   
   a:hover {
     text-decoration: underline;
-  }
-  
-  /* Button styling */
-  button, .btn {
-    cursor: pointer;
-    border: none;
-    font-size: 14px;
-    border-radius: 0.25rem;
-    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-  }
-  
-  button:disabled, .btn:disabled {
-    opacity: 0.65;
-    pointer-events: none;
-  }
-  
-  /* Form controls */
-  input, select, textarea {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
   }
   
   /* Table basics */
@@ -64,34 +42,383 @@
     padding: 0.75rem;
     text-align: left;
     vertical-align: top;
-    border-bottom: 1px solid #e2e8f0;
   }
   
   th {
     font-weight: 600;
   }
   
-  /* Status indicators */
+  /* Form controls */
+  input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+  
+  /* =====================
+     THEME VARIABLES
+     ===================== */
+  :root {
+    --background-color: #f5f7f9;
+    --card-background: #ffffff;
+    --text-color: #333333;
+    --text-secondary: #6b7280;
+    --border-color: #e2e8f0;
+    --accent-color: #1677ff;
+    --hover-color: #0055cc;
+    --success-bg: #ecfdf5;
+    --success-text: #047857;
+    --warning-bg: #ffedd5;
+    --warning-text: #c2410c;
+    --error-bg: #fee2e2;
+    --error-text: #b91c1c;
+    --button-bg: #e5e7eb;
+    --button-hover: #d1d5db;
+    --button-primary-bg: #1677ff;
+    --button-primary-hover: #0055cc;
+    --table-header-bg: #f9fafb;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --text-on-primary: #ffffff;
+  }
+  
+  /* Dark mode theme */
+  .dark-mode {
+    --background-color: #000000;
+    --card-background: #121212;
+    --text-color: #ffffff;
+    --text-secondary: #9ca3af;
+    --border-color: #333333;
+    --accent-color: #ff6b00; /* Orange */
+    --hover-color: #ff8c33; /* Lighter orange */
+    --success-bg: #052e16;
+    --success-text: #34d399;
+    --warning-bg: #451a03;
+    --warning-text: #fdba74;
+    --error-bg: #450a0a;
+    --error-text: #fca5a5;
+    --button-bg: #333333;
+    --button-hover: #4b5563;
+    --button-primary-bg: #ff6b00; /* Orange */
+    --button-primary-hover: #ff8c33; /* Lighter orange */
+    --table-header-bg: #1f1f1f;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --text-on-primary: #ffffff;
+  }
+  
+  /* =====================
+     THEME APPLICATION
+     ===================== */
+  body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
+  }
+  
+  .bg-white {
+    background-color: var(--card-background) !important;
+  }
+  
+  .bg-gray-50, .bg-gray-100 {
+    background-color: var(--table-header-bg) !important;
+  }
+  
+  .text-gray-500, .text-gray-600, .text-gray-700 {
+    color: var(--text-secondary) !important;
+  }
+  
+  .border, .border-gray-200 {
+    border-color: var(--border-color) !important;
+  }
+  
+  .divide-gray-200 > * + * {
+    border-color: var(--border-color) !important;
+  }
+  
+  .shadow {
+    box-shadow: 0 1px 3px 0 var(--shadow-color) !important;
+  }
+  
+  a {
+    color: var(--accent-color);
+  }
+  
+  /* =====================
+     BUTTON STYLING
+     ===================== */
+  button, .btn {
+    cursor: pointer;
+    border: none;
+    font-size: 14px;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s, color 0.2s, transform 0.1s;
+    position: relative;
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    font-weight: 500;
+    text-decoration: none !important;
+    overflow: hidden;
+  }
+  
+  button:disabled, .btn:disabled {
+    opacity: 0.65;
+    pointer-events: none;
+  }
+  
+  /* Primary buttons */
+  .bg-blue-600, .bg-blue-700 {
+    background-color: var(--button-primary-bg) !important;
+    color: var(--text-on-primary) !important;
+  }
+  
+  .hover\:bg-blue-700:hover {
+    background-color: var(--button-primary-hover) !important;
+  }
+  
+  /* Secondary buttons */
+  .bg-gray-200, .bg-gray-300 {
+    background-color: var(--button-bg) !important;
+    color: var(--text-color) !important;
+  }
+  
+  .hover\:bg-gray-300:hover {
+    background-color: var(--button-hover) !important;
+  }
+  
+  /* Button effects */
+  button:hover, 
+  .bg-blue-600:hover,
+  .bg-blue-700:hover,
+  .text-blue-600:hover,
+  .text-blue-900:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-decoration: none !important;
+  }
+  
+  button:active, 
+  .bg-blue-600:active,
+  .bg-blue-700:active,
+  .text-blue-600:active,
+  .text-blue-900:active {
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+  
+  /* =====================
+     TABLE ACTION BUTTONS
+     ===================== */
+  /* Action buttons in tables */
+  td button, 
+  td a[class*="text-blue"],
+  td a.text-blue-600, 
+  td a.text-blue-900,
+  td button.bg-blue-600 {
+    background-color: var(--button-primary-bg) !important;
+    color: var(--text-on-primary) !important;
+    text-align: center;
+    min-width: 5rem;
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    text-decoration: none !important;
+    font-weight: 500;
+  }
+  
+  /* Additional button targeting */
+td button:first-child, 
+td a:first-child {
+  background-color: var(--button-primary-bg);
+  color: var(--text-on-primary) !important;
+  text-align: center;
+  min-width: 5rem;
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  text-decoration: none !important;
+  font-weight: 500;
+}
+
+/* Ensure button text is always visible */
+td button span, 
+td a span,
+td button, 
+td a,
+td button:first-child span, 
+td a:first-child span,
+td button:first-child, 
+td a:first-child {
+  color: var(--text-on-primary) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 2;
+  position: relative;
+}
+  
+  /* Link-style buttons */
+  .text-blue-600, .text-blue-900 {
+    color: var(--accent-color) !important;
+  }
+  
+  .hover\:text-blue-900:hover {
+    color: var(--hover-color) !important;
+  }
+  
+  /* Button hover states */
+  td a[class*="text-blue"]:hover,
+  td button:hover,
+  td a:hover,
+  .hover\:text-blue-900:hover {
+    background-color: var(--button-primary-hover) !important;
+    color: var(--text-on-primary) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    text-decoration: none !important;
+  }
+  
+  /* Center actions column */
+  td:last-child {
+    text-align: center;
+  }
+  
+  th:last-child {
+    text-align: center;
+  }
+  
+  /* =====================
+     DESTRUCTIVE ACTIONS
+     ===================== */
+  /* Delete/Remove buttons */
+  td a.text-red-600, 
+  td a.text-red-900,
+  td a[class*="text-red"],
+  .text-red-600, 
+  .text-red-700, 
+  .text-red-800, 
+  .text-red-900 {
+    background-color: var(--button-primary-bg) !important;
+    color: var(--text-on-primary) !important;
+    text-align: center;
+    min-width: 5rem;
+  }
+  
+/* Fix for empty buttons */
+td a:empty:before {
+  content: "Remove";
+  color: var(--text-on-primary) !important;
+}
+
+td button:empty:before {
+  content: "View";
+  display: inline-block;
+  color: var(--text-on-primary) !important;
+  visibility: visible;
+  opacity: 1;
+}
+  
+  /* =====================
+     STATUS INDICATORS
+     ===================== */
+  /* Status badges */
   .status-badge {
     display: inline-flex;
     align-items: center;
     border-radius: 9999px;
     font-size: 0.75rem;
     font-weight: 500;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.75rem;
   }
   
   .status-badge.protected {
-    background-color: #ecfdf5;
-    color: #047857;
+    background-color: var(--success-bg);
+    color: var(--success-text);
   }
   
   .status-badge.not-protected {
-    background-color: #ffedd5;
-    color: #c2410c;
+    background-color: var(--warning-bg);
+    color: var(--warning-text);
   }
   
-  /* Modal overlay */
+  .bg-green-100 {
+    background-color: rgba(52, 211, 153, 0.2) !important;
+    border: 1px solid var(--success-text);
+  }
+  
+  .text-green-800 {
+    color: var(--success-text) !important;
+  }
+  
+  .bg-yellow-100, .bg-yellow-50 {
+    background-color: rgba(253, 186, 116, 0.2) !important;
+    border: 1px solid var(--warning-text);
+  }
+  
+  .text-yellow-800, .text-yellow-700 {
+    color: var(--warning-text) !important;
+  }
+  
+  .bg-red-100, .bg-red-50 {
+    background-color: var(--error-bg) !important;
+  }
+  
+  .text-red-700, .text-red-800, .text-red-600 {
+    color: var(--error-text) !important;
+  }
+  
+  .border-red-300, .border-red-400 {
+    border-color: var(--error-text) !important;
+  }
+  
+  .border-yellow-400 {
+    border-color: var(--warning-text) !important;
+  }
+  
+  .border-blue-400 {
+    border-color: var(--accent-color) !important;
+  }
+  
+  /* Make status badges more distinct */
+  span.px-2.py-1.inline-flex.text-xs.leading-5.font-semibold.rounded-full {
+    padding: 0.25rem 0.75rem;
+  }
+  
+  /* =====================
+     DARK MODE TOGGLE
+     ===================== */
+  .dark-mode-toggle {
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--button-bg);
+    color: var(--text-color);
+    transition: background-color 0.3s;
+    width: 2rem;
+    height: 2rem;
+  }
+  
+  .dark-mode-toggle:hover {
+    background-color: var(--button-hover);
+  }
+  
+  .dark-mode-icon, .light-mode-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    transition: transform 0.3s;
+  }
+  
+  .dark-mode-icon {
+    transform: rotate(0deg);
+  }
+  
+  .light-mode-icon {
+    transform: rotate(360deg);
+  }
+  
+  /* =====================
+     MODAL STYLING
+     ===================== */
   .modal-overlay {
     position: fixed;
     top: 0;
@@ -105,14 +432,20 @@
     z-index: 1000;
   }
   
-  /* Loading animation */
+  .bg-gray-600.bg-opacity-50 {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+  }
+  
+  /* =====================
+     LOADING ANIMATIONS
+     ===================== */
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
   
   .loading-spinner {
     border: 3px solid #f3f3f3;
-    border-top: 3px solid #1677ff;
+    border-top: 3px solid var(--accent-color);
     border-radius: 50%;
     width: 24px;
     height: 24px;
@@ -120,7 +453,9 @@
     margin: 0 auto;
   }
   
-  /* Container utilities */
+  /* =====================
+     CONTAINER & LAYOUT
+     ===================== */
   .container {
     width: 100%;
     padding-right: 1rem;
@@ -129,7 +464,10 @@
     margin-left: auto;
   }
   
-  /* Responsive adjustments */
+  /* =====================
+     RESPONSIVE STYLES
+     ===================== */
+  /* Responsive breakpoints */
   @media (min-width: 640px) {
     .container {
       max-width: 640px;
@@ -153,17 +491,6 @@
       max-width: 1280px;
     }
   }
-
-  /* Responsive Enhancements for Middleware Manager UI */
-
-/* Base responsive container */
-.container {
-    width: 100%;
-    padding-right: 1rem;
-    padding-left: 1rem;
-    margin-right: auto;
-    margin-left: auto;
-  }
   
   /* Responsive navigation */
   nav .container {
@@ -186,22 +513,41 @@
       font-size: 0.875rem;
       padding: 0.5rem 0.75rem;
     }
-  }
   
-  /* Responsive card grids */
-  @media (max-width: 768px) {
-    .grid.grid-cols-1.md\:grid-cols-3 {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-    
+    /* Card grids */
+    .grid.grid-cols-1.md\:grid-cols-3,
     .grid.grid-cols-1.md\:grid-cols-2 {
       grid-template-columns: 1fr;
       gap: 1rem;
     }
+  
+    /* Action buttons */
+    .text-blue-600.hover\:text-blue-900,
+    .text-red-600.hover\:text-red-900 {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      margin: 0.125rem;
+    }
+    
+    /* Form layout */
+    .mb-6.flex.justify-between {
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: stretch;
+    }
+    
+    .mb-6.flex.justify-between .relative.w-64 {
+      width: 100%;
+    }
+    
+    .mb-6.flex.justify-between .space-x-3 {
+      display: flex;
+      justify-content: space-between;
+    }
   }
   
-  /* Make tables responsive */
+  /* Table responsiveness */
   @media (max-width: 1024px) {
     .overflow-x-auto {
       -webkit-overflow-scrolling: touch;
@@ -212,7 +558,7 @@
     }
   }
   
-  /* Improve form layout on small screens */
+  /* Small screen forms */
   @media (max-width: 640px) {
     form input, 
     form select, 
@@ -233,35 +579,8 @@
       flex-wrap: wrap;
       gap: 0.5rem;
     }
-  }
   
-  /* Responsive modals */
-  @media (max-width: 640px) {
-    .fixed.inset-0.flex.items-center.justify-center .max-w-md {
-      width: calc(100% - 2rem);
-      margin: 0 1rem;
-    }
-    
-    .fixed.inset-0.flex.items-center.justify-center .px-6 {
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
-  }
-  
-  /* Resource & Middleware actions column */
-  @media (max-width: 768px) {
-    .text-blue-600.hover\:text-blue-900,
-    .text-red-600.hover\:text-red-900 {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      background-color: #f3f4f6;
-      border-radius: 0.25rem;
-      margin: 0.125rem;
-    }
-  }
-  
-  /* Dashboard sections responsive spacing */
-  @media (max-width: 640px) {
+    /* Dashboard sections */
     main.container {
       padding-top: 1rem;
       padding-bottom: 2rem;
@@ -278,39 +597,147 @@
     .bg-white.p-6 {
       padding: 1rem;
     }
-  }
-  
-  /* Search and action buttons in list views */
-  @media (max-width: 768px) {
-    .mb-6.flex.justify-between {
-      flex-direction: column;
-      gap: 0.75rem;
-      align-items: stretch;
+    
+    /* Badges */
+    span.px-2.py-1.inline-flex.text-xs {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
     }
     
-    .mb-6.flex.justify-between .relative.w-64 {
-      width: 100%;
+    /* Modal */
+    .fixed.inset-0.flex.items-center.justify-center .max-w-md {
+      width: calc(100% - 2rem);
+      margin: 0 1rem;
     }
     
-    .mb-6.flex.justify-between .space-x-3 {
-      display: flex;
-      justify-content: space-between;
+    .fixed.inset-0.flex.items-center.justify-center .px-6 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    .fixed.inset-0.bg-gray-600.bg-opacity-50.flex.items-center.justify-center {
+      align-items: flex-start;
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+      overflow-y: auto;
     }
   }
   
-  /* Middleware form json editor */
+  /* Middleware form */
   @media (max-width: 768px) {
     textarea.w-full.px-3.py-2.border.font-mono.h-64 {
       height: 180px;
     }
   }
+
+  /* Add this new section at the end of your CSS file */
+/* =====================
+   DARK MODE TEXT VISIBILITY FIXES
+   ===================== */
+.dark-mode button,
+.dark-mode .btn,
+.dark-mode a[role="button"],
+.dark-mode [class*="btn"],
+.dark-mode td a,
+.dark-mode td button {
+  color: var(--text-on-primary) !important;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+/* First button in each row - often "Visit" */
+.dark-mode a:first-child,
+.dark-mode button:first-child,
+.dark-mode .dark-mode td > *:first-child {
+  color: var(--text-on-primary) !important;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Fix specifically for Visit button */
+.dark-mode a:empty:before,
+.dark-mode button:empty:before {
+  content: "Visit";
+  display: inline;
+  color: var(--text-on-primary) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Fix for other buttons in various contexts */
+.dark-mode td a:nth-child(2):empty:before,
+.dark-mode td button:nth-child(2):empty:before {
+  content: "Remove";
+  color: var(--text-on-primary) !important;
+}
+
+/* Fix modal buttons */
+.dark-mode .modal-overlay button,
+.dark-mode .fixed button,
+.dark-mode [role="dialog"] button {
+  color: var(--text-on-primary) !important;
+  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+/* =====================
+   DARK MODE TEXT VISIBILITY FIXES
+   ===================== */
+   .dark-mode {
+    /* Add stronger text contrast settings */
+    --text-color: #ffffff !important;
+    --text-secondary: #e2e8f0 !important;
+    --text-on-primary: #ffffff !important;
+  }
   
-  /* Status badges better touch targets */
-  @media (max-width: 640px) {
-    span.px-2.py-1.inline-flex.text-xs {
-      padding: 0.25rem 0.5rem;
-      font-size: 0.75rem;
-    }
+  /* Force all text elements to use proper color in dark mode */
+  .dark-mode p,
+  .dark-mode h1,
+  .dark-mode h2,
+  .dark-mode h3,
+  .dark-mode h4,
+  .dark-mode h5,
+  .dark-mode h6,
+  .dark-mode span,
+  .dark-mode div,
+  .dark-mode label,
+  .dark-mode button,
+  .dark-mode a,
+  .dark-mode li,
+  .dark-mode td,
+  .dark-mode th,
+  .dark-mode input,
+  .dark-mode select,
+  .dark-mode textarea {
+    color: var(--text-color) !important;
+  }
+  
+  /* Ensure input text is visible against input backgrounds */
+  .dark-mode input,
+  .dark-mode select,
+  .dark-mode textarea {
+    background-color: #333 !important;
+    color: #fff !important;
+  }
+  
+  /* Fix for dropdowns and modal content */
+  .dark-mode .dropdown-content,
+  .dark-mode [role="listbox"],
+  .dark-mode [role="menu"],
+  .dark-mode [role="dialog"] {
+    color: var(--text-color) !important;
+    background-color: var(--card-background) !important;
+  }
+  
+  /* Ensure text in status indicators remains visible */
+  .dark-mode .status-badge.protected,
+  .dark-mode .bg-green-100 {
+    color: #34d399 !important; /* Brighter green for dark mode */
+  }
+  
+  .dark-mode .status-badge.not-protected,
+  .dark-mode .bg-yellow-100,
+  .dark-mode .bg-yellow-50 {
+    color: #fdba74 !important; /* Brighter orange for dark mode */
   }
   
   /* Fix for modal scrolling on mobile */
