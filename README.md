@@ -1,10 +1,6 @@
 <div align="center">
     <h1 align="center"><a href="https://forum.hhf.technology/t/enhancing-your-pangolin-deployment-with-middleware-manager">Pangolin Middleware Manager</a></h1>
 
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.fossorial.io/)
-[![Docker](https://img.shields.io/docker/pulls/hhftechnology/middleware-manager?style=flat-square)](https://hub.docker.com/r/hhftechnology/middleware-manager)
-![Stars](https://img.shields.io/github/stars/hhftechnology/middleware-manager?style=flat-square)
-
 </div>
 
 <h3 align="center">Middleware/Router Manager for your Pangolin Stack</h3>
