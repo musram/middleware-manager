@@ -84,30 +84,6 @@ const api = {
     fetch(`${API_URL}/resources/${resourceId}/middlewares/${middlewareId}`, {
       method: 'DELETE',
     }).then((res) => res.json()),
-  
-  // HTTP entrypoints config
-updateHTTPConfig: (resourceId, data) =>
-  fetch(`${API_URL}/resources/${resourceId}/config/http`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  }).then((res) => res.json()),
-  
-// TLS domains config  
-updateTLSConfig: (resourceId, data) =>
-  fetch(`${API_URL}/resources/${resourceId}/config/tls`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  }).then((res) => res.json()),
-  
-// TCP SNI config
-updateTCPConfig: (resourceId, data) =>
-  fetch(`${API_URL}/resources/${resourceId}/config/tcp`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  }).then((res) => res.json()),  
 
   // Middleware-related API calls
   getMiddlewares: () =>
@@ -129,6 +105,28 @@ updateTCPConfig: (resourceId, data) =>
   deleteMiddleware: (id) =>
     fetch(`${API_URL}/middlewares/${id}`, {
       method: 'DELETE',
+    }).then((res) => res.json()),
+    
+  // New API calls for router configuration
+  updateHTTPConfig: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/http`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
+    
+  updateTLSConfig: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/tls`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
+    
+  updateTCPConfig: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/tcp`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     }).then((res) => res.json()),
 };
 
@@ -629,7 +627,7 @@ const Dashboard = ({ navigateTo }) => {
               <p className="text-sm text-blue-700">
                 You have {disabledResources} disabled resources that were removed
                 from Pangolin.{' '}
-                <a
+                
                   className="underline"
                   onClick={() => navigateTo('resources')}
                 >
@@ -835,18 +833,17 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
   const [priority, setPriority] = useState(100);
-  // HTTP Router Configuration
+  
+  // New state variables for custom entrypoints and SNI support
   const [entrypoints, setEntrypoints] = useState('websecure');
-  const [showHTTPConfigModal, setShowHTTPConfigModal] = useState(false);
-
-  // TLS Certificate Domains Configuration
   const [tlsDomains, setTLSDomains] = useState('');
-  const [showTLSConfigModal, setShowTLSConfigModal] = useState(false);
-
-  // TCP SNI Router Configuration
   const [tcpEnabled, setTCPEnabled] = useState(false);
   const [tcpEntrypoints, setTCPEntrypoints] = useState('tcp');
   const [tcpSNIRule, setTCPSNIRule] = useState('');
+  
+  // Modal control state for new features
+  const [showHTTPConfigModal, setShowHTTPConfigModal] = useState(false);
+  const [showTLSConfigModal, setShowTLSConfigModal] = useState(false);
   const [showTCPConfigModal, setShowTCPConfigModal] = useState(false);
 
   // Fetch resource and middleware data
@@ -860,11 +857,10 @@ const ResourceDetail = ({ id, navigateTo }) => {
 
       setResource(resourceData);
       setMiddlewares(middlewaresData);
-      // Set HTTP config
+      
+      // Set the new configuration properties
       setEntrypoints(resourceData.entrypoints || 'websecure');
-      // Set TLS domains config
       setTLSDomains(resourceData.tls_domains || '');
-      // Set TCP config
       setTCPEnabled(resourceData.tcp_enabled || false);
       setTCPEntrypoints(resourceData.tcp_entrypoints || 'tcp');
       setTCPSNIRule(resourceData.tcp_sni_rule || '');
@@ -891,51 +887,6 @@ const ResourceDetail = ({ id, navigateTo }) => {
   useEffect(() => {
     fetchData();
   }, [id]);
-  const handleUpdateHTTPConfig = async (e) => {
-    e.preventDefault();
-    
-    try {
-      await api.updateHTTPConfig(id, { entrypoints });
-      setShowHTTPConfigModal(false);
-      fetchData();
-      alert('HTTP router configuration updated successfully');
-    } catch (err) {
-      alert('Failed to update HTTP router configuration');
-      console.error('Update HTTP config error:', err);
-    }
-  };
-  
-  const handleUpdateTLSConfig = async (e) => {
-    e.preventDefault();
-    
-    try {
-      await api.updateTLSConfig(id, { tls_domains: tlsDomains });
-      setShowTLSConfigModal(false);
-      fetchData();
-      alert('TLS certificate domains updated successfully');
-    } catch (err) {
-      alert('Failed to update TLS certificate domains');
-      console.error('Update TLS config error:', err);
-    }
-  };
-  
-  const handleUpdateTCPConfig = async (e) => {
-    e.preventDefault();
-    
-    try {
-      await api.updateTCPConfig(id, {
-        tcp_enabled: tcpEnabled,
-        tcp_entrypoints: tcpEntrypoints,
-        tcp_sni_rule: tcpSNIRule
-      });
-      setShowTCPConfigModal(false);
-      fetchData();
-      alert('TCP SNI router configuration updated successfully');
-    } catch (err) {
-      alert('Failed to update TCP SNI router configuration');
-      console.error('Update TCP config error:', err);
-    }
-  };
 
   // Handle multiple middleware selection
   const handleMiddlewareSelection = (e) => {
@@ -989,6 +940,53 @@ const ResourceDetail = ({ id, navigateTo }) => {
       console.error('Remove middleware error:', err);
     }
   };
+  
+  // New handlers for router configuration
+  const handleUpdateHTTPConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateHTTPConfig(id, { entrypoints });
+      setShowHTTPConfigModal(false);
+      fetchData();
+      alert('HTTP router configuration updated successfully');
+    } catch (err) {
+      alert('Failed to update HTTP router configuration');
+      console.error('Update HTTP config error:', err);
+    }
+  };
+
+  const handleUpdateTLSConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateTLSConfig(id, { tls_domains: tlsDomains });
+      setShowTLSConfigModal(false);
+      fetchData();
+      alert('TLS certificate domains updated successfully');
+    } catch (err) {
+      alert('Failed to update TLS certificate domains');
+      console.error('Update TLS config error:', err);
+    }
+  };
+
+  const handleUpdateTCPConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateTCPConfig(id, {
+        tcp_enabled: tcpEnabled,
+        tcp_entrypoints: tcpEntrypoints,
+        tcp_sni_rule: tcpSNIRule
+      });
+      setShowTCPConfigModal(false);
+      fetchData();
+      alert('TCP SNI router configuration updated successfully');
+    } catch (err) {
+      alert('Failed to update TCP SNI router configuration');
+      console.error('Update TCP config error:', err);
+    }
+  };
 
   if (loading) {
     return <div className="flex justify-center p-12">Loading...</div>;
@@ -1023,6 +1021,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
   }
 
   const isDisabled = resource.status === 'disabled';
+
   return (
     <div>
       <div className="mb-6 flex items-center">
@@ -1039,7 +1038,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </span>
         )}
       </div>
-  
+
       {/* Disabled Resource Warning */}
       {isDisabled && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
@@ -1060,7 +1059,8 @@ const ResourceDetail = ({ id, navigateTo }) => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-red-700">
-                This resource has been removed from Pangolin and is now disabled. Any changes to middleware will not take effect.
+                This resource has been removed from Pangolin and is now
+                disabled. Any changes to middleware will not take effect.
               </p>
               <div className="mt-2 flex space-x-4">
                 <button
@@ -1083,7 +1083,10 @@ const ResourceDetail = ({ id, navigateTo }) => {
                           navigateTo('resources');
                         })
                         .catch((error) => {
-                          console.error('Error deleting resource:', error);
+                          console.error(
+                            'Error deleting resource:',
+                            error
+                          );
                           alert('Failed to delete resource');
                         });
                     }
@@ -1097,7 +1100,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
-  
+
       {/* Resource Details */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-xl font-semibold mb-4">Resource Details</h2>
@@ -1106,7 +1109,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
             <p className="text-sm text-gray-500">Host</p>
             <p className="font-medium flex items-center">
               {resource.host}
-              <a
+              
                 href={`https://${resource.host}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1146,7 +1149,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       </div>
-  
+      
       {/* Router Configuration Section */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-xl font-semibold mb-4">Router Configuration</h2>
@@ -1173,7 +1176,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
             TCP SNI Routing
           </button>
         </div>
-  
+        
         {/* Current Configuration Summary */}
         <div className="mt-4 p-4 bg-gray-50 rounded border">
           <h3 className="font-medium mb-2">Current Configuration</h3>
@@ -1207,7 +1210,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       </div>
-  
+
       {/* Middlewares Section */}
       <div className="bg-white p-6 rounded-lg shadow">
         <div className="flex justify-between items-center mb-4">
@@ -1248,11 +1251,14 @@ const ResourceDetail = ({ id, navigateTo }) => {
                     name: middleware.name,
                     type: 'unknown',
                   };
-  
+
                 return (
                   <tr key={middleware.id}>
                     <td className="px-6 py-4">
-                      {formatMiddlewareDisplay(middlewareDetails, middlewares)}
+                      {formatMiddlewareDisplay(
+                        middlewareDetails,
+                        middlewares
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {middleware.priority}
@@ -1273,7 +1279,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </table>
         )}
       </div>
-  
+
       {/* Add Middleware Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -1292,7 +1298,9 @@ const ResourceDetail = ({ id, navigateTo }) => {
             <div className="px-6 py-4">
               {availableMiddlewares.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">
-                  <p>All middlewares have been assigned to this resource.</p>
+                  <p>
+                    All middlewares have been assigned to this resource.
+                  </p>
                   <button
                     onClick={() => navigateTo('middleware-form')}
                     className="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -1314,13 +1322,18 @@ const ResourceDetail = ({ id, navigateTo }) => {
                       size={5}
                     >
                       {availableMiddlewares.map((middleware) => (
-                        <option key={middleware.id} value={middleware.id}>
+                        <option
+                          key={middleware.id}
+                          value={middleware.id}
+                        >
                           {middleware.name} ({middleware.type})
                         </option>
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Hold Ctrl (or Cmd) to select multiple middlewares. All selected middlewares will be assigned with the same priority.
+                      Hold Ctrl (or Cmd) to select multiple middlewares.
+                      All selected middlewares will be assigned with the
+                      same priority.
                     </p>
                   </div>
                   <div className="mb-4">
@@ -1337,7 +1350,8 @@ const ResourceDetail = ({ id, navigateTo }) => {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Higher priority middlewares are applied first (1-1000)
+                      Higher priority middlewares are applied first
+                      (1-1000)
                     </p>
                   </div>
                   <div className="flex justify-end space-x-3">
@@ -1362,13 +1376,15 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
-  
+      
       {/* HTTP Config Modal */}
       {showHTTPConfigModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold">HTTP Router Configuration</h3>
+              <h3 className="text-lg font-semibold">
+                HTTP Router Configuration
+              </h3>
               <button
                 onClick={() => setShowHTTPConfigModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -1417,13 +1433,15 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
-  
+
       {/* TLS Certificate Domains Modal */}
       {showTLSConfigModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold">TLS Certificate Domains</h3>
+              <h3 className="text-lg font-semibold">
+                TLS Certificate Domains
+              </h3>
               <button
                 onClick={() => setShowTLSConfigModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -1471,13 +1489,15 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
-  
+
       {/* TCP SNI Routing Modal */}
       {showTCPConfigModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold">TCP SNI Routing Configuration</h3>
+              <h3 className="text-lg font-semibold">
+                TCP SNI Routing Configuration
+              </h3>
               <button
                 onClick={() => setShowTCPConfigModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -1536,7 +1556,9 @@ const ResourceDetail = ({ id, navigateTo }) => {
                       <p className="text-xs text-gray-500 mt-1">
                         SNI rule using HostSNI or HostSNIRegexp matchers
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Examples:</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Examples:
+                      </p>
                       <ul className="text-xs text-gray-500 mt-1 list-disc pl-5">
                         <li>Match specific domain: <code>{`HostSNI(\`${resource.host}\`)`}</code></li>
                         <li>Match with wildcard: <code>{`HostSNIRegexp(\`^.+\\.example\\.com$\`)`}</code></li>
@@ -1574,38 +1596,711 @@ const ResourceDetail = ({ id, navigateTo }) => {
 
 // --- Middlewares List Component ---
 const MiddlewaresList = ({ navigateTo }) => {
-  // Placeholder implementation
+  const [middlewares, setMiddlewares] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch all middlewares
+  const fetchMiddlewares = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getMiddlewares();
+      setMiddlewares(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load middlewares');
+      console.error('Middlewares fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMiddlewares();
+  }, []);
+
+  // Handle middleware deletion with confirmation
+  const handleDeleteMiddleware = async (id, name) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the middleware "${name}"?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.deleteMiddleware(id);
+      fetchMiddlewares();
+    } catch (err) {
+      alert('Failed to delete middleware');
+      console.error('Delete middleware error:', err);
+    }
+  };
+
+  // Filter middlewares based on search term
+  const filteredMiddlewares = middlewares.filter(
+    (middleware) =>
+      middleware.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      middleware.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="text-center p-12 text-gray-500">
-      <h1 className="text-2xl font-bold mb-4">Middlewares</h1>
-      <p>This feature is under construction.</p>
-      <button
-        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-        onClick={() => navigateTo('dashboard')}
-      >
-        Back to Dashboard
-      </button>
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Middlewares</h1>
+      <div className="mb-6 flex justify-between">
+        <div className="relative w-64">
+          <input
+            type="text"
+            placeholder="Search middlewares..."
+            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="space-x-3">
+          <button
+            onClick={fetchMiddlewares}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            disabled={loading}
+          >
+            Refresh
+          </button>
+          <button
+            onClick={() => navigateTo('middleware-form')}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Create Middleware
+          </button>
+        </div>
+      </div>
+      {loading && !middlewares.length ? (
+        <div className="flex justify-center p-12">Loading...</div>
+      ) : error ? (
+        <div className="bg-red-100 text-red-700 p-4 rounded">{error}</div>
+      ) : (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredMiddlewares.map((middleware) => (
+                <tr key={middleware.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {middleware.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {middleware.type}
+                    </span>
+                    {middleware.type === 'chain' && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        (Middleware Chain)
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      onClick={() =>
+                        navigateTo('middleware-form', middleware.id)
+                      }
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleDeleteMiddleware(middleware.id, middleware.name)
+                      }
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredMiddlewares.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="3"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
+                    No middlewares found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
 
 // --- Middleware Form Component ---
 const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
-  // Placeholder implementation
+  const [name, setName] = useState('');
+  const [type, setType] = useState('forwardAuth');
+  const [config, setConfig] = useState('{}');
+  const [loading, setLoading] = useState(id ? true : false);
+  const [error, setError] = useState(null);
+  const [jsonError, setJsonError] = useState(null);
+  const [availableMiddlewares, setAvailableMiddlewares] = useState([]);
+  const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
+
+  // Middleware type options
+  const middlewareTypes = [
+    { value: 'basicAuth', label: 'Basic Authentication' },
+    { value: 'forwardAuth', label: 'Forward Authentication' },
+    { value: 'ipWhiteList', label: 'IP Whitelist' },
+    { value: 'rateLimit', label: 'Rate Limiting' },
+    { value: 'headers', label: 'Headers' },
+    { value: 'stripPrefix', label: 'Strip Prefix' },
+    { value: 'addPrefix', label: 'Add Prefix' },
+    { value: 'redirectRegex', label: 'Redirect Regex' },
+    { value: 'redirectScheme', label: 'Redirect Scheme' },
+    { value: 'chain', label: 'Middleware Chain' },
+    { value: 'replacepathregex', label: 'RegEx Path Replacement' },
+    { value: 'plugin', label: 'Traefik Plugin' },
+  ];
+
+  // Configuration templates for different middleware types
+  const templates = {
+    forwardAuth: {
+      address: 'http://auth-service:9000/verify',
+      trustForwardHeader: true,
+      authResponseHeaders: ['X-Remote-User', 'X-Remote-Email', 'X-Remote-Groups'],
+    },
+    basicAuth: {
+      users: ['admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/'],
+    },
+    ipWhiteList: {
+      sourceRange: ['127.0.0.1/32', '192.168.1.0/24'],
+    },
+    rateLimit: {
+      average: 100,
+      burst: 50,
+    },
+    headers: {
+      accessControlAllowMethods: ['GET', 'OPTIONS', 'PUT'],
+      browserXssFilter: true,
+      contentTypeNosniff: true,
+      customFrameOptionsValue: 'SAMEORIGIN',
+      customResponseHeaders: {
+        'X-Robots-Tag': 'none,noarchive,nosnippet,notranslate,noimageindex',
+        server: '',
+      },
+    },
+    chain: {
+      middlewares: [],
+    },
+    replacepathregex: {
+      regex: '^/path/to/replace',
+      replacement: '/new/path',
+    },
+    redirectRegex: {
+      regex: '^/path/to/redirect',
+      replacement: '/new/path',
+      permanent: false,
+    },
+    plugin: {},
+    geoblock: {
+      geoblock: {
+        silentStartUp: false,
+        allowLocalRequests: false,
+        logLocalRequests: false,
+        logAllowedRequests: false,
+        logApiRequests: false,
+        api: 'https://get.geojs.io/v1/ip/country/{ip}',
+        apiTimeoutMs: 750,
+        cacheSize: 15,
+        forceMonthlyUpdate: false,
+        allowUnknownCountries: false,
+        unknownCountryApiResponse: 'nil',
+        blackListMode: false,
+        addCountryHeader: false,
+        countries: ['DE'],
+      },
+    },
+    crowdsec: {
+      crowdsec: {
+        enabled: true,
+        logLevel: 'INFO',
+        updateIntervalSeconds: 15,
+        updateMaxFailure: 0,
+        defaultDecisionSeconds: 15,
+        httpTimeoutSeconds: 10,
+        crowdsecMode: 'live',
+        crowdsecAppsecEnabled: true,
+        crowdsecAppsecHost: 'crowdsec:7422',
+        crowdsecAppsecFailureBlock: true,
+        crowdsecAppsecUnreachableBlock: true,
+        crowdsecAppsecBodyLimit: 10485760,
+        crowdsecLapiKey: 'PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK',
+        crowdsecLapiHost: 'crowdsec:8080',
+        crowdsecLapiScheme: 'http',
+        forwardedHeadersTrustedIPs: ['0.0.0.0/0'],
+        clientTrustedIPs: [
+          '10.0.0.0/8',
+          '172.16.0.0/12',
+          '192.168.0.0/16',
+          '100.89.137.0/20',
+        ],
+      },
+    },
+  };
+
+  // Load middleware data when editing
+  useEffect(() => {
+    if (id) {
+      setLoading(true);
+      api
+        .getMiddleware(id)
+        .then((data) => {
+          setName(data.name);
+          setType(data.type);
+          let configData = data.config;
+          if (typeof configData === 'string') {
+            try {
+              configData = JSON.parse(configData);
+            } catch (e) {
+              console.error('Error parsing config JSON:', e);
+            }
+          }
+          setConfig(JSON.stringify(configData, null, 2));
+          setLoading(false);
+        })
+        .catch((err) => {
+          setError('Failed to load middleware');
+          console.error('Middleware fetch error:', err);
+          setLoading(false);
+        });
+    } else {
+      // Set default template for new middleware
+      setConfig(JSON.stringify(templates[type] || {}, null, 2));
+    }
+  }, [id, type]);
+
+  // Update template when type changes (new middleware only)
+  useEffect(() => {
+    if (!id) {
+      setConfig(JSON.stringify(templates[type] || {}, null, 2));
+    }
+  }, [type, id]);
+
+// Fetch available middlewares for chain type
+useEffect(() => {
+  if (type === 'chain') {
+    // Fetch all middlewares for chain configuration
+    api
+      .getMiddlewares()
+      .then((data) => {
+        // Exclude current middleware when editing to prevent self-referencing
+        const filtered = id ? data.filter((m) => m.id !== id) : data;
+        setAvailableMiddlewares(filtered);
+
+        // Initialize selected middlewares from config when editing
+        if (id && config) {
+          try {
+            const configObj = JSON.parse(config);
+            if (Array.isArray(configObj.middlewares)) {
+              // Add a check to prevent unnecessary updates
+              const currentMiddlewares = JSON.stringify(configObj.middlewares);
+              const selectedMiddlewaresStr = JSON.stringify(selectedMiddlewares);
+              if (currentMiddlewares !== selectedMiddlewaresStr) {
+                setSelectedMiddlewares(configObj.middlewares);
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing chain config:', e);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch middlewares for chain:', err);
+        setError('Failed to load available middlewares');
+      });
+  }
+}, [type, id, config]);
+
+// Synchronize chain config with selected middlewares
+useEffect(() => {
+  if (type === 'chain') {
+    // Add a check to prevent unnecessary updates
+    try {
+      const currentConfig = JSON.parse(config);
+      const currentMiddlewares = currentConfig.middlewares || [];
+      
+      // Only update if the arrays are different
+      if (JSON.stringify(currentMiddlewares) !== JSON.stringify(selectedMiddlewares)) {
+        const chainConfig = {
+          middlewares: selectedMiddlewares,
+        };
+        setConfig(JSON.stringify(chainConfig, null, 2));
+      }
+    } catch (e) {
+      // If parsing fails, update the config anyway
+      const chainConfig = {
+        middlewares: selectedMiddlewares,
+      };
+      setConfig(JSON.stringify(chainConfig, null, 2));
+    }
+  }
+}, [selectedMiddlewares, type]);
+
+  // Validate JSON configuration
+  const validateJson = (json) => {
+    try {
+      JSON.parse(json);
+      setJsonError(null);
+      return true;
+    } catch (err) {
+      setJsonError(err.message);
+      return false;
+    }
+  };
+
+  // Handle config changes and validate JSON
+  const handleConfigChange = (e) => {
+    const newConfig = e.target.value;
+    setConfig(newConfig);
+    validateJson(newConfig);
+
+    // For chain middleware, sync selected middlewares with config
+    if (type === 'chain') {
+      try {
+        const configObj = JSON.parse(newConfig);
+        if (Array.isArray(configObj.middlewares)) {
+          setSelectedMiddlewares(configObj.middlewares);
+        }
+      } catch (e) {
+        // Ignore invalid JSON until corrected
+      }
+    }
+  };
+
+  // Handle middleware selection for chain type
+  const handleMiddlewareSelection = (e) => {
+    const options = e.target.options;
+    const selected = Array.from(options)
+      .filter((option) => option.selected)
+      .map((option) => option.value);
+    setSelectedMiddlewares(selected);
+  };
+
+  // Provide helper text for specific middleware types
+  const getTypeHelperText = () => {
+    switch (type) {
+      case 'plugin':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>Configure a Traefik plugin middleware.</p>
+            <div className="mt-2">
+              <h4 className="font-semibold">GeoBlock Configuration</h4>
+              <ul className="list-disc pl-5">
+                <li>
+                  <strong>blackListMode</strong>: When false, countries
+                  list is a whitelist; when true, it's a blacklist
+                </li>
+                <li>
+                  <strong>countries</strong>: Array of two-letter ISO
+                  country codes
+                </li>
+                <li>
+                  <strong>allowLocalRequests</strong>: When true, allows
+                  requests from private IP ranges
+                </li>
+                <li>
+                  <strong>api</strong>: Geolocation API endpoint for IP
+                  lookups
+                </li>
+              </ul>
+            </div>
+            <div className="mt-2">
+              <h4 className="font-semibold">CrowdSec Configuration</h4>
+              <ul className="list-disc pl-5">
+                <li>
+                  <strong>crowdsecLapiKey</strong>: Your CrowdSec bouncer
+                  API key
+                </li>
+                <li>
+                  <strong>crowdsecLapiHost</strong>: CrowdSec service
+                  address (e.g., "crowdsec:8080")
+                </li>
+                <li>
+                  <strong>forwardedHeadersTrustedIPs</strong>: IP ranges
+                  to trust for forwarded headers
+                </li>
+                <li>
+                  <strong>clientTrustedIPs</strong>: IP ranges to exempt
+                  from CrowdSec checks
+                </li>
+              </ul>
+            </div>
+            <p className="mt-2 italic">
+              Note: Plugins must be installed on your Traefik instances
+              for this configuration to work.
+            </p>
+          </div>
+        );
+      case 'replacepathregex':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>
+              The RegEx Path Replacement middleware rewrites the URL path
+              based on regex match.
+            </p>
+            <p>Common use cases:</p>
+            <ul className="list-disc pl-5 mt-1">
+              <li>
+                WebDAV redirects:{' '}
+                <code>^/.well-known/ca(l|rd)dav</code> →{' '}
+                <code>/remote.php/dav/</code>
+              </li>
+              <li>
+                Hiding paths:{' '}
+                <code>^/api/internal/(.*)</code> →{' '}
+                <code>/api/public/$1</code>
+              </li>
+            </ul>
+          </div>
+        );
+      case 'chain':
+        return (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>
+              The Chain middleware combines multiple middlewares into a
+              single unit.
+            </p>
+            <p>
+              Order matters - middlewares are executed sequentially from
+              top to bottom.
+            </p>
+            <p className="mt-2 italic">
+              Note: Ensure selected middlewares are compatible and avoid
+              circular references.
+            </p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Handle form submission for creating/updating middleware
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      alert('Please enter a name');
+      return;
+    }
+
+    if (!validateJson(config)) {
+      alert('Invalid JSON configuration');
+      return;
+    }
+
+    try {
+      const configObj = JSON.parse(config);
+      if (id) {
+        // Update existing middleware
+        await api.updateMiddleware(id, {
+          name,
+          type,
+          config: configObj,
+        });
+        alert('Middleware updated successfully');
+      } else {
+        // Create new middleware
+        await api.createMiddleware({
+          name,
+          type,
+          config: configObj,
+        });
+        alert('Middleware created successfully');
+      }
+      navigateTo('middlewares');
+    } catch (err) {
+      alert('Failed to save middleware');
+      console.error('Save middleware error:', err);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center p-12">Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-100 text-red-700 p-4 rounded">
+        {error}
+        <button
+          className="ml-4 text-blue-600 hover:underline"
+          onClick={() => navigateTo('middlewares')}
+        >
+          Back to Middlewares
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="text-center p-12 text-gray-500">
-      <h1 className="text-2xl font-bold mb-4">
-        {isEditing ? 'Edit Middleware' : 'Create Middleware'}
-      </h1>
-      <p>This feature is under construction.</p>
-      <button
-        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-        onClick={() => navigateTo('middlewares')}
-      >
-        Back to Middlewares
-      </button>
+    <div>
+      <div className="mb-6 flex items-center">
+        <button
+          onClick={() => navigateTo('middlewares')}
+          className="mr-4 px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+        >
+          Back
+        </button>
+        <h1 className="text-2xl font-bold">
+          {id ? `Edit Middleware: ${name}` : 'Create New Middleware'}
+        </h1>
+      </div>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Middleware Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Authelia Authentication"
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Middleware Type
+            </label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+              disabled={!!id}
+            >
+              {middlewareTypes.map((typeOption) => (
+                <option
+                  key={typeOption.value}
+                  value={typeOption.value}
+                >
+                  {typeOption.label}
+                </option>
+              ))}
+            </select>
+            {getTypeHelperText()}
+          </div>
+          {type === 'plugin' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Plugin Type
+              </label>
+              <select
+                onChange={(e) => {
+                  const pluginType = e.target.value;
+                  if (pluginType === 'geoblock') {
+                    setConfig(JSON.stringify(templates.geoblock, null, 2));
+                  } else if (pluginType === 'crowdsec') {
+                    setConfig(JSON.stringify(templates.crowdsec, null, 2));
+                  }
+                }}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Select a plugin --</option>
+                <option value="geoblock">
+                  GeoBlock - Geographic Access Control
+                </option>
+                <option value="crowdsec">
+                  CrowdSec - Threat Protection
+                </option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select a plugin type to load its configuration template.
+              </p>
+            </div>
+          )}
+          {type === 'chain' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Select Middlewares for Chain
+              </label>
+              <select
+                multiple
+                value={selectedMiddlewares}
+                onChange={handleMiddlewareSelection}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                size={5}
+              >
+                {availableMiddlewares.map((middleware) => (
+                  <option
+                    key={middleware.id}
+                    value={middleware.id}
+                  >
+                    {middleware.name} ({middleware.type})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Hold Ctrl (or Cmd) to select multiple middlewares. Order
+                matters - middlewares are applied from top to bottom.
+              </p>
+            </div>
+          )}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Configuration (JSON)
+            </label>
+            <textarea
+              value={config}
+              onChange={handleConfigChange}
+              className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono h-64 ${
+                jsonError ? 'border-red-500' : ''
+              }`}
+              spellCheck="false"
+            ></textarea>
+            {jsonError && (
+              <p className="text-red-500 text-xs mt-1">
+                JSON Error: {jsonError}
+              </p>
+            )}
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => navigateTo('middlewares')}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              disabled={!!jsonError}
+            >
+              {id ? 'Update Middleware' : 'Create Middleware'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
-
 export default App;
+
