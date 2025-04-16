@@ -1571,4 +1571,41 @@ const ResourceDetail = ({ id, navigateTo }) => {
     </div>
   );
 };
+
+// --- Middlewares List Component ---
+const MiddlewaresList = ({ navigateTo }) => {
+  // Placeholder implementation
+  return (
+    <div className="text-center p-12 text-gray-500">
+      <h1 className="text-2xl font-bold mb-4">Middlewares</h1>
+      <p>This feature is under construction.</p>
+      <button
+        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+        onClick={() => navigateTo('dashboard')}
+      >
+        Back to Dashboard
+      </button>
+    </div>
+  );
+};
+
+// --- Middleware Form Component ---
+const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
+  // Placeholder implementation
+  return (
+    <div className="text-center p-12 text-gray-500">
+      <h1 className="text-2xl font-bold mb-4">
+        {isEditing ? 'Edit Middleware' : 'Create Middleware'}
+      </h1>
+      <p>This feature is under construction.</p>
+      <button
+        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+        onClick={() => navigateTo('middlewares')}
+      >
+        Back to Middlewares
+      </button>
+    </div>
+  );
+};
+
 export default App;
