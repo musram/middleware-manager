@@ -3,9 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main
-      - master
-      - dev
+      - sni-support
     paths:
       - 'Dockerfile'
       - 'go.mod'
@@ -66,8 +64,8 @@ jobs:
           if [[ "${{ github.ref_type }}" == "branch" ]]; then
             if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
               TAGS="${{ env.DOCKERHUB_IMAGE_NAME }}:latest,${{ env.DOCKERHUB_IMAGE_NAME }}:sha-${GITHUB_SHA::7},${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.date.outputs.date }}"
-            elif [[ "${{ github.ref_name }}" == "dev" ]]; then
-              TAGS="${{ env.DOCKERHUB_IMAGE_NAME }}:dev"
+            elif [[ "${{ github.ref_name }}" == "sni-support" ]]; then
+              TAGS="${{ env.DOCKERHUB_IMAGE_NAME }}:sni-support"
             else
               TAGS="${{ env.DOCKERHUB_IMAGE_NAME }}:${{ github.ref_name }}"
             fi
