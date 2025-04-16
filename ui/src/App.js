@@ -1152,65 +1152,65 @@ const ResourceDetail = ({ id, navigateTo }) => {
         </div>
       </div>
       {/* Router Configuration Section */}
-<div className="bg-white p-6 rounded-lg shadow mb-6">
-  <h2 className="text-xl font-semibold mb-4">Router Configuration</h2>
-  <div className="flex flex-wrap gap-4">
-    <button
-      onClick={() => setShowHTTPConfigModal(true)}
-      disabled={isDisabled}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      HTTP Router Configuration
-    </button>
-    <button
-      onClick={() => setShowTLSConfigModal(true)}
-      disabled={isDisabled}
-      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      TLS Certificate Domains
-    </button>
-    <button
-      onClick={() => setShowTCPConfigModal(true)}
-      disabled={isDisabled}
-      className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      TCP SNI Routing
-    </button>
-  </div>
-  
-  {/* Current Configuration Summary */}
-  <div className="mt-4 p-4 bg-gray-50 rounded border">
-    <h3 className="font-medium mb-2">Current Configuration</h3>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <p className="text-sm text-gray-500">HTTP Entrypoints</p>
-        <p className="font-medium">{entrypoints || 'websecure'}</p>
-      </div>
-      <div>
-        <p className="text-sm text-gray-500">TLS Certificate Domains</p>
-        <p className="font-medium">{tlsDomains || 'None'}</p>
-      </div>
-      <div>
-        <p className="text-sm text-gray-500">TCP SNI Routing</p>
-        <p className="font-medium">{tcpEnabled ? 'Enabled' : 'Disabled'}</p>
-      </div>
-      {tcpEnabled && (
-        <>
-          <div>
-            <p className="text-sm text-gray-500">TCP Entrypoints</p>
-            <p className="font-medium">{tcpEntrypoints || 'tcp'}</p>
-          </div>
-          {tcpSNIRule && (
-            <div className="col-span-2">
-              <p className="text-sm text-gray-500">TCP SNI Rule</p>
-              <p className="font-medium font-mono text-sm break-all">{tcpSNIRule}</p>
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Router Configuration</h2>
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={() => setShowHTTPConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            HTTP Router Configuration
+          </button>
+          <button
+            onClick={() => setShowTLSConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            TLS Certificate Domains
+          </button>
+          <button
+            onClick={() => setShowTCPConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            TCP SNI Routing
+          </button>
+        </div>
+        
+        {/* Current Configuration Summary */}
+        <div className="mt-4 p-4 bg-gray-50 rounded border">
+          <h3 className="font-medium mb-2">Current Configuration</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">HTTP Entrypoints</p>
+              <p className="font-medium">{entrypoints || 'websecure'}</p>
             </div>
-          )}
-        </>
-      )}
-    </div>
-  </div>
-</div>
+            <div>
+              <p className="text-sm text-gray-500">TLS Certificate Domains</p>
+              <p className="font-medium">{tlsDomains || 'None'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">TCP SNI Routing</p>
+              <p className="font-medium">{tcpEnabled ? 'Enabled' : 'Disabled'}</p>
+            </div>
+            {tcpEnabled && (
+              <>
+                <div>
+                  <p className="text-sm text-gray-500">TCP Entrypoints</p>
+                  <p className="font-medium">{tcpEntrypoints || 'tcp'}</p>
+                </div>
+                {tcpSNIRule && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500">TCP SNI Rule</p>
+                    <p className="font-medium font-mono text-sm break-all">{tcpSNIRule}</p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
       {/* Middlewares Section */}
       <div className="bg-white p-6 rounded-lg shadow">
         <div className="flex justify-between items-center mb-4">
@@ -1379,221 +1379,221 @@ const ResourceDetail = ({ id, navigateTo }) => {
     </div>
 
   )}
-  
+
     {/* HTTP Config Modal */}
-{showHTTPConfigModal && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-      <div className="flex justify-between items-center px-6 py-4 border-b">
-        <h3 className="text-lg font-semibold">
-          HTTP Router Configuration
-        </h3>
-        <button
-          onClick={() => setShowHTTPConfigModal(false)}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ×
-        </button>
-      </div>
-      <div className="px-6 py-4">
-        <form onSubmit={handleUpdateHTTPConfig}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              HTTP Entry Points (comma-separated)
-            </label>
-            <input
-              type="text"
-              value={entrypoints}
-              onChange={(e) => setEntrypoints(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="websecure,metrics,api"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Standard entrypoints: websecure (HTTPS), web (HTTP). Default: websecure
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              <strong>Note:</strong> Entrypoints must be defined in your Traefik static configuration file
-            </p>
-          </div>
-          <div className="flex justify-end space-x-3">
+    {showHTTPConfigModal && (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+          <div className="flex justify-between items-center px-6 py-4 border-b">
+            <h3 className="text-lg font-semibold">
+              HTTP Router Configuration
+            </h3>
             <button
-              type="button"
               onClick={() => setShowHTTPConfigModal(false)}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              className="text-gray-500 hover:text-gray-700"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Save Configuration
+              ×
             </button>
           </div>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
-
-{/* TLS Certificate Domains Modal */}
-{showTLSConfigModal && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-      <div className="flex justify-between items-center px-6 py-4 border-b">
-        <h3 className="text-lg font-semibold">
-          TLS Certificate Domains
-        </h3>
-        <button
-          onClick={() => setShowTLSConfigModal(false)}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ×
-        </button>
-      </div>
-      <div className="px-6 py-4">
-        <form onSubmit={handleUpdateTLSConfig}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Additional Certificate Domains (comma-separated)
-            </label>
-            <input
-              type="text"
-              value={tlsDomains}
-              onChange={(e) => setTLSDomains(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="example.com,*.example.com"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Extra domains to include in the TLS certificate (Subject Alternative Names)
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Main domain ({resource.host}) will be automatically included
-            </p>
-          </div>
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => setShowTLSConfigModal(false)}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Save Certificate Domains
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
-
-{/* TCP SNI Routing Modal */}
-{showTCPConfigModal && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-      <div className="flex justify-between items-center px-6 py-4 border-b">
-        <h3 className="text-lg font-semibold">
-          TCP SNI Routing Configuration
-        </h3>
-        <button
-          onClick={() => setShowTCPConfigModal(false)}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ×
-        </button>
-      </div>
-      <div className="px-6 py-4">
-        <form onSubmit={handleUpdateTCPConfig}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2 flex items-center">
-              <input
-                type="checkbox"
-                checked={tcpEnabled}
-                onChange={(e) => setTCPEnabled(e.target.checked)}
-                className="mr-2"
-              />
-              Enable TCP SNI Routing
-            </label>
-            <p className="text-xs text-gray-500 mt-1">
-              Creates a separate TCP router with SNI matching rules
-            </p>
-          </div>
-          {tcpEnabled && (
-            <>
+          <div className="px-6 py-4">
+            <form onSubmit={handleUpdateHTTPConfig}>
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
-                  TCP Entry Points (comma-separated)
+                  HTTP Entry Points (comma-separated)
                 </label>
                 <input
                   type="text"
-                  value={tcpEntrypoints}
-                  onChange={(e) => setTCPEntrypoints(e.target.value)}
+                  value={entrypoints}
+                  onChange={(e) => setEntrypoints(e.target.value)}
                   className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="tcp"
+                  placeholder="websecure,metrics,api"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Standard TCP entrypoint: tcp. Default: tcp
+                  Standard entrypoints: websecure (HTTPS), web (HTTP). Default: websecure
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   <strong>Note:</strong> Entrypoints must be defined in your Traefik static configuration file
                 </p>
               </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowHTTPConfigModal(false)}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Save Configuration
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* TLS Certificate Domains Modal */}
+    {showTLSConfigModal && (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+          <div className="flex justify-between items-center px-6 py-4 border-b">
+            <h3 className="text-lg font-semibold">
+              TLS Certificate Domains
+            </h3>
+            <button
+              onClick={() => setShowTLSConfigModal(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ×
+            </button>
+          </div>
+          <div className="px-6 py-4">
+            <form onSubmit={handleUpdateTLSConfig}>
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2">
-                  TCP SNI Matching Rule
+                  Additional Certificate Domains (comma-separated)
                 </label>
                 <input
                   type="text"
-                  value={tcpSNIRule}
-                  onChange={(e) => setTCPSNIRule(e.target.value)}
+                  value={tlsDomains}
+                  onChange={(e) => setTLSDomains(e.target.value)}
                   className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={`HostSNI(\`${resource.host}\`)`}
+                  placeholder="example.com,*.example.com"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  SNI rule using HostSNI or HostSNIRegexp matchers
+                  Extra domains to include in the TLS certificate (Subject Alternative Names)
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Examples:
-                </p>
-                <ul className="text-xs text-gray-500 mt-1 list-disc pl-5">
-                  <li>Match specific domain: <code>{`HostSNI(\`${resource.host}\`)`}</code></li>
-                  <li>Match with wildcard: <code>{`HostSNIRegexp(\`^.+\\.example\\.com$\`)`}</code></li>
-                  <li>Complex rule: <code>{`HostSNI(\`${resource.host}\`) || (HostSNI(\`other.example.com\`) && !ALPN(\`h2\`))`}</code></li>
-                </ul>
-                <p className="text-xs text-gray-500 mt-1">
-                  If empty, defaults to <code>{`HostSNI(\`${resource.host}\`)`}</code>
+                  Main domain ({resource.host}) will be automatically included
                 </p>
               </div>
-            </>
-          )}
-          <div className="flex justify-end space-x-3">
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowTLSConfigModal(false)}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Save Certificate Domains
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* TCP SNI Routing Modal */}
+    {showTCPConfigModal && (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+          <div className="flex justify-between items-center px-6 py-4 border-b">
+            <h3 className="text-lg font-semibold">
+              TCP SNI Routing Configuration
+            </h3>
             <button
-              type="button"
               onClick={() => setShowTCPConfigModal(false)}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              className="text-gray-500 hover:text-gray-700"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-            >
-              Save TCP Configuration
+              ×
             </button>
           </div>
-        </form>
+          <div className="px-6 py-4">
+            <form onSubmit={handleUpdateTCPConfig}>
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2 flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={tcpEnabled}
+                    onChange={(e) => setTCPEnabled(e.target.checked)}
+                    className="mr-2"
+                  />
+                  Enable TCP SNI Routing
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Creates a separate TCP router with SNI matching rules
+                </p>
+              </div>
+              {tcpEnabled && (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      TCP Entry Points (comma-separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={tcpEntrypoints}
+                      onChange={(e) => setTCPEntrypoints(e.target.value)}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="tcp"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Standard TCP entrypoint: tcp. Default: tcp
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>Note:</strong> Entrypoints must be defined in your Traefik static configuration file
+                    </p>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                      TCP SNI Matching Rule
+                    </label>
+                    <input
+                      type="text"
+                      value={tcpSNIRule}
+                      onChange={(e) => setTCPSNIRule(e.target.value)}
+                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={`HostSNI(\`${resource.host}\`)`}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      SNI rule using HostSNI or HostSNIRegexp matchers
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Examples:
+                    </p>
+                    <ul className="text-xs text-gray-500 mt-1 list-disc pl-5">
+                      <li>Match specific domain: <code>{`HostSNI(\`${resource.host}\`)`}</code></li>
+                      <li>Match with wildcard: <code>{`HostSNIRegexp(\`^.+\\.example\\.com$\`)`}</code></li>
+                      <li>Complex rule: <code>{`HostSNI(\`${resource.host}\`) || (HostSNI(\`other.example.com\`) && !ALPN(\`h2\`))`}</code></li>
+                    </ul>
+                    <p className="text-xs text-gray-500 mt-1">
+                      If empty, defaults to <code>{`HostSNI(\`${resource.host}\`)`}</code>
+                    </p>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowTCPConfigModal(false)}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                >
+                  Save TCP Configuration
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-  );
-};
+      
+    )}
 
 // --- Middlewares List Component ---
 const MiddlewaresList = ({ navigateTo }) => {
