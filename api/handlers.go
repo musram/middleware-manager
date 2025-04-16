@@ -678,6 +678,197 @@ func (s *Server) removeMiddleware(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"message": "Middleware removed from resource successfully"})
 }
 
+// updateHTTPConfig updates the HTTP router entrypoints configuration
+func (s *Server) updateHTTPConfig(c *gin.Context) {
+    id := c.Param("id")
+    if id == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
+        return
+    }
+    
+    var input struct {
+        Entrypoints string `json:"entrypoints"`
+    }
+    
+    if err := c.ShouldBindJSON(&input); err != nil {
+        ResponseWithError(c, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
+        return
+    }
+    
+    // Verify resource exists and is active
+    var exists int
+    var status string
+    err := s.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", id).Scan(&exists, &status)
+    if err == sql.ErrNoRows {
+        ResponseWithError(c, http.StatusNotFound, "Resource not found")
+        return
+    } else if err != nil {
+        log.Printf("Error checking resource existence: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // Don't allow updating disabled resources
+    if status == "disabled" {
+        ResponseWithError(c, http.StatusBadRequest, "Cannot update a disabled resource")
+        return
+    }
+    
+    // Validate entrypoints - should be comma-separated list
+    if input.Entrypoints == "" {
+        input.Entrypoints = "websecure" // Default
+    }
+    
+    // Update the resource
+    _, err = s.db.Exec(
+        "UPDATE resources SET entrypoints = ?, updated_at = ? WHERE id = ?",
+        input.Entrypoints, time.Now(), id,
+    )
+    
+    if err != nil {
+        log.Printf("Error updating resource entrypoints: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to update resource")
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "id": id,
+        "entrypoints": input.Entrypoints,
+    })
+}
+
+// updateTLSConfig updates the TLS certificate domains configuration
+func (s *Server) updateTLSConfig(c *gin.Context) {
+    id := c.Param("id")
+    if id == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
+        return
+    }
+    
+    var input struct {
+        TLSDomains string `json:"tls_domains"`
+    }
+    
+    if err := c.ShouldBindJSON(&input); err != nil {
+        ResponseWithError(c, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
+        return
+    }
+    
+    // Verify resource exists and is active
+    var exists int
+    var status string
+    err := s.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", id).Scan(&exists, &status)
+    if err == sql.ErrNoRows {
+        ResponseWithError(c, http.StatusNotFound, "Resource not found")
+        return
+    } else if err != nil {
+        log.Printf("Error checking resource existence: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // Don't allow updating disabled resources
+    if status == "disabled" {
+        ResponseWithError(c, http.StatusBadRequest, "Cannot update a disabled resource")
+        return
+    }
+    
+    // Update the resource
+    _, err = s.db.Exec(
+        "UPDATE resources SET tls_domains = ?, updated_at = ? WHERE id = ?",
+        input.TLSDomains, time.Now(), id,
+    )
+    
+    if err != nil {
+        log.Printf("Error updating TLS domains: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to update TLS domains")
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "id": id,
+        "tls_domains": input.TLSDomains,
+    })
+}
+
+// updateTCPConfig updates the TCP SNI router configuration
+func (s *Server) updateTCPConfig(c *gin.Context) {
+    id := c.Param("id")
+    if id == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
+        return
+    }
+    
+    var input struct {
+        TCPEnabled     bool   `json:"tcp_enabled"`
+        TCPEntrypoints string `json:"tcp_entrypoints"`
+        TCPSNIRule     string `json:"tcp_sni_rule"`
+    }
+    
+    if err := c.ShouldBindJSON(&input); err != nil {
+        ResponseWithError(c, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
+        return
+    }
+    
+    // Verify resource exists and is active
+    var exists int
+    var status string
+    err := s.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", id).Scan(&exists, &status)
+    if err == sql.ErrNoRows {
+        ResponseWithError(c, http.StatusNotFound, "Resource not found")
+        return
+    } else if err != nil {
+        log.Printf("Error checking resource existence: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // Don't allow updating disabled resources
+    if status == "disabled" {
+        ResponseWithError(c, http.StatusBadRequest, "Cannot update a disabled resource")
+        return
+    }
+    
+    // Validate TCP entrypoints if provided
+    if input.TCPEntrypoints == "" {
+        input.TCPEntrypoints = "tcp" // Default
+    }
+    
+    // Validate SNI rule if provided
+    if input.TCPSNIRule != "" {
+        // Basic validation - ensure it contains HostSNI
+        if !strings.Contains(input.TCPSNIRule, "HostSNI") {
+            ResponseWithError(c, http.StatusBadRequest, "TCP SNI rule must contain HostSNI matcher")
+            return
+        }
+    }
+    
+    // Convert boolean to integer for SQLite
+    tcpEnabled := 0
+    if input.TCPEnabled {
+        tcpEnabled = 1
+    }
+    
+    // Update the resource
+    _, err = s.db.Exec(
+        "UPDATE resources SET tcp_enabled = ?, tcp_entrypoints = ?, tcp_sni_rule = ?, updated_at = ? WHERE id = ?",
+        tcpEnabled, input.TCPEntrypoints, input.TCPSNIRule, time.Now(), id,
+    )
+    
+    if err != nil {
+        log.Printf("Error updating TCP config: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to update TCP configuration")
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "id":              id,
+        "tcp_enabled":     input.TCPEnabled,
+        "tcp_entrypoints": input.TCPEntrypoints,
+        "tcp_sni_rule":    input.TCPSNIRule,
+    })
+}
+
 // generateID generates a random 16-character hex string
 func generateID() (string, error) {
 	bytes := make([]byte, 8)

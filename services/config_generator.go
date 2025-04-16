@@ -31,6 +31,10 @@ type TraefikConfig struct {
 		Middlewares map[string]interface{} `yaml:"middlewares,omitempty"`
 		Routers     map[string]interface{} `yaml:"routers,omitempty"`
 	} `yaml:"http"`
+	
+	TCP struct {
+		Routers     map[string]interface{} `yaml:"routers,omitempty"`
+	} `yaml:"tcp,omitempty"`
 }
 
 // NewConfigGenerator creates a new config generator
@@ -105,15 +109,21 @@ func (cg *ConfigGenerator) generateConfig() error {
 	config := TraefikConfig{}
 	config.HTTP.Middlewares = make(map[string]interface{})
 	config.HTTP.Routers = make(map[string]interface{})
+	config.TCP.Routers = make(map[string]interface{})
 
 	// Process middlewares
 	if err := cg.processMiddlewares(&config); err != nil {
 		return fmt.Errorf("failed to process middlewares: %w", err)
 	}
 
-	// Process resources
+	// Process HTTP resources
 	if err := cg.processResources(&config); err != nil {
-		return fmt.Errorf("failed to process resources: %w", err)
+		return fmt.Errorf("failed to process HTTP resources: %w", err)
+	}
+	
+	// Process TCP resources
+	if err := cg.processTCPRouters(&config); err != nil {
+		return fmt.Errorf("failed to process TCP resources: %w", err)
 	}
 
 	// Convert to YAML
@@ -233,11 +243,13 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 
 // processResources fetches and processes all resources and their middlewares
 func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
-	// Fetch all resources and their middlewares
+	// Fetch all active resources and their middlewares
 	rows, err := cg.db.Query(`
-		SELECT r.id, r.host, r.service_id, rm.middleware_id, rm.priority
+		SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains, 
+		       rm.middleware_id, rm.priority
 		FROM resources r
 		JOIN resource_middlewares rm ON r.id = rm.resource_id
+		WHERE r.status = 'active'
 		ORDER BY rm.priority DESC
 	`)
 	if err != nil {
@@ -248,25 +260,31 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
 	// Group middlewares by resource
 	resourceMiddlewares := make(map[string][]string)
 	resourceInfo := make(map[string]struct {
-		Host      string
-		ServiceID string
+		Host         string
+		ServiceID    string
+		Entrypoints  string
+		TLSDomains   string
 	})
 
 	for rows.Next() {
-		var resourceID, host, serviceID, middlewareID string
+		var resourceID, host, serviceID, entrypoints, tlsDomains, middlewareID string
 		var priority int
-		if err := rows.Scan(&resourceID, &host, &serviceID, &middlewareID, &priority); err != nil {
+		if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, &middlewareID, &priority); err != nil {
 			log.Printf("Failed to scan resource middleware: %v", err)
 			continue
 		}
 
 		resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middlewareID)
 		resourceInfo[resourceID] = struct {
-			Host      string
-			ServiceID string
+			Host         string
+			ServiceID    string
+			Entrypoints  string
+			TLSDomains   string
 		}{
-			Host:      host,
-			ServiceID: serviceID,
+			Host:         host,
+			ServiceID:    serviceID,
+			Entrypoints:  entrypoints,
+			TLSDomains:   tlsDomains,
 		}
 	}
 
@@ -280,6 +298,25 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
 		if !exists {
 			log.Printf("Warning: Resource info not found for %s", resourceID)
 			continue
+		}
+		
+		// Process entrypoints (comma-separated list to array)
+		entrypoints := []string{"websecure"} // Default
+		if info.Entrypoints != "" {
+			// Split by comma and trim spaces
+			rawEntrypoints := strings.Split(info.Entrypoints, ",")
+			entrypoints = make([]string, 0, len(rawEntrypoints))
+			for _, ep := range rawEntrypoints {
+				trimmed := strings.TrimSpace(ep)
+				if trimmed != "" {
+					entrypoints = append(entrypoints, trimmed)
+				}
+			}
+			
+			// If after processing we have no valid entrypoints, use the default
+			if len(entrypoints) == 0 {
+				entrypoints = []string{"websecure"}
+			}
 		}
 		
 		// Add "badger" middleware with http provider suffix if not already present
@@ -299,18 +336,118 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
 		// Create a router with higher priority
 		customRouterID := fmt.Sprintf("%s-auth", resourceID)
 		
-		config.HTTP.Routers[customRouterID] = map[string]interface{}{
+		// Basic router configuration
+		routerConfig := map[string]interface{}{
 			"rule":        fmt.Sprintf("Host(`%s`)", info.Host),
 			"service":     fmt.Sprintf("%s@http", info.ServiceID),  // Reference service from http provider
-			"entryPoints": []string{"websecure"},
+			"entryPoints": entrypoints,
 			"middlewares": middlewares,
 			"priority":    100, // Higher than Pangolin's default
-			"tls": map[string]interface{}{
-				"certResolver": "letsencrypt",
-			},
 		}
+		
+		// Add TLS configuration with optional domains for certificate
+		if info.TLSDomains != "" {
+			// Parse the comma-separated domains
+			domains := strings.Split(info.TLSDomains, ",")
+			// Clean up the domains
+			var cleanDomains []string
+			for _, domain := range domains {
+				domain = strings.TrimSpace(domain)
+				if domain != "" {
+					cleanDomains = append(cleanDomains, domain)
+				}
+			}
+			
+			if len(cleanDomains) > 0 {
+				// Create TLS configuration with domains
+				tlsConfig := map[string]interface{}{
+					"certResolver": "letsencrypt",
+					"domains": []map[string]interface{}{
+						{
+							"main": info.Host,
+							"sans": cleanDomains,
+						},
+					},
+				}
+				routerConfig["tls"] = tlsConfig
+			} else {
+				// Default TLS config if no additional domains
+				routerConfig["tls"] = map[string]interface{}{
+					"certResolver": "letsencrypt",
+				}
+			}
+		} else {
+			// Default TLS config
+			routerConfig["tls"] = map[string]interface{}{
+				"certResolver": "letsencrypt",
+			}
+		}
+		
+		config.HTTP.Routers[customRouterID] = routerConfig
 	}
 
+	return nil
+}
+
+// processTCPRouters fetches and processes all resources with TCP SNI routing enabled
+func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
+	// Fetch resources with TCP routing enabled
+	rows, err := cg.db.Query(`
+		SELECT id, host, service_id, tcp_entrypoints, tcp_sni_rule
+		FROM resources
+		WHERE status = 'active' AND tcp_enabled = 1
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to fetch TCP resources: %w", err)
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		var id, host, serviceID, tcpEntrypoints, tcpSNIRule string
+		if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypoints, &tcpSNIRule); err != nil {
+			log.Printf("Failed to scan TCP resource: %v", err)
+			continue
+		}
+		
+		// Process TCP entrypoints (comma-separated list to array)
+		entrypoints := []string{"tcp"} // Default
+		if tcpEntrypoints != "" {
+			// Split by comma and trim spaces
+			rawEntrypoints := strings.Split(tcpEntrypoints, ",")
+			entrypoints = make([]string, 0, len(rawEntrypoints))
+			for _, ep := range rawEntrypoints {
+				trimmed := strings.TrimSpace(ep)
+				if trimmed != "" {
+					entrypoints = append(entrypoints, trimmed)
+				}
+			}
+			
+			// If after processing we have no valid entrypoints, use the default
+			if len(entrypoints) == 0 {
+				entrypoints = []string{"tcp"}
+			}
+		}
+		
+		// Create the rule - default to HostSNI for the domain if no custom rule
+		rule := fmt.Sprintf("HostSNI(`%s`)", host)
+		if tcpSNIRule != "" {
+			rule = tcpSNIRule
+		}
+		
+		// Create TCP router config
+		tcpRouterID := fmt.Sprintf("%s-tcp", id)
+		config.TCP.Routers[tcpRouterID] = map[string]interface{}{
+			"rule":        rule,
+			"service":     fmt.Sprintf("%s@http", serviceID), // Reference service from http provider
+			"entryPoints": entrypoints,
+			"tls":         map[string]interface{}{},  // Enable TLS for SNI
+		}
+	}
+	
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error during TCP resources iteration: %w", err)
+	}
+	
 	return nil
 }
 

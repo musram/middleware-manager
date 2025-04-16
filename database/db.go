@@ -102,25 +102,47 @@ func runMigrations(db *sql.DB) error {
 
 // runPostMigrationUpdates handles migrations that SQLite can't do easily in schema migrations
 func runPostMigrationUpdates(db *sql.DB) error {
-	// Check if we need to add the status column to the resources table
-	// SQLite doesn't support ALTER TABLE IF NOT EXISTS, so we need to check first
-	var hasStatusColumn bool
+	// Check if existing resources table is missing any of our columns
+	// We'll check just one of the new columns - if it's missing, we'll likely need to add them all
+	var hasEntrypointsColumn bool
 	err := db.QueryRow(`
 		SELECT COUNT(*) > 0 
 		FROM pragma_table_info('resources') 
-		WHERE name = 'status'
-	`).Scan(&hasStatusColumn)
+		WHERE name = 'entrypoints'
+	`).Scan(&hasEntrypointsColumn)
 	
 	if err != nil {
-		return fmt.Errorf("failed to check if status column exists: %w", err)
+		return fmt.Errorf("failed to check if entrypoints column exists: %w", err)
 	}
 	
-	if !hasStatusColumn {
-		log.Println("Adding status column to resources table")
-		_, err := db.Exec("ALTER TABLE resources ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
-		if err != nil {
-			return fmt.Errorf("failed to add status column: %w", err)
+	// If the column doesn't exist, we need to add all the new columns to the existing table
+	if !hasEntrypointsColumn {
+		log.Println("Adding new configuration columns to resources table")
+		
+		// Add columns for HTTP routing
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN entrypoints TEXT DEFAULT 'websecure'"); err != nil {
+			return fmt.Errorf("failed to add entrypoints column: %w", err)
 		}
+		
+		// Add columns for TLS certificate configuration
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN tls_domains TEXT DEFAULT ''"); err != nil {
+			return fmt.Errorf("failed to add tls_domains column: %w", err)
+		}
+		
+		// Add columns for TCP SNI routing
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN tcp_enabled INTEGER DEFAULT 0"); err != nil {
+			return fmt.Errorf("failed to add tcp_enabled column: %w", err)
+		}
+		
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN tcp_entrypoints TEXT DEFAULT 'tcp'"); err != nil {
+			return fmt.Errorf("failed to add tcp_entrypoints column: %w", err)
+		}
+		
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN tcp_sni_rule TEXT DEFAULT ''"); err != nil {
+			return fmt.Errorf("failed to add tcp_sni_rule column: %w", err)
+		}
+		
+		log.Println("Successfully added all new configuration columns")
 	}
 	
 	return nil
@@ -192,7 +214,8 @@ func (db *DB) GetMiddlewares() ([]map[string]interface{}, error) {
 // GetResources fetches all resources
 func (db *DB) GetResources() ([]map[string]interface{}, error) {
 	rows, err := db.Query(`
-		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status,
+		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status, 
+		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -206,19 +229,27 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 	var resources []map[string]interface{}
 	for rows.Next() {
-		var id, host, serviceID, orgID, siteID, status string
+		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule string
+		var tcpEnabled int
 		var middlewares sql.NullString
-		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, &middlewares); err != nil {
+		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, 
+				   &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
+				   &middlewares); err != nil {
 			return nil, fmt.Errorf("row scan failed: %w", err)
 		}
 		
 		resource := map[string]interface{}{
-			"id":         id,
-			"host":       host,
-			"service_id": serviceID,
-			"org_id":     orgID,
-			"site_id":    siteID,
-			"status":     status,
+			"id":              id,
+			"host":            host,
+			"service_id":      serviceID,
+			"org_id":          orgID,
+			"site_id":         siteID,
+			"status":          status,
+			"entrypoints":     entrypoints,
+			"tls_domains":     tlsDomains,
+			"tcp_enabled":     tcpEnabled > 0,
+			"tcp_entrypoints": tcpEntrypoints,
+			"tcp_sni_rule":    tcpSNIRule,
 		}
 		
 		if middlewares.Valid {
@@ -239,18 +270,22 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 // GetResource fetches a specific resource by ID
 func (db *DB) GetResource(id string) (map[string]interface{}, error) {
-	var host, serviceID, orgID, siteID, status string
+	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule string
+	var tcpEnabled int
 	var middlewares sql.NullString
 
 	err := db.QueryRow(`
 		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
-			   GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
+		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
+		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
 		LEFT JOIN middlewares m ON rm.middleware_id = m.id
 		WHERE r.id = ?
 		GROUP BY r.id
-	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, &middlewares)
+	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
+		    &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
+		    &middlewares)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("resource not found: %s", id)
@@ -259,12 +294,17 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 	}
 
 	resource := map[string]interface{}{
-		"id":         id,
-		"host":       host,
-		"service_id": serviceID,
-		"org_id":     orgID,
-		"site_id":    siteID,
-		"status":     status,
+		"id":              id,
+		"host":            host,
+		"service_id":      serviceID,
+		"org_id":          orgID,
+		"site_id":         siteID,
+		"status":          status,
+		"entrypoints":     entrypoints,
+		"tls_domains":     tlsDomains,
+		"tcp_enabled":     tcpEnabled > 0,
+		"tcp_entrypoints": tcpEntrypoints,
+		"tcp_sni_rule":    tcpSNIRule,
 	}
 
 	if middlewares.Valid {
