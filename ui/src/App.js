@@ -1574,36 +1574,382 @@ const ResourceDetail = ({ id, navigateTo }) => {
 
 // --- Middlewares List Component ---
 const MiddlewaresList = ({ navigateTo }) => {
-  // Placeholder implementation
+  const [middlewares, setMiddlewares] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Fetch all middlewares
+  const fetchMiddlewares = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getMiddlewares();
+      setMiddlewares(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load middlewares');
+      console.error('Middlewares fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMiddlewares();
+  }, []);
+
+  // Handle middleware deletion
+  const handleDeleteMiddleware = async (id) => {
+    try {
+      await api.deleteMiddleware(id);
+      setConfirmDelete(null);
+      fetchMiddlewares();
+    } catch (err) {
+      alert(`Failed to delete middleware: ${err.message || 'Unknown error'}`);
+      console.error('Delete middleware error:', err);
+    }
+  };
+
+  // Filter middlewares based on search term
+  const filteredMiddlewares = middlewares.filter((middleware) =>
+    middleware.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    middleware.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="text-center p-12 text-gray-500">
-      <h1 className="text-2xl font-bold mb-4">Middlewares</h1>
-      <p>This feature is under construction.</p>
-      <button
-        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-        onClick={() => navigateTo('dashboard')}
-      >
-        Back to Dashboard
-      </button>
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Middlewares</h1>
+      <div className="mb-6 flex justify-between">
+        <div className="relative w-64">
+          <input
+            type="text"
+            placeholder="Search middlewares..."
+            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => navigateTo('middleware-form')}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Create Middleware
+          </button>
+          <button
+            onClick={fetchMiddlewares}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            disabled={loading}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+      {loading && !middlewares.length ? (
+        <div className="flex justify-center p-12">Loading...</div>
+      ) : error ? (
+        <div className="bg-red-100 text-red-700 p-4 rounded">{error}</div>
+      ) : (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredMiddlewares.map((middleware) => (
+                <tr key={middleware.id}>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{middleware.name}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {middleware.type}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap flex space-x-2">
+                    <button
+                      onClick={() => navigateTo('middleware-form', middleware.id)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(middleware)}
+                      className="text-red-600 hover:text-red-900 ml-3"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredMiddlewares.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="3"
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
+                    No middlewares found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+            <p className="mb-4">
+              Are you sure you want to delete the middleware "{confirmDelete.name}"?
+              This cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteMiddleware(confirmDelete.id)}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // --- Middleware Form Component ---
 const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
-  // Placeholder implementation
+  const [middleware, setMiddleware] = useState({
+    name: '',
+    type: 'basicAuth',
+    config: {}
+  });
+  const [configText, setConfigText] = useState('{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}');
+  const [loading, setLoading] = useState(isEditing);
+  const [error, setError] = useState(null);
+  
+  // Available middleware types
+  const middlewareTypes = [
+    { value: 'basicAuth', label: 'Basic Authentication' },
+    { value: 'forwardAuth', label: 'Forward Authentication' },
+    { value: 'ipWhiteList', label: 'IP Whitelist' },
+    { value: 'rateLimit', label: 'Rate Limiting' },
+    { value: 'headers', label: 'HTTP Headers' },
+    { value: 'stripPrefix', label: 'Strip Prefix' },
+    { value: 'addPrefix', label: 'Add Prefix' },
+    { value: 'redirectRegex', label: 'Redirect Regex' },
+    { value: 'redirectScheme', label: 'Redirect Scheme' },
+    { value: 'chain', label: 'Middleware Chain' },
+    { value: 'replacepathregex', label: 'Replace Path Regex' },
+    { value: 'plugin', label: 'Traefik Plugin' }
+  ];
+
+  // Template configs for different middleware types
+  const configTemplates = {
+    basicAuth: '{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}',
+    forwardAuth: '{\n  "address": "http://auth-service:9090/auth",\n  "trustForwardHeader": true,\n  "authResponseHeaders": [\n    "X-Auth-User",\n    "X-Auth-Roles"\n  ]\n}',
+    ipWhiteList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
+    rateLimit: '{\n  "average": 100,\n  "burst": 50\n}',
+    headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000\n}',
+    stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ]\n}',
+    addPrefix: '{\n  "prefix": "/api"\n}',
+    redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}"\n}',
+    redirectScheme: '{\n  "scheme": "https",\n  "permanent": true\n}',
+    chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
+    replacepathregex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/$1"\n}',
+    plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}'
+  };
+
+  // Fetch middleware details if editing
+  useEffect(() => {
+    if (isEditing && id) {
+      const fetchMiddleware = async () => {
+        try {
+          setLoading(true);
+          const data = await api.getMiddleware(id);
+          setMiddleware({
+            name: data.name,
+            type: data.type,
+            config: data.config
+          });
+          
+          // Format config as JSON string
+          const configJson = typeof data.config === 'string' 
+            ? data.config 
+            : JSON.stringify(data.config, null, 2);
+          
+          setConfigText(configJson);
+          setError(null);
+        } catch (err) {
+          setError('Failed to load middleware details');
+          console.error('Middleware fetch error:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchMiddleware();
+    }
+  }, [id, isEditing]);
+
+  // Update config template when type changes
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    setMiddleware({ ...middleware, type: newType });
+    setConfigText(configTemplates[newType] || '{}');
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      // Parse config JSON
+      let configObj;
+      try {
+        configObj = JSON.parse(configText);
+      } catch (err) {
+        alert('Invalid JSON configuration. Please check the format.');
+        return;
+      }
+      
+      const middlewareData = {
+        name: middleware.name,
+        type: middleware.type,
+        config: configObj
+      };
+      
+      setLoading(true);
+      
+      if (isEditing) {
+        await api.updateMiddleware(id, middlewareData);
+        alert('Middleware updated successfully');
+      } else {
+        await api.createMiddleware(middlewareData);
+        alert('Middleware created successfully');
+      }
+      
+      navigateTo('middlewares');
+    } catch (err) {
+      setError(`Failed to ${isEditing ? 'update' : 'create'} middleware`);
+      console.error('Middleware form error:', err);
+      alert(`Error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && isEditing) {
+    return <div className="flex justify-center p-12">Loading...</div>;
+  }
+
   return (
-    <div className="text-center p-12 text-gray-500">
-      <h1 className="text-2xl font-bold mb-4">
-        {isEditing ? 'Edit Middleware' : 'Create Middleware'}
-      </h1>
-      <p>This feature is under construction.</p>
-      <button
-        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-        onClick={() => navigateTo('middlewares')}
-      >
-        Back to Middlewares
-      </button>
+    <div>
+      <div className="mb-6 flex items-center">
+        <button
+          onClick={() => navigateTo('middlewares')}
+          className="mr-4 px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+        >
+          Back
+        </button>
+        <h1 className="text-2xl font-bold">
+          {isEditing ? 'Edit Middleware' : 'Create Middleware'}
+        </h1>
+      </div>
+
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-6">{error}</div>
+      )}
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Middleware Name
+            </label>
+            <input
+              type="text"
+              value={middleware.name}
+              onChange={(e) => setMiddleware({ ...middleware, name: e.target.value })}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., production-authentication"
+              required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Middleware Type
+            </label>
+            <select
+              value={middleware.type}
+              onChange={handleTypeChange}
+              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              {middlewareTypes.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Configuration (JSON)
+            </label>
+            <textarea
+              value={configText}
+              onChange={(e) => setConfigText(e.target.value)}
+              className="w-full px-3 py-2 border font-mono h-64 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter JSON configuration"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Configuration must be valid JSON for the selected middleware type
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => navigateTo('middlewares')}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : isEditing ? 'Update Middleware' : 'Create Middleware'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
