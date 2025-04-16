@@ -1570,5 +1570,5 @@ const ResourceDetail = ({ id, navigateTo }) => {
       )}
     </div>
   );
- 
+};
 export default App;
