@@ -739,69 +739,14 @@ td button:empty:before {
   .dark-mode .bg-yellow-50 {
     color: #fdba74 !important; /* Brighter orange for dark mode */
   }
-
-  /* Alternative approach with more general selectors */
-
-/* =====================
-   DARK MODE LABEL VISIBILITY FIX
-   ===================== */
-.dark-mode {
-  /* Override specific element colors for dark mode */
-  --badge-bg-blue: #90cdf4;
-  --badge-text-blue: #1e3a8a;
-  --badge-bg-green: #0d9488;
-  --badge-text-green: #ffffff;
-  --badge-bg-yellow: #d97706;
-  --badge-text-yellow: #ffffff;
-  --badge-bg-red: #f87171;
-  --badge-text-red: #ffffff;
-}
-
-/* General badge styles for dark mode */
-.dark-mode [class*="rounded-full"],
-.dark-mode .status-badge {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-/* Blue badges (middleware types) */
-.dark-mode .bg-blue-100,
-.dark-mode [class*="bg-blue-"] {
-  background-color: var(--badge-bg-blue) !important;
-  color: var(--badge-text-blue) !important;
-  text-shadow: none;
-}
-
-/* Green badges (protected status) */
-.dark-mode .bg-green-100,
-.dark-mode [class*="bg-green-"] {
-  background-color: var(--badge-bg-green) !important;
-  color: var(--badge-text-green) !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-}
-
-/* Yellow badges (not protected status) */
-.dark-mode .bg-yellow-100,
-.dark-mode .bg-yellow-50,
-.dark-mode [class*="bg-yellow-"] {
-  background-color: var(--badge-bg-yellow) !important;
-  color: var(--badge-text-yellow) !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-}
-
-/* Red badges (errors, disabled) */
-.dark-mode .bg-red-100,
-.dark-mode .bg-red-50,
-.dark-mode [class*="bg-red-"] {
-  background-color: var(--badge-bg-red) !important;
-  color: var(--badge-text-red) !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-}
-
-/* Force text visibility for all badge elements */
-.dark-mode span[class*="rounded-full"],
-.dark-mode .status-badge {
-  opacity: 1 !important;
-  visibility: visible !important;
-  font-weight: 600 !important;
-}
+  
+  /* Fix for modal scrolling on mobile */
+  @media (max-width: 640px) {
+    .fixed.inset-0.bg-gray-600.bg-opacity-50.flex.items-center.justify-center {
+      align-items: flex-start;
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+      overflow-y: auto;
+    }
+  }
+  /* Fix for loading spinner */
