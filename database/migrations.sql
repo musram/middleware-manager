@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS middlewares (
 );
 
 -- Resources table stores Pangolin resources
--- Includes all configuration columns including the new custom_headers column
+-- Includes all configuration columns including the router_priority column
 CREATE TABLE IF NOT EXISTS resources (
     id TEXT PRIMARY KEY,
     host TEXT NOT NULL,
@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS resources (
     -- Custom headers configuration
     custom_headers TEXT DEFAULT '',
     
+    -- Router priority configuration
+    router_priority INTEGER DEFAULT 100,
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -49,6 +52,6 @@ CREATE TABLE IF NOT EXISTS resource_middlewares (
 
 -- Insert default middlewares
 INSERT OR IGNORE INTO middlewares (id, name, type, config) VALUES 
-('authelia', 'Authelia', 'forwardAuth', '{"address":"http://authelia:9091/api/verify?rd=https://auth.yourdomain.com","trustForwardHeader":true,"authResponseHeaders":["Remote-User","Remote-Groups","Remote-Name","Remote-Email"]}'),
+('authelia', 'Authelia', 'forwardAuth', '{"address":"http://authelia:9091/api/authz/forward-auth","trustForwardHeader":true,"authResponseHeaders":["Remote-User","Remote-Groups","Remote-Name","Remote-Email"]}'),
 ('authentik', 'Authentik', 'forwardAuth', '{"address":"http://authentik:9000/outpost.goauthentik.io/auth/traefik","trustForwardHeader":true,"authResponseHeaders":["X-authentik-username","X-authentik-groups","X-authentik-email","X-authentik-name","X-authentik-uid"]}'),
 ('basic-auth', 'Basic Auth', 'basicAuth', '{"users":["admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"]}');

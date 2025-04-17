@@ -125,7 +125,28 @@ func runPostMigrationUpdates(db *sql.DB) error {
 		
 		log.Println("Successfully added custom_headers column")
 	}
-	
+	// Check for router_priority column
+	var hasRouterPriorityColumn bool
+	err = db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM pragma_table_info('resources') 
+		WHERE name = 'router_priority'
+	`).Scan(&hasRouterPriorityColumn)
+
+	if err != nil {
+		return fmt.Errorf("failed to check if router_priority column exists: %w", err)
+	}
+
+	// If the column doesn't exist, add it
+	if !hasRouterPriorityColumn {
+		log.Println("Adding router_priority column to resources table")
+		
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN router_priority INTEGER DEFAULT 100"); err != nil {
+			return fmt.Errorf("failed to add router_priority column: %w", err)
+		}
+		
+		log.Println("Successfully added router_priority column")
+	}	
 	// Check for entrypoints column as well (from previous migration)
 	var hasEntrypointsColumn bool
 	err = db.QueryRow(`

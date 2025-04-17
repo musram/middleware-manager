@@ -251,10 +251,10 @@ type MiddlewareWithPriority struct {
 
 // processResources fetches and processes all resources and their middlewares
 func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
-    // Fetch all active resources with custom headers
+    // Fetch all active resources with custom headers and router priority
     rows, err := cg.db.Query(`
         SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains, 
-               r.custom_headers, rm.middleware_id, rm.priority
+               r.custom_headers, r.router_priority, rm.middleware_id, rm.priority
         FROM resources r
         LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
         WHERE r.status = 'active'
@@ -273,39 +273,50 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
         Entrypoints   string
         TLSDomains    string
         CustomHeaders string
+        RouterPriority int
     })
 
     for rows.Next() {
         var resourceID, host, serviceID, entrypoints, tlsDomains, customHeaders string
+        var routerPriority sql.NullInt64
         var middlewareID sql.NullString
-        var priority sql.NullInt64
+        var middlewarePriority sql.NullInt64
         
         if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, 
-                           &customHeaders, &middlewareID, &priority); err != nil {
+                           &customHeaders, &routerPriority, &middlewareID, &middlewarePriority); err != nil {
             log.Printf("Failed to scan resource middleware: %v", err)
             continue
         }
         
-        if middlewareID.Valid {
-            middleware := MiddlewareWithPriority{
-                ID:       middlewareID.String,
-                Priority: int(priority.Int64),
-            }
-            resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middleware)
+        // Set default router priority if null
+        priority := 100 // Default priority
+        if routerPriority.Valid {
+            priority = int(routerPriority.Int64)
         }
         
+        // Store resource info and router priority
         resourceInfo[resourceID] = struct {
             Host          string
             ServiceID     string
             Entrypoints   string
             TLSDomains    string
             CustomHeaders string
+            RouterPriority int
         }{
             Host:          host,
             ServiceID:     serviceID,
             Entrypoints:   entrypoints,
             TLSDomains:    tlsDomains,
             CustomHeaders: customHeaders,
+            RouterPriority: priority,
+        }
+        
+        if middlewareID.Valid {
+            middleware := MiddlewareWithPriority{
+                ID:       middlewareID.String,
+                Priority: int(middlewarePriority.Int64),
+            }
+            resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middleware)
         }
     }
 
@@ -398,13 +409,13 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
         // Create a router with higher priority
         customRouterID := fmt.Sprintf("%s-auth", resourceID)
         
-        // Basic router configuration
+        // Basic router configuration - use the resource's router priority
         routerConfig := map[string]interface{}{
             "rule":        fmt.Sprintf("Host(`%s`)", info.Host),
             "service":     fmt.Sprintf("%s@http", info.ServiceID),  // Reference service from http provider
             "entryPoints": entrypoints,
             "middlewares": middlewareIDs,
-            "priority":    100, // Higher than Pangolin's default
+            "priority":    info.RouterPriority, // Use the resource's router priority
         }
         
         // Add TLS configuration with optional domains for certificate
@@ -453,9 +464,9 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
 
 // processTCPRouters fetches and processes all resources with TCP SNI routing enabled
 func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
-	// Fetch resources with TCP routing enabled
+	// Fetch resources with TCP routing enabled including router priority
 	rows, err := cg.db.Query(`
-		SELECT id, host, service_id, tcp_entrypoints, tcp_sni_rule
+		SELECT id, host, service_id, tcp_entrypoints, tcp_sni_rule, router_priority
 		FROM resources
 		WHERE status = 'active' AND tcp_enabled = 1
 	`)
@@ -466,9 +477,17 @@ func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
 	
 	for rows.Next() {
 		var id, host, serviceID, tcpEntrypoints, tcpSNIRule string
-		if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypoints, &tcpSNIRule); err != nil {
+		var routerPriority sql.NullInt64
+		
+		if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypoints, &tcpSNIRule, &routerPriority); err != nil {
 			log.Printf("Failed to scan TCP resource: %v", err)
 			continue
+		}
+		
+		// Set default router priority if null
+		priority := 100 // Default priority
+		if routerPriority.Valid {
+			priority = int(routerPriority.Int64)
 		}
 		
 		// Process TCP entrypoints (comma-separated list to array)
@@ -496,13 +515,14 @@ func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
 			rule = tcpSNIRule
 		}
 		
-		// Create TCP router config
+		// Create TCP router config with the specified priority
 		tcpRouterID := fmt.Sprintf("%s-tcp", id)
 		config.TCP.Routers[tcpRouterID] = map[string]interface{}{
 			"rule":        rule,
 			"service":     serviceID, // Reference service from http provider
 			"entryPoints": entrypoints,
 			"tls":         map[string]interface{}{},  // Enable TLS for SNI
+			"priority":    priority,  // Use the resource's router priority
 		}
 	}
 	

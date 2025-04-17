@@ -124,6 +124,7 @@ func (s *Server) setupRoutes(uiPath string) {
 			resources.PUT("/:id/config/tls", s.updateTLSConfig)      // TLS certificate domains
 			resources.PUT("/:id/config/tcp", s.updateTCPConfig)      // TCP SNI routing
             resources.PUT("/:id/config/headers", s.updateHeadersConfig) // Custom Host headers
+			resources.PUT("/:id/config/priority", s.updateRouterPriority) // Router priority
 		}
 	}
 

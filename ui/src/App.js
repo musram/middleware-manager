@@ -116,7 +116,13 @@ updateTCPConfig: (resourceId, data) =>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then((res) => res.json()),
-
+  // Add to API service object
+  updateRouterPriority: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/priority`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
   // Middleware-related API calls
   getMiddlewares: () =>
     fetch(`${API_URL}/middlewares`).then((res) => res.json()),
@@ -862,6 +868,26 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [showHeadersConfigModal, setShowHeadersConfigModal] = useState(false);
   const [headerKey, setHeaderKey] = useState('');
   const [headerValue, setHeaderValue] = useState('');
+  const [routerPriority, setRouterPriority] = useState(100);
+
+  // Add this useEffect to load the router priority when the resource data loads
+  useEffect(() => {
+    if (resource) {
+      setRouterPriority(resource.router_priority || 100);
+    }
+  }, [resource]);
+
+  // Add this handler function
+  const handleUpdateRouterPriority = async () => {
+    try {
+      await api.updateRouterPriority(id, { router_priority: routerPriority });
+      alert('Router priority updated successfully');
+      fetchData(); // Refresh data
+    } catch (err) {
+      alert('Failed to update router priority');
+      console.error('Update router priority error:', err);
+    }
+  };
 
   // Fetch resource and middleware data
   const fetchData = async () => {
@@ -1299,6 +1325,38 @@ const removeHeader = (key) => {
           </div>
         </div>
       </div>
+      
+      {/* Add the Router Priority Configuration here */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Router Priority</h2>
+        <div className="mb-4">
+          <p className="text-gray-700">
+            Set the priority of this router. When multiple routers match the same request, 
+            the router with the highest priority (highest number) will be selected first.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Note: This is different from middleware priority, which controls the order middlewares 
+            are applied within a router.
+          </p>
+        </div>
+        
+        <div className="flex items-center">
+          <input
+            type="number"
+            value={routerPriority}
+            onChange={(e) => setRouterPriority(parseInt(e.target.value) || 100)}
+            className="w-24 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="1"
+            max="1000"
+          />
+          <button
+            onClick={handleUpdateRouterPriority}
+            className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Update Priority
+          </button>
+        </div>
+      </div>
   
       {/* Middlewares Section */}
       <div className="bg-white p-6 rounded-lg shadow">
@@ -1661,114 +1719,114 @@ const removeHeader = (key) => {
         </div>
       )}
       {/* Add Custom Headers Modal here */}
-{showHeadersConfigModal && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-      <div className="flex justify-between items-center px-6 py-4 border-b">
-        <h3 className="text-lg font-semibold">Custom Headers Configuration</h3>
-        <button
-          onClick={() => setShowHeadersConfigModal(false)}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ×
-        </button>
-      </div>
-      <div className="px-6 py-4">
-        <form onSubmit={handleUpdateHeadersConfig}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Custom Request Headers
-            </label>
-            
-            {/* Current headers list */}
-            {Object.keys(customHeaders).length > 0 ? (
-              <div className="mb-4 border rounded p-3">
-                <h4 className="text-sm font-semibold mb-2">Current Headers</h4>
-                <ul className="space-y-2">
-                  {Object.entries(customHeaders).map(([key, value]) => (
-                    <li key={key} className="flex justify-between items-center">
-                      <div>
-                        <span className="font-medium">{key}:</span> {value}
+      {showHeadersConfigModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">Custom Headers Configuration</h3>
+              <button
+                onClick={() => setShowHeadersConfigModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <form onSubmit={handleUpdateHeadersConfig}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">
+                    Custom Request Headers
+                  </label>
+                  
+                  {/* Current headers list */}
+                  {Object.keys(customHeaders).length > 0 ? (
+                    <div className="mb-4 border rounded p-3">
+                      <h4 className="text-sm font-semibold mb-2">Current Headers</h4>
+                      <ul className="space-y-2">
+                        {Object.entries(customHeaders).map(([key, value]) => (
+                          <li key={key} className="flex justify-between items-center">
+                            <div>
+                              <span className="font-medium">{key}:</span> {value}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeHeader(key)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-4">No custom headers configured.</p>
+                  )}
+                  
+                  {/* Add new header */}
+                  <div className="border rounded p-3">
+                    <h4 className="text-sm font-semibold mb-2">Add New Header</h4>
+                    <div className="grid grid-cols-5 gap-2 mb-2">
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={headerKey}
+                          onChange={(e) => setHeaderKey(e.target.value)}
+                          placeholder="Header name"
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeHeader(key)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 mb-4">No custom headers configured.</p>
-            )}
-            
-            {/* Add new header */}
-            <div className="border rounded p-3">
-              <h4 className="text-sm font-semibold mb-2">Add New Header</h4>
-              <div className="grid grid-cols-5 gap-2 mb-2">
-                <div className="col-span-2">
-                  <input
-                    type="text"
-                    value={headerKey}
-                    onChange={(e) => setHeaderKey(e.target.value)}
-                    placeholder="Header name"
-                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={headerValue}
+                          onChange={(e) => setHeaderValue(e.target.value)}
+                          placeholder="Header value"
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <button
+                          type="button"
+                          onClick={addHeader}
+                          className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Common examples: Host, X-Forwarded-Host
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>Host</strong>: To modify the hostname sent to the backend service
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>X-Forwarded-Host</strong>: To pass the original hostname to the backend
+                    </p>
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  <input
-                    type="text"
-                    value={headerValue}
-                    onChange={(e) => setHeaderValue(e.target.value)}
-                    placeholder="Header value"
-                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="col-span-1">
+                
+                <div className="flex justify-end space-x-3">
                   <button
                     type="button"
-                    onClick={addHeader}
-                    className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    onClick={() => setShowHeadersConfigModal(false)}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
                   >
-                    Add
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                  >
+                    Save Headers
                   </button>
                 </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Common examples: Host, X-Forwarded-Host
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                <strong>Host</strong>: To modify the hostname sent to the backend service
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                <strong>X-Forwarded-Host</strong>: To pass the original hostname to the backend
-              </p>
+              </form>
             </div>
           </div>
-          
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => setShowHeadersConfigModal(false)}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-            >
-              Save Headers
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
     </div>
   );
 };

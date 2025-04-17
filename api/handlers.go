@@ -136,7 +136,59 @@ func (s *Server) getMiddleware(c *gin.Context) {
 
 	c.JSON(http.StatusOK, middleware)
 }
-
+// updateRouterPriority updates the router priority for a resource
+func (s *Server) updateRouterPriority(c *gin.Context) {
+    id := c.Param("id")
+    if id == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
+        return
+    }
+    
+    var input struct {
+        RouterPriority int `json:"router_priority" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&input); err != nil {
+        ResponseWithError(c, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
+        return
+    }
+    
+    // Verify resource exists and is active
+    var exists int
+    var status string
+    err := s.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", id).Scan(&exists, &status)
+    if err == sql.ErrNoRows {
+        ResponseWithError(c, http.StatusNotFound, "Resource not found")
+        return
+    } else if err != nil {
+        log.Printf("Error checking resource existence: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // Don't allow updating disabled resources
+    if status == "disabled" {
+        ResponseWithError(c, http.StatusBadRequest, "Cannot update a disabled resource")
+        return
+    }
+    
+    // Update the resource
+    _, err = s.db.Exec(
+        "UPDATE resources SET router_priority = ?, updated_at = ? WHERE id = ?",
+        input.RouterPriority, time.Now(), id,
+    )
+    
+    if err != nil {
+        log.Printf("Error updating router priority: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to update router priority")
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "id": id,
+        "router_priority": input.RouterPriority,
+    })
+}
 // updateMiddleware updates a middleware configuration
 func (s *Server) updateMiddleware(c *gin.Context) {
 	id := c.Param("id")
