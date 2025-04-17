@@ -6,26 +6,29 @@ import (
 
 // Resource represents a Pangolin resource
 type Resource struct {
-	ID            string    `json:"id"`
-	Host          string    `json:"host"`
-	ServiceID     string    `json:"service_id"`
-	OrgID         string    `json:"org_id"`
-	SiteID        string    `json:"site_id"`
-	Status        string    `json:"status"`
+	ID             string    `json:"id"`
+	Host           string    `json:"host"`
+	ServiceID      string    `json:"service_id"`
+	OrgID          string    `json:"org_id"`
+	SiteID         string    `json:"site_id"`
+	Status         string    `json:"status"`
 	
 	// HTTP router configuration
-	Entrypoints   string    `json:"entrypoints"`
+	Entrypoints    string    `json:"entrypoints"`
 	
 	// TLS certificate configuration
-	TLSDomains    string    `json:"tls_domains"`
+	TLSDomains     string    `json:"tls_domains"`
 	
 	// TCP SNI routing configuration
-	TCPEnabled    bool      `json:"tcp_enabled"`
-	TCPEntrypoints string   `json:"tcp_entrypoints"`
-	TCPSNIRule    string    `json:"tcp_sni_rule"`
+	TCPEnabled     bool      `json:"tcp_enabled"`
+	TCPEntrypoints string    `json:"tcp_entrypoints"`
+	TCPSNIRule     string    `json:"tcp_sni_rule"`
 	
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	// Custom headers configuration
+	CustomHeaders  string    `json:"custom_headers"`
+	
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 	
 	// Middlewares is a list of associated middlewares, populated when needed
 	Middlewares []ResourceMiddleware `json:"middlewares,omitempty"`

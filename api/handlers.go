@@ -878,7 +878,67 @@ func generateID() (string, error) {
 	}
 	return hex.EncodeToString(bytes), nil
 }
-
+// updateHeadersConfig updates the custom headers configuration
+func (s *Server) updateHeadersConfig(c *gin.Context) {
+    id := c.Param("id")
+    if id == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
+        return
+    }
+    
+    var input struct {
+        CustomHeaders map[string]string `json:"custom_headers" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&input); err != nil {
+        ResponseWithError(c, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
+        return
+    }
+    
+    // Verify resource exists and is active
+    var exists int
+    var status string
+    err := s.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", id).Scan(&exists, &status)
+    if err == sql.ErrNoRows {
+        ResponseWithError(c, http.StatusNotFound, "Resource not found")
+        return
+    } else if err != nil {
+        log.Printf("Error checking resource existence: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // Don't allow updating disabled resources
+    if status == "disabled" {
+        ResponseWithError(c, http.StatusBadRequest, "Cannot update a disabled resource")
+        return
+    }
+    
+    // Convert headers to JSON for storage
+    headersJSON, err := json.Marshal(input.CustomHeaders)
+    if err != nil {
+        log.Printf("Error encoding headers: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to encode headers")
+        return
+    }
+    
+    // Update the resource
+    _, err = s.db.Exec(
+        "UPDATE resources SET custom_headers = ?, updated_at = ? WHERE id = ?",
+        string(headersJSON), time.Now(), id,
+    )
+    
+    if err != nil {
+        log.Printf("Error updating custom headers: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to update custom headers")
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "id": id,
+        "custom_headers": input.CustomHeaders,
+    })
+}
 // isValidMiddlewareType checks if a middleware type is valid
 func isValidMiddlewareType(typ string) bool {
 	validTypes := map[string]bool{

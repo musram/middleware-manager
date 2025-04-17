@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -243,150 +244,188 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 
 // processResources fetches and processes all resources and their middlewares
 func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
-	// Fetch all active resources and their middlewares
-	rows, err := cg.db.Query(`
-		SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains, 
-		       rm.middleware_id, rm.priority
-		FROM resources r
-		JOIN resource_middlewares rm ON r.id = rm.resource_id
-		WHERE r.status = 'active'
-		ORDER BY rm.priority DESC
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to fetch resources: %w", err)
-	}
-	defer rows.Close()
+    // Fetch all active resources with custom headers
+    rows, err := cg.db.Query(`
+        SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains, 
+               r.custom_headers, rm.middleware_id, rm.priority
+        FROM resources r
+        LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
+        WHERE r.status = 'active'
+        ORDER BY rm.priority DESC
+    `)
+    if err != nil {
+        return fmt.Errorf("failed to fetch resources: %w", err)
+    }
+    defer rows.Close()
 
-	// Group middlewares by resource
-	resourceMiddlewares := make(map[string][]string)
-	resourceInfo := make(map[string]struct {
-		Host         string
-		ServiceID    string
-		Entrypoints  string
-		TLSDomains   string
-	})
+    // Group middlewares by resource
+    resourceMiddlewares := make(map[string][]string)
+    resourceInfo := make(map[string]struct {
+        Host          string
+        ServiceID     string
+        Entrypoints   string
+        TLSDomains    string
+        CustomHeaders string
+    })
 
 	for rows.Next() {
-		var resourceID, host, serviceID, entrypoints, tlsDomains, middlewareID string
-		var priority int
-		if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, &middlewareID, &priority); err != nil {
+		var resourceID, host, serviceID, entrypoints, tlsDomains, customHeaders string
+		var middlewareID sql.NullString
+		var priority sql.NullInt64
+		
+		if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, 
+						   &customHeaders, &middlewareID, &priority); err != nil {
 			log.Printf("Failed to scan resource middleware: %v", err)
 			continue
 		}
-
-		resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middlewareID)
-		resourceInfo[resourceID] = struct {
-			Host         string
-			ServiceID    string
-			Entrypoints  string
-			TLSDomains   string
-		}{
-			Host:         host,
-			ServiceID:    serviceID,
-			Entrypoints:  entrypoints,
-			TLSDomains:   tlsDomains,
-		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error during resource rows iteration: %w", err)
-	}
-
-	// Create routers for resources with custom middlewares
-	for resourceID, middlewares := range resourceMiddlewares {
-		info, exists := resourceInfo[resourceID]
-		if !exists {
-			log.Printf("Warning: Resource info not found for %s", resourceID)
-			continue
-		}
 		
-		// Process entrypoints (comma-separated list to array)
-		entrypoints := []string{"websecure"} // Default
-		if info.Entrypoints != "" {
-			// Split by comma and trim spaces
-			rawEntrypoints := strings.Split(info.Entrypoints, ",")
-			entrypoints = make([]string, 0, len(rawEntrypoints))
-			for _, ep := range rawEntrypoints {
-				trimmed := strings.TrimSpace(ep)
-				if trimmed != "" {
-					entrypoints = append(entrypoints, trimmed)
-				}
-			}
-			
-			// If after processing we have no valid entrypoints, use the default
-			if len(entrypoints) == 0 {
-				entrypoints = []string{"websecure"}
-			}
-		}
-		
-		// Add "badger" middleware with http provider suffix if not already present
-		if !stringSliceContains(middlewares, "badger@http") {
-			middlewares = append(middlewares, "badger@http")
-		}
+        if middlewareID.Valid {
+            resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middlewareID.String)
+        }
+        
+        resourceInfo[resourceID] = struct {
+            Host          string
+            ServiceID     string
+            Entrypoints   string
+            TLSDomains    string
+            CustomHeaders string
+        }{
+            Host:          host,
+            ServiceID:     serviceID,
+            Entrypoints:   entrypoints,
+            TLSDomains:    tlsDomains,
+            CustomHeaders: customHeaders,
+        }
+    }
 
-		// Process middleware references to add provider suffixes
-		for i, middleware := range middlewares {
-			// If this is not already a fully qualified middleware reference and not the Pangolin badger middleware
-			if !strings.Contains(middleware, "@") && middleware != "badger@http" {
-				// Assume it's from our file provider
-				middlewares[i] = fmt.Sprintf("%s@file", middleware)
-			}
-		}
+    if err := rows.Err(); err != nil {
+        return fmt.Errorf("error during resource rows iteration: %w", err)
+    }
 
-		// Create a router with higher priority
-		customRouterID := fmt.Sprintf("%s-auth", resourceID)
-		
-		// Basic router configuration
-		routerConfig := map[string]interface{}{
-			"rule":        fmt.Sprintf("Host(`%s`)", info.Host),
-			"service":     fmt.Sprintf("%s@http", info.ServiceID),  // Reference service from http provider
-			"entryPoints": entrypoints,
-			"middlewares": middlewares,
-			"priority":    100, // Higher than Pangolin's default
-		}
-		
-		// Add TLS configuration with optional domains for certificate
-		if info.TLSDomains != "" {
-			// Parse the comma-separated domains
-			domains := strings.Split(info.TLSDomains, ",")
-			// Clean up the domains
-			var cleanDomains []string
-			for _, domain := range domains {
-				domain = strings.TrimSpace(domain)
-				if domain != "" {
-					cleanDomains = append(cleanDomains, domain)
-				}
-			}
-			
-			if len(cleanDomains) > 0 {
-				// Create TLS configuration with domains
-				tlsConfig := map[string]interface{}{
-					"certResolver": "letsencrypt",
-					"domains": []map[string]interface{}{
-						{
-							"main": info.Host,
-							"sans": cleanDomains,
-						},
-					},
-				}
-				routerConfig["tls"] = tlsConfig
-			} else {
-				// Default TLS config if no additional domains
-				routerConfig["tls"] = map[string]interface{}{
-					"certResolver": "letsencrypt",
-				}
-			}
-		} else {
-			// Default TLS config
-			routerConfig["tls"] = map[string]interface{}{
-				"certResolver": "letsencrypt",
-			}
-		}
-		
-		config.HTTP.Routers[customRouterID] = routerConfig
-	}
+    // Create routers for resources with custom middlewares
+    for resourceID, middlewares := range resourceMiddlewares {
+        info, exists := resourceInfo[resourceID]
+        if !exists {
+            log.Printf("Warning: Resource info not found for %s", resourceID)
+            continue
+        }
+        
+        // Process entrypoints (comma-separated list to array)
+        entrypoints := []string{"websecure"} // Default
+        if info.Entrypoints != "" {
+            // Split by comma and trim spaces
+            rawEntrypoints := strings.Split(info.Entrypoints, ",")
+            entrypoints = make([]string, 0, len(rawEntrypoints))
+            for _, ep := range rawEntrypoints {
+                trimmed := strings.TrimSpace(ep)
+                if trimmed != "" {
+                    entrypoints = append(entrypoints, trimmed)
+                }
+            }
+            
+            // If after processing we have no valid entrypoints, use the default
+            if len(entrypoints) == 0 {
+                entrypoints = []string{"websecure"}
+            }
+        }
+        
+        // Process custom headers if present
+        var customHeadersMiddleware string
+        if info.CustomHeaders != "" && info.CustomHeaders != "{}" && info.CustomHeaders != "null" {
+            // Parse the custom headers
+            var customHeaders map[string]string
+            if err := json.Unmarshal([]byte(info.CustomHeaders), &customHeaders); err != nil {
+                log.Printf("Failed to parse custom headers for resource %s: %v", resourceID, err)
+            } else if len(customHeaders) > 0 {
+                // Create a custom headers middleware
+                customHeadersMiddlewareID := fmt.Sprintf("%s-custom-headers", resourceID)
+                
+                // Add the middleware to the config
+                config.HTTP.Middlewares[customHeadersMiddlewareID] = map[string]interface{}{
+                    "headers": map[string]interface{}{
+                        "customRequestHeaders": customHeaders,
+                    },
+                }
+                
+                // Add reference with file provider suffix
+                customHeadersMiddleware = fmt.Sprintf("%s@file", customHeadersMiddlewareID)
+                
+                // Add to middlewares list if not already present
+                if !stringSliceContains(middlewares, customHeadersMiddleware) {
+                    // Add at beginning to ensure the headers are set before other middlewares process the request
+                    middlewares = append([]string{customHeadersMiddleware}, middlewares...)
+                }
+            }
+        }
+        
+        // Add "badger" middleware with http provider suffix if not already present
+        if !stringSliceContains(middlewares, "badger@http") {
+            middlewares = append(middlewares, "badger@http")
+        }
 
-	return nil
+        // Process middleware references to add provider suffixes
+        for i, middleware := range middlewares {
+            // If this is not already a fully qualified middleware reference and not the Pangolin badger middleware
+            if !strings.Contains(middleware, "@") && middleware != "badger@http" && middleware != customHeadersMiddleware {
+                // Assume it's from our file provider
+                middlewares[i] = fmt.Sprintf("%s@file", middleware)
+            }
+        }
+
+        // Create a router with higher priority
+        customRouterID := fmt.Sprintf("%s-auth", resourceID)
+        
+        // Basic router configuration
+        routerConfig := map[string]interface{}{
+            "rule":        fmt.Sprintf("Host(`%s`)", info.Host),
+            "service":     fmt.Sprintf("%s@http", info.ServiceID),  // Reference service from http provider
+            "entryPoints": entrypoints,
+            "middlewares": middlewares,
+            "priority":    100, // Higher than Pangolin's default
+        }
+        
+        // Add TLS configuration with optional domains for certificate
+        if info.TLSDomains != "" {
+            // Parse the comma-separated domains
+            domains := strings.Split(info.TLSDomains, ",")
+            // Clean up the domains
+            var cleanDomains []string
+            for _, domain := range domains {
+                domain = strings.TrimSpace(domain)
+                if domain != "" {
+                    cleanDomains = append(cleanDomains, domain)
+                }
+            }
+            
+            if len(cleanDomains) > 0 {
+                // Create TLS configuration with domains
+                tlsConfig := map[string]interface{}{
+                    "certResolver": "letsencrypt",
+                    "domains": []map[string]interface{}{
+                        {
+                            "main": info.Host,
+                            "sans": cleanDomains,
+                        },
+                    },
+                }
+                routerConfig["tls"] = tlsConfig
+            } else {
+                // Default TLS config if no additional domains
+                routerConfig["tls"] = map[string]interface{}{
+                    "certResolver": "letsencrypt",
+                }
+            }
+        } else {
+            // Default TLS config
+            routerConfig["tls"] = map[string]interface{}{
+                "certResolver": "letsencrypt",
+            }
+        }
+        
+        config.HTTP.Routers[customRouterID] = routerConfig
+    }
+
+    return nil
 }
 
 // processTCPRouters fetches and processes all resources with TCP SNI routing enabled
@@ -438,7 +477,7 @@ func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
 		tcpRouterID := fmt.Sprintf("%s-tcp", id)
 		config.TCP.Routers[tcpRouterID] = map[string]interface{}{
 			"rule":        rule,
-			"service":     fmt.Sprintf("%s@http", serviceID), // Reference service from http provider
+			"service":     serviceID, // Reference service from http provider
 			"entryPoints": entrypoints,
 			"tls":         map[string]interface{}{},  // Enable TLS for SNI
 		}

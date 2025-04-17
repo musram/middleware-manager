@@ -107,7 +107,15 @@ updateTCPConfig: (resourceId, data) =>
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
-  }).then((res) => res.json()),  
+  }).then((res) => res.json()),
+  
+  // Headers config
+  updateHeadersConfig: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/headers`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
 
   // Middleware-related API calls
   getMiddlewares: () =>
@@ -849,6 +857,12 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [tcpSNIRule, setTCPSNIRule] = useState('');
   const [showTCPConfigModal, setShowTCPConfigModal] = useState(false);
 
+  // new state variables for headers
+  const [customHeaders, setCustomHeaders] = useState({});
+  const [showHeadersConfigModal, setShowHeadersConfigModal] = useState(false);
+  const [headerKey, setHeaderKey] = useState('');
+  const [headerValue, setHeaderValue] = useState('');
+
   // Fetch resource and middleware data
   const fetchData = async () => {
     try {
@@ -868,6 +882,18 @@ const ResourceDetail = ({ id, navigateTo }) => {
       setTCPEnabled(resourceData.tcp_enabled || false);
       setTCPEntrypoints(resourceData.tcp_entrypoints || 'tcp');
       setTCPSNIRule(resourceData.tcp_sni_rule || '');
+
+      // Add this code here for custom headers parsing
+    if (resourceData.custom_headers) {
+      try {
+        setCustomHeaders(JSON.parse(resourceData.custom_headers));
+      } catch (e) {
+        console.error("Error parsing custom headers:", e);
+        setCustomHeaders({});
+      }
+    } else {
+      setCustomHeaders({});
+    }
 
       // Parse assigned middlewares
       const middlewaresList = parseMiddlewares(resourceData.middlewares);
@@ -917,6 +943,15 @@ const ResourceDetail = ({ id, navigateTo }) => {
       alert('Failed to update TLS certificate domains');
       console.error('Update TLS config error:', err);
     }
+    try {
+      await api.updateHeadersConfig(id, { custom_headers: customHeaders });
+      setShowHeadersConfigModal(false);
+      fetchData();
+      alert('Custom headers updated successfully');
+    } catch (err) {
+      alert('Failed to update custom headers');
+      console.error('Update headers config error:', err);
+    }
   };
   
   const handleUpdateTCPConfig = async (e) => {
@@ -936,6 +971,29 @@ const ResourceDetail = ({ id, navigateTo }) => {
       console.error('Update TCP config error:', err);
     }
   };
+
+  // Function to add new header
+const addHeader = () => {
+  if (!headerKey.trim()) {
+    alert('Header key cannot be empty');
+    return;
+  }
+  
+  setCustomHeaders({
+    ...customHeaders,
+    [headerKey]: headerValue
+  });
+  
+  setHeaderKey('');
+  setHeaderValue('');
+};
+
+// Function to remove header
+const removeHeader = (key) => {
+  const newHeaders = {...customHeaders};
+  delete newHeaders[key];
+  setCustomHeaders(newHeaders);
+};
 
   // Handle multiple middleware selection
   const handleMiddlewareSelection = (e) => {
@@ -1172,6 +1230,15 @@ const ResourceDetail = ({ id, navigateTo }) => {
           >
             TCP SNI Routing
           </button>
+
+          {/* Add the Custom Headers button here */}
+          <button
+            onClick={() => setShowHeadersConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Custom Headers
+          </button>
         </div>
   
         {/* Current Configuration Summary */}
@@ -1204,6 +1271,19 @@ const ResourceDetail = ({ id, navigateTo }) => {
                 )}
               </>
             )}
+            {/* Add Custom Headers summary here */}
+      {Object.keys(customHeaders).length > 0 && (
+        <div>
+          <p className="text-sm text-gray-500">Custom Headers</p>
+          <div className="font-medium">
+            {Object.entries(customHeaders).map(([key, value]) => (
+              <div key={key} className="text-sm">
+                <span className="font-mono">{key}</span>: <span className="font-mono">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
           </div>
         </div>
       </div>
@@ -1568,6 +1648,115 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
+      {/* Add Custom Headers Modal here */}
+{showHeadersConfigModal && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+      <div className="flex justify-between items-center px-6 py-4 border-b">
+        <h3 className="text-lg font-semibold">Custom Headers Configuration</h3>
+        <button
+          onClick={() => setShowHeadersConfigModal(false)}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          ×
+        </button>
+      </div>
+      <div className="px-6 py-4">
+        <form onSubmit={handleUpdateHeadersConfig}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Custom Request Headers
+            </label>
+            
+            {/* Current headers list */}
+            {Object.keys(customHeaders).length > 0 ? (
+              <div className="mb-4 border rounded p-3">
+                <h4 className="text-sm font-semibold mb-2">Current Headers</h4>
+                <ul className="space-y-2">
+                  {Object.entries(customHeaders).map(([key, value]) => (
+                    <li key={key} className="flex justify-between items-center">
+                      <div>
+                        <span className="font-medium">{key}:</span> {value}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeHeader(key)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 mb-4">No custom headers configured.</p>
+            )}
+            
+            {/* Add new header */}
+            <div className="border rounded p-3">
+              <h4 className="text-sm font-semibold mb-2">Add New Header</h4>
+              <div className="grid grid-cols-5 gap-2 mb-2">
+                <div className="col-span-2">
+                  <input
+                    type="text"
+                    value={headerKey}
+                    onChange={(e) => setHeaderKey(e.target.value)}
+                    placeholder="Header name"
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    type="text"
+                    value={headerValue}
+                    onChange={(e) => setHeaderValue(e.target.value)}
+                    placeholder="Header value"
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <button
+                    type="button"
+                    onClick={addHeader}
+                    className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Common examples: Host, X-Forwarded-Host
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                <strong>Host</strong>: To modify the hostname sent to the backend service
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                <strong>X-Forwarded-Host</strong>: To pass the original hostname to the backend
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setShowHeadersConfigModal(false)}
+              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            >
+              Save Headers
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

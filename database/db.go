@@ -103,9 +103,32 @@ func runMigrations(db *sql.DB) error {
 // runPostMigrationUpdates handles migrations that SQLite can't do easily in schema migrations
 func runPostMigrationUpdates(db *sql.DB) error {
 	// Check if existing resources table is missing any of our columns
-	// We'll check just one of the new columns - if it's missing, we'll likely need to add them all
-	var hasEntrypointsColumn bool
+	// We'll check for the custom_headers column
+	var hasCustomHeadersColumn bool
 	err := db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM pragma_table_info('resources') 
+		WHERE name = 'custom_headers'
+	`).Scan(&hasCustomHeadersColumn)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check if custom_headers column exists: %w", err)
+	}
+	
+	// If the column doesn't exist, we need to add it to the existing table
+	if !hasCustomHeadersColumn {
+		log.Println("Adding custom_headers column to resources table")
+		
+		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN custom_headers TEXT DEFAULT ''"); err != nil {
+			return fmt.Errorf("failed to add custom_headers column: %w", err)
+		}
+		
+		log.Println("Successfully added custom_headers column")
+	}
+	
+	// Check for entrypoints column as well (from previous migration)
+	var hasEntrypointsColumn bool
+	err = db.QueryRow(`
 		SELECT COUNT(*) > 0 
 		FROM pragma_table_info('resources') 
 		WHERE name = 'entrypoints'
@@ -115,9 +138,9 @@ func runPostMigrationUpdates(db *sql.DB) error {
 		return fmt.Errorf("failed to check if entrypoints column exists: %w", err)
 	}
 	
-	// If the column doesn't exist, we need to add all the new columns to the existing table
+	// If the column doesn't exist, add the routing columns too
 	if !hasEntrypointsColumn {
-		log.Println("Adding new configuration columns to resources table")
+		log.Println("Adding routing configuration columns to resources table")
 		
 		// Add columns for HTTP routing
 		if _, err := db.Exec("ALTER TABLE resources ADD COLUMN entrypoints TEXT DEFAULT 'websecure'"); err != nil {
@@ -142,7 +165,7 @@ func runPostMigrationUpdates(db *sql.DB) error {
 			return fmt.Errorf("failed to add tcp_sni_rule column: %w", err)
 		}
 		
-		log.Println("Successfully added all new configuration columns")
+		log.Println("Successfully added all routing configuration columns")
 	}
 	
 	return nil
@@ -216,6 +239,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 	rows, err := db.Query(`
 		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status, 
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
+		       r.custom_headers,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -229,12 +253,12 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 	var resources []map[string]interface{}
 	for rows.Next() {
-		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule string
+		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
 		var tcpEnabled int
 		var middlewares sql.NullString
 		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, 
 				   &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-				   &middlewares); err != nil {
+				   &customHeaders, &middlewares); err != nil {
 			return nil, fmt.Errorf("row scan failed: %w", err)
 		}
 		
@@ -250,6 +274,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 			"tcp_enabled":     tcpEnabled > 0,
 			"tcp_entrypoints": tcpEntrypoints,
 			"tcp_sni_rule":    tcpSNIRule,
+			"custom_headers":  customHeaders,
 		}
 		
 		if middlewares.Valid {
@@ -270,13 +295,14 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 // GetResource fetches a specific resource by ID
 func (db *DB) GetResource(id string) (map[string]interface{}, error) {
-	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule string
+	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
 	var tcpEnabled int
 	var middlewares sql.NullString
 
 	err := db.QueryRow(`
 		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
+		       r.custom_headers,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -285,7 +311,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		GROUP BY r.id
 	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
 		    &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-		    &middlewares)
+		    &customHeaders, &middlewares)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("resource not found: %s", id)
@@ -305,6 +331,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		"tcp_enabled":     tcpEnabled > 0,
 		"tcp_entrypoints": tcpEntrypoints,
 		"tcp_sni_rule":    tcpSNIRule,
+		"custom_headers":  customHeaders,
 	}
 
 	if middlewares.Valid {

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS middlewares (
 );
 
 -- Resources table stores Pangolin resources
--- Includes all the new configuration columns for custom entrypoints, TLS domains, and TCP SNI routing
+-- Includes all configuration columns including the new custom_headers column
 CREATE TABLE IF NOT EXISTS resources (
     id TEXT PRIMARY KEY,
     host TEXT NOT NULL,
@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS resources (
     tcp_enabled INTEGER DEFAULT 0,
     tcp_entrypoints TEXT DEFAULT 'tcp',
     tcp_sni_rule TEXT DEFAULT '',
+    
+    -- Custom headers configuration
+    custom_headers TEXT DEFAULT '',
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

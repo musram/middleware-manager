@@ -119,10 +119,11 @@ func (s *Server) setupRoutes(uiPath string) {
 			resources.POST("/:id/middlewares/bulk", s.assignMultipleMiddlewares)
 			resources.DELETE("/:id/middlewares/:middlewareId", s.removeMiddleware)
 			
-			// New routes for router configuration
+			// Router configuration routes
 			resources.PUT("/:id/config/http", s.updateHTTPConfig)    // HTTP entrypoints
 			resources.PUT("/:id/config/tls", s.updateTLSConfig)      // TLS certificate domains
 			resources.PUT("/:id/config/tcp", s.updateTCPConfig)      // TCP SNI routing
+            resources.PUT("/:id/config/headers", s.updateHeadersConfig) // Custom Host headers
 		}
 	}
 
