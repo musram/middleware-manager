@@ -1,4 +1,22 @@
-# Pangolin Middleware Manager
+<div align="center">
+    <h1 align="center"><a href="https://forum.hhf.technology/t/enhancing-your-pangolin-deployment-with-middleware-manager">Pangolin Middleware Manager</a></h1>
+
+</div>
+
+<h3 align="center">Middleware/Router Manager for your Pangolin Stack</h3>
+<div align="center">
+
+
+</div>
+
+<div align="center">
+  <h5>
+<img src="screenshots/dashboard.jpeg" alt="Preview"/>
+<img src="screenshots/middleware-list.jpeg" alt="Preview"/>
+<img src="screenshots/middlewares.jpeg" alt="Preview"/>
+<img src="screenshots/resources.jpeg" alt="Preview"/>
+  </h5>
+</div>
 
 A specialized microservice that enhances your Pangolin deployment by enabling custom Traefik middleware attachment to resources without modifying Pangolin itself. This provides crucial functionality for implementing authentication, security headers, rate limiting, and other middleware-based protections.
 
