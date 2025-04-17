@@ -1979,33 +1979,59 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   // Available middleware types
   const middlewareTypes = [
     { value: 'basicAuth', label: 'Basic Authentication' },
+    { value: 'digestAuth', label: 'Digest Authentication' },
     { value: 'forwardAuth', label: 'Forward Authentication' },
     { value: 'ipWhiteList', label: 'IP Whitelist' },
+    { value: 'ipAllowList', label: 'IP Allow List' },
     { value: 'rateLimit', label: 'Rate Limiting' },
     { value: 'headers', label: 'HTTP Headers' },
     { value: 'stripPrefix', label: 'Strip Prefix' },
+    { value: 'stripPrefixRegex', label: 'Strip Prefix Regex' },
     { value: 'addPrefix', label: 'Add Prefix' },
     { value: 'redirectRegex', label: 'Redirect Regex' },
     { value: 'redirectScheme', label: 'Redirect Scheme' },
+    { value: 'replacePath', label: 'Replace Path' },
+    { value: 'replacePathRegex', label: 'Replace Path Regex' },
     { value: 'chain', label: 'Middleware Chain' },
-    { value: 'replacepathregex', label: 'Replace Path Regex' },
-    { value: 'plugin', label: 'Traefik Plugin' }
+    { value: 'plugin', label: 'Traefik Plugin' },
+    { value: 'buffering', label: 'Buffering' },
+    { value: 'circuitBreaker', label: 'Circuit Breaker' },
+    { value: 'compress', label: 'Compression' },
+    { value: 'contentType', label: 'Content Type' },
+    { value: 'errors', label: 'Error Pages' },
+    { value: 'grpcWeb', label: 'gRPC Web' },
+    { value: 'inFlightReq', label: 'In-Flight Request Limiter' },
+    { value: 'passTLSClientCert', label: 'Pass TLS Client Certificate' },
+    { value: 'retry', label: 'Retry' }
   ];
 
   // Template configs for different middleware types
   const configTemplates = {
     basicAuth: '{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}',
+    digestAuth: '{\n  "users": [\n    "test:traefik:a2688e031edb4be6a3797f3882655c05"\n  ]\n}', 
     forwardAuth: '{\n  "address": "http://auth-service:9090/auth",\n  "trustForwardHeader": true,\n  "authResponseHeaders": [\n    "X-Auth-User",\n    "X-Auth-Roles"\n  ]\n}',
     ipWhiteList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
+    ipAllowList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
     rateLimit: '{\n  "average": 100,\n  "burst": 50\n}',
     headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000\n}',
-    stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ]\n}',
+    stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ],\n  "forceSlash": true\n}',
     addPrefix: '{\n  "prefix": "/api"\n}',
-    redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}"\n}',
-    redirectScheme: '{\n  "scheme": "https",\n  "permanent": true\n}',
+    redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}",\n  "permanent": true\n}',
+    redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
     chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
-    replacepathregex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/$1"\n}',
-    plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}'
+    replacePath: '{\n  "path": "/newpath"\n}',
+    replacePathRegex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/$1"\n}',
+    stripPrefixRegex: '{\n  "regex": [\n    "^/api/v\\\\d+/"\n  ]\n}',
+    plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}',
+    buffering: '{\n  "maxRequestBodyBytes": 5000000,\n  "memRequestBodyBytes": 2000000,\n  "maxResponseBodyBytes": 5000000,\n  "memResponseBodyBytes": 2000000,\n  "retryExpression": "IsNetworkError() && Attempts() < 2"\n}',
+    circuitBreaker: '{\n  "expression": "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",\n  "checkPeriod": "10s",\n  "fallbackDuration": "30s",\n  "recoveryDuration": "60s"\n}',
+    compress: '{\n  "excludedContentTypes": [\n    "text/event-stream"\n  ],\n  "minResponseBodyBytes": 1024\n}',
+    contentType: '{}',
+    errors: '{\n  "status": ["500-599"],\n  "service": "error-handler-service",\n  "query": "/{status}.html"\n}',
+    grpcWeb: '{\n  "allowOrigins": ["*"]\n}',
+    inFlightReq: '{\n  "amount": 10,\n  "sourceCriterion": {\n    "ipStrategy": {\n      "depth": 2,\n      "excludedIPs": ["127.0.0.1/32"]\n    }\n  }\n}',
+    passTLSClientCert: '{\n  "pem": true\n}',
+    retry: '{\n  "attempts": 3,\n  "initialInterval": "100ms"\n}'
   };
 
   // Fetch middleware details if editing

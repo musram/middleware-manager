@@ -114,51 +114,348 @@ func SaveTemplateFile(templatesDir string) error {
 	}
 	
 	// Create default templates
-	templates := DefaultTemplates{
-		Middlewares: []DefaultMiddleware{
-			{
-				ID:   "authelia",
-				Name: "Authelia",
-				Type: "forwardAuth",
-				Config: map[string]interface{}{
-					"address":            "http://authelia:9091/api/verify?rd=https://auth.yourdomain.com",
-					"trustForwardHeader": true,
-					"authResponseHeaders": []string{
-						"Remote-User",
-						"Remote-Groups",
-						"Remote-Name",
-						"Remote-Email",
-					},
+// Create default templates
+templates := DefaultTemplates{
+	Middlewares: []DefaultMiddleware{
+		// Authentication middlewares
+		{
+			ID:   "authelia",
+			Name: "Authelia",
+			Type: "forwardAuth",
+			Config: map[string]interface{}{
+				"address":            "http://authelia:9091/api/authz/forward-auth",
+				"trustForwardHeader": true,
+				"authResponseHeaders": []string{
+					"Remote-User",
+					"Remote-Groups",
+					"Remote-Name",
+					"Remote-Email",
 				},
 			},
-			{
-				ID:   "authentik",
-				Name: "Authentik",
-				Type: "forwardAuth",
-				Config: map[string]interface{}{
-					"address":            "http://authentik:9000/outpost.goauthentik.io/auth/traefik",
-					"trustForwardHeader": true,
-					"authResponseHeaders": []string{
-						"X-authentik-username",
-						"X-authentik-groups",
-						"X-authentik-email",
-						"X-authentik-name",
-						"X-authentik-uid",
-					},
+		},
+		{
+			ID:   "authentik",
+			Name: "Authentik",
+			Type: "forwardAuth",
+			Config: map[string]interface{}{
+				"address":            "http://authentik:9000/outpost.goauthentik.io/auth/traefik",
+				"trustForwardHeader": true,
+				"authResponseHeaders": []string{
+					"X-authentik-username",
+					"X-authentik-groups",
+					"X-authentik-email",
+					"X-authentik-name",
+					"X-authentik-uid",
 				},
 			},
-			{
-				ID:   "basic-auth",
-				Name: "Basic Auth",
-				Type: "basicAuth",
-				Config: map[string]interface{}{
-					"users": []string{
-						"admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/",
+		},
+		{
+			ID:   "basic-auth",
+			Name: "Basic Auth",
+			Type: "basicAuth",
+			Config: map[string]interface{}{
+				"users": []string{
+					"admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/",
+				},
+			},
+		},
+		{
+			ID:   "digest-auth",
+			Name: "Digest Auth",
+			Type: "digestAuth",
+			Config: map[string]interface{}{
+				"users": []string{
+					"test:traefik:a2688e031edb4be6a3797f3882655c05",
+				},
+			},
+		},
+		{
+			ID:   "jwt-auth",
+			Name: "JWT Authentication",
+			Type: "forwardAuth",
+			Config: map[string]interface{}{
+				"address":            "http://jwt-auth:8080/verify",
+				"trustForwardHeader": true,
+				"authResponseHeaders": []string{
+					"X-JWT-Sub",
+					"X-JWT-Name",
+					"X-JWT-Email",
+				},
+			},
+		},
+		
+		// Security middlewares
+		{
+			ID:   "ip-whitelist",
+			Name: "IP Whitelist",
+			Type: "ipWhiteList",
+			Config: map[string]interface{}{
+				"sourceRange": []string{
+					"127.0.0.1/32",
+					"192.168.1.0/24",
+					"10.0.0.0/8",
+				},
+			},
+		},
+		{
+			ID:   "ip-allowlist",
+			Name: "IP Allow List",
+			Type: "ipAllowList",
+			Config: map[string]interface{}{
+				"sourceRange": []string{
+					"127.0.0.1/32",
+					"192.168.1.0/24",
+					"10.0.0.0/8",
+				},
+			},
+		},
+		{
+			ID:   "rate-limit",
+			Name: "Rate Limit",
+			Type: "rateLimit",
+			Config: map[string]interface{}{
+				"average": 100,
+				"burst":   50,
+			},
+		},
+		{
+			ID:   "headers-standard",
+			Name: "Standard Security Headers",
+			Type: "headers",
+			Config: map[string]interface{}{
+				"accessControlAllowMethods": []string{
+					"GET",
+					"OPTIONS",
+					"PUT",
+				},
+				"browserXssFilter":        true,
+				"contentTypeNosniff":      true,
+				"customFrameOptionsValue": "SAMEORIGIN",
+				"customResponseHeaders": map[string]string{
+					"X-Forwarded-Proto": "https",
+					"X-Robots-Tag":      "none,noarchive,nosnippet,notranslate,noimageindex",
+					"server":            "",
+				},
+				"forceSTSHeader": true,
+				"hostsProxyHeaders": []string{
+					"X-Forwarded-Host",
+				},
+				"permissionsPolicy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()",
+				"referrerPolicy":    "same-origin",
+				"sslProxyHeaders": map[string]string{
+					"X-Forwarded-Proto": "https",
+				},
+				"stsIncludeSubdomains": true,
+				"stsPreload":           true,
+				"stsSeconds":           63072000,
+			},
+		},
+		{
+			ID:   "in-flight-req",
+			Name: "In-Flight Request Limiter",
+			Type: "inFlightReq",
+			Config: map[string]interface{}{
+				"amount": 10,
+				"sourceCriterion": map[string]interface{}{
+					"ipStrategy": map[string]interface{}{
+						"depth": 2,
+						"excludedIPs": []string{
+							"127.0.0.1/32",
+						},
 					},
 				},
 			},
 		},
-	}
+		{
+			ID:   "pass-tls-cert",
+			Name: "Pass TLS Client Certificate",
+			Type: "passTLSClientCert",
+			Config: map[string]interface{}{
+				"pem": true,
+			},
+		},
+		
+		// Path manipulation middlewares
+		{
+			ID:   "add-prefix",
+			Name: "Add Prefix",
+			Type: "addPrefix",
+			Config: map[string]interface{}{
+				"prefix": "/api",
+			},
+		},
+		{
+			ID:   "strip-prefix",
+			Name: "Strip Prefix",
+			Type: "stripPrefix",
+			Config: map[string]interface{}{
+				"prefixes": []string{
+					"/api",
+					"/v1",
+				},
+				"forceSlash": true,
+			},
+		},
+		{
+			ID:   "strip-prefix-regex",
+			Name: "Strip Prefix Regex",
+			Type: "stripPrefixRegex",
+			Config: map[string]interface{}{
+				"regex": []string{
+					"/foo/[a-z0-9]+/[0-9]+/",
+				},
+			},
+		},
+		{
+			ID:   "replace-path",
+			Name: "Replace Path",
+			Type: "replacePath",
+			Config: map[string]interface{}{
+				"path": "/api",
+			},
+		},
+		{
+			ID:   "replace-path-regex",
+			Name: "Replace Path Regex",
+			Type: "replacePathRegex",
+			Config: map[string]interface{}{
+				"regex":       "^/foo/(.*)",
+				"replacement": "/bar/$1",
+			},
+		},
+		
+		// Redirect middlewares
+		{
+			ID:   "redirect-regex",
+			Name: "Redirect Regex",
+			Type: "redirectRegex",
+			Config: map[string]interface{}{
+				"regex":       "^http://localhost/(.*)",
+				"replacement": "https://example.com/${1}",
+				"permanent":   true,
+			},
+		},
+		{
+			ID:   "redirect-scheme",
+			Name: "Redirect to HTTPS",
+			Type: "redirectScheme",
+			Config: map[string]interface{}{
+				"scheme":    "https",
+				"port":      "443",
+				"permanent": true,
+			},
+		},
+		
+		// Content processing middlewares
+		{
+			ID:   "compress",
+			Name: "Compress Response",
+			Type: "compress",
+			Config: map[string]interface{}{
+				"excludedContentTypes": []string{
+					"text/event-stream",
+				},
+				"includedContentTypes": []string{
+					"text/html",
+					"text/plain",
+					"application/json",
+				},
+				"minResponseBodyBytes": 1024,
+				"encodings": []string{
+					"gzip",
+					"br",
+				},
+			},
+		},
+		{
+			ID:   "buffering",
+			Name: "Request/Response Buffering",
+			Type: "buffering",
+			Config: map[string]interface{}{
+				"maxRequestBodyBytes":  5000000,
+				"memRequestBodyBytes":  2000000,
+				"maxResponseBodyBytes": 5000000,
+				"memResponseBodyBytes": 2000000,
+				"retryExpression":      "IsNetworkError() && Attempts() < 2",
+			},
+		},
+		{
+			ID:   "content-type",
+			Name: "Content Type Auto-Detector",
+			Type: "contentType",
+			Config: map[string]interface{}{},
+		},
+		
+		// Error handling and reliability middlewares
+		{
+			ID:   "circuit-breaker",
+			Name: "Circuit Breaker",
+			Type: "circuitBreaker",
+			Config: map[string]interface{}{
+				"expression":        "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",
+				"checkPeriod":       "10s",
+				"fallbackDuration":  "30s",
+				"recoveryDuration":  "60s",
+				"responseCode":      503,
+			},
+		},
+		{
+			ID:   "retry",
+			Name: "Retry Failed Requests",
+			Type: "retry",
+			Config: map[string]interface{}{
+				"attempts":        3,
+				"initialInterval": "100ms",
+			},
+		},
+		{
+			ID:   "error-pages",
+			Name: "Custom Error Pages",
+			Type: "errors",
+			Config: map[string]interface{}{
+				"status": []string{
+					"500-599",
+				},
+				"service": "error-handler-service",
+				"query":   "/{status}.html",
+			},
+		},
+		{
+			ID:   "grpc-web",
+			Name: "gRPC Web",
+			Type: "grpcWeb",
+			Config: map[string]interface{}{
+				"allowOrigins": []string{
+					"*",
+				},
+			},
+		},
+		
+		// Chain middlewares
+		{
+			ID:   "security-chain",
+			Name: "Security Chain",
+			Type: "chain",
+			Config: map[string]interface{}{
+				"middlewares": []string{
+					"rate-limit",
+					"ip-whitelist",
+				},
+			},
+		},
+		
+		// Special use case middlewares
+		{
+			ID:   "nextcloud-dav",
+			Name: "Nextcloud WebDAV Redirect",
+			Type: "replacePathRegex",
+			Config: map[string]interface{}{
+				"regex":       "^/.well-known/ca(l|rd)dav",
+				"replacement": "/remote.php/dav/",
+			},
+		},
+	},
+}
 	
 	// Convert to YAML
 	data, err := yaml.Marshal(templates)
