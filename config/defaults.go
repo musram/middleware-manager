@@ -214,8 +214,8 @@ templates := DefaultTemplates{
 			Name: "Rate Limit",
 			Type: "rateLimit",
 			Config: map[string]interface{}{
-				"average": 100,
-				"burst":   50,
+				"average": float64(100),
+				"burst":   float64(50),
 			},
 		},
 		{
@@ -230,24 +230,24 @@ templates := DefaultTemplates{
 				},
 				"browserXssFilter":        true,
 				"contentTypeNosniff":      true,
-				"customFrameOptionsValue": "SAMEORIGIN",
+				"customFrameOptionsValue": "\"SAMEORIGIN\"",
 				"customResponseHeaders": map[string]string{
-					"X-Forwarded-Proto": "https",
-					"X-Robots-Tag":      "none,noarchive,nosnippet,notranslate,noimageindex",
+					"X-Forwarded-Proto": "\"https\"",
+					"X-Robots-Tag":      "\"none,noarchive,nosnippet,notranslate,noimageindex\"",
 					"server":            "",
 				},
 				"forceSTSHeader": true,
 				"hostsProxyHeaders": []string{
 					"X-Forwarded-Host",
 				},
-				"permissionsPolicy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()",
-				"referrerPolicy":    "same-origin",
+				"permissionsPolicy": "\"camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()\"",
+				"referrerPolicy":    "\"same-origin\"",
 				"sslProxyHeaders": map[string]string{
-					"X-Forwarded-Proto": "https",
+					"X-Forwarded-Proto": "\"https\"",
 				},
 				"stsIncludeSubdomains": true,
 				"stsPreload":           true,
-				"stsSeconds":           63072000,
+				"stsSeconds":           float64(63072000),
 			},
 		},
 		{
@@ -255,10 +255,10 @@ templates := DefaultTemplates{
 			Name: "In-Flight Request Limiter",
 			Type: "inFlightReq",
 			Config: map[string]interface{}{
-				"amount": 10,
+				"amount": float64(10),
 				"sourceCriterion": map[string]interface{}{
 					"ipStrategy": map[string]interface{}{
-						"depth": 2,
+						"depth": float64(2),
 						"excludedIPs": []string{
 							"127.0.0.1/32",
 						},
@@ -281,7 +281,7 @@ templates := DefaultTemplates{
 			Name: "Add Prefix",
 			Type: "addPrefix",
 			Config: map[string]interface{}{
-				"prefix": "/api",
+				"prefix": "\"/api\"",
 			},
 		},
 		{
@@ -311,7 +311,7 @@ templates := DefaultTemplates{
 			Name: "Replace Path",
 			Type: "replacePath",
 			Config: map[string]interface{}{
-				"path": "/api",
+				"path": "\"/api\"",
 			},
 		},
 		{
@@ -319,8 +319,8 @@ templates := DefaultTemplates{
 			Name: "Replace Path Regex",
 			Type: "replacePathRegex",
 			Config: map[string]interface{}{
-				"regex":       "^/foo/(.*)",
-				"replacement": "/bar/$1",
+				"regex":       "\"^/foo/(.*)\"",
+				"replacement": "\"/bar/$1\"",
 			},
 		},
 		
@@ -330,8 +330,8 @@ templates := DefaultTemplates{
 			Name: "Redirect Regex",
 			Type: "redirectRegex",
 			Config: map[string]interface{}{
-				"regex":       "^http://localhost/(.*)",
-				"replacement": "https://example.com/${1}",
+				"regex":       "\"^http://localhost/(.*)\"",
+				"replacement": "\"https://example.com/${1}\"",
 				"permanent":   true,
 			},
 		},
@@ -340,8 +340,8 @@ templates := DefaultTemplates{
 			Name: "Redirect to HTTPS",
 			Type: "redirectScheme",
 			Config: map[string]interface{}{
-				"scheme":    "https",
-				"port":      "443",
+				"scheme":    "\"https\"",
+				"port":      "\"443\"",
 				"permanent": true,
 			},
 		},
@@ -360,7 +360,7 @@ templates := DefaultTemplates{
 					"text/plain",
 					"application/json",
 				},
-				"minResponseBodyBytes": 1024,
+				"minResponseBodyBytes": float64(1024),
 				"encodings": []string{
 					"gzip",
 					"br",
@@ -372,11 +372,11 @@ templates := DefaultTemplates{
 			Name: "Request/Response Buffering",
 			Type: "buffering",
 			Config: map[string]interface{}{
-				"maxRequestBodyBytes":  5000000,
-				"memRequestBodyBytes":  2000000,
-				"maxResponseBodyBytes": 5000000,
-				"memResponseBodyBytes": 2000000,
-				"retryExpression":      "IsNetworkError() && Attempts() < 2",
+				"maxRequestBodyBytes":  float64(5000000),
+				"memRequestBodyBytes":  float64(2000000),
+				"maxResponseBodyBytes": float64(5000000),
+				"memResponseBodyBytes": float64(2000000),
+				"retryExpression":      "\"IsNetworkError() && Attempts() < 2\"",
 			},
 		},
 		{
@@ -392,11 +392,11 @@ templates := DefaultTemplates{
 			Name: "Circuit Breaker",
 			Type: "circuitBreaker",
 			Config: map[string]interface{}{
-				"expression":        "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",
-				"checkPeriod":       "10s",
-				"fallbackDuration":  "30s",
-				"recoveryDuration":  "60s",
-				"responseCode":      503,
+				"expression":        "\"NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25\"",
+				"checkPeriod":       "\"10s\"",
+				"fallbackDuration":  "\"30s\"",
+				"recoveryDuration":  "\"60s\"",
+				"responseCode":      float64(503),
 			},
 		},
 		{
@@ -404,8 +404,8 @@ templates := DefaultTemplates{
 			Name: "Retry Failed Requests",
 			Type: "retry",
 			Config: map[string]interface{}{
-				"attempts":        3,
-				"initialInterval": "100ms",
+				"attempts":        float64(3),
+				"initialInterval": "\"100ms\"",
 			},
 		},
 		{
@@ -416,8 +416,8 @@ templates := DefaultTemplates{
 				"status": []string{
 					"500-599",
 				},
-				"service": "error-handler-service",
-				"query":   "/{status}.html",
+				"service": "\"error-handler-service\"",
+				"query":   "\"/{status}.html\"",
 			},
 		},
 		{
@@ -444,14 +444,66 @@ templates := DefaultTemplates{
 			},
 		},
 		
+		// Crowdsec plugin middleware with fixed number formatting
+		{
+			ID:   "crowdsec",
+			Name: "Crowdsec",
+			Type: "plugin",
+			Config: map[string]interface{}{
+				"crowdsec": map[string]interface{}{
+					"enabled":                     true,
+					"logLevel":                    "INFO",
+					"updateIntervalSeconds":       float64(15),
+					"updateMaxFailure":            float64(0),
+					"defaultDecisionSeconds":      float64(15),
+					"httpTimeoutSeconds":          float64(10),
+					"crowdsecMode":                "live",
+					"crowdsecAppsecEnabled":       true,
+					"crowdsecAppsecHost":          "crowdsec:7422",
+					"crowdsecAppsecFailureBlock":  true,
+					"crowdsecAppsecUnreachableBlock": true,
+					"crowdsecAppsecBodyLimit":     float64(10485760),  // Use float64 instead of integer to avoid scientific notation
+					"crowdsecLapiKey":             "PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK",
+					"crowdsecLapiHost":            "crowdsec:8080",
+					"crowdsecLapiScheme":          "http",
+					"forwardedHeadersTrustedIPs": []string{
+						"0.0.0.0/0",
+					},
+					"clientTrustedIPs": []string{
+						"10.0.0.0/8",
+						"172.16.0.0/12",
+						"192.168.0.0/16",
+					},
+				},
+			},
+		},
+		
 		// Special use case middlewares
 		{
 			ID:   "nextcloud-dav",
 			Name: "Nextcloud WebDAV Redirect",
 			Type: "replacePathRegex",
 			Config: map[string]interface{}{
-				"regex":       "^/.well-known/ca(l|rd)dav",
-				"replacement": "/remote.php/dav/",
+				"regex":       "\"^/.well-known/ca(l|rd)dav\"",
+				"replacement": "\"/remote.php/dav/\"",
+			},
+		},
+		
+		// Custom headers example with properly escaped quotes
+		{
+			ID:   "custom-headers-example",
+			Name: "Custom Headers Example",
+			Type: "headers",
+			Config: map[string]interface{}{
+				"customRequestHeaders": map[string]string{
+					"X-Script-Name":        "\"test\"",
+					"X-Custom-Value":       "\"value with spaces\"",
+					"X-Custom-Request-Header": "",  // Remove header
+				},
+				"customResponseHeaders": map[string]string{
+					"X-Custom-Response-Header": "\"value\"",
+					"Server":                  "",  // Remove header
+				},
 			},
 		},
 	},
