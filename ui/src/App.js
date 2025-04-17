@@ -971,7 +971,19 @@ const ResourceDetail = ({ id, navigateTo }) => {
       console.error('Update TCP config error:', err);
     }
   };
-
+  const handleUpdateHeadersConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateHeadersConfig(id, { custom_headers: customHeaders });
+      setShowHeadersConfigModal(false);
+      fetchData();
+      alert('Custom headers updated successfully');
+    } catch (err) {
+      alert('Failed to update custom headers');
+      console.error('Update headers config error:', err);
+    }
+  };
   // Function to add new header
 const addHeader = () => {
   if (!headerKey.trim()) {
