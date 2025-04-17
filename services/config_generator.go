@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -242,6 +243,12 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 	return nil
 }
 
+// MiddlewareWithPriority represents a middleware with its priority value
+type MiddlewareWithPriority struct {
+    ID       string
+    Priority int
+}
+
 // processResources fetches and processes all resources and their middlewares
 func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
     // Fetch all active resources with custom headers
@@ -251,15 +258,15 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
         FROM resources r
         LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
         WHERE r.status = 'active'
-        ORDER BY rm.priority DESC
+        ORDER BY r.id, rm.priority DESC
     `)
     if err != nil {
         return fmt.Errorf("failed to fetch resources: %w", err)
     }
     defer rows.Close()
 
-    // Group middlewares by resource
-    resourceMiddlewares := make(map[string][]string)
+    // Group middlewares by resource and preserve priority
+    resourceMiddlewares := make(map[string][]MiddlewareWithPriority)
     resourceInfo := make(map[string]struct {
         Host          string
         ServiceID     string
@@ -268,19 +275,23 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
         CustomHeaders string
     })
 
-	for rows.Next() {
-		var resourceID, host, serviceID, entrypoints, tlsDomains, customHeaders string
-		var middlewareID sql.NullString
-		var priority sql.NullInt64
-		
-		if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, 
-						   &customHeaders, &middlewareID, &priority); err != nil {
-			log.Printf("Failed to scan resource middleware: %v", err)
-			continue
-		}
-		
+    for rows.Next() {
+        var resourceID, host, serviceID, entrypoints, tlsDomains, customHeaders string
+        var middlewareID sql.NullString
+        var priority sql.NullInt64
+        
+        if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, 
+                           &customHeaders, &middlewareID, &priority); err != nil {
+            log.Printf("Failed to scan resource middleware: %v", err)
+            continue
+        }
+        
         if middlewareID.Valid {
-            resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middlewareID.String)
+            middleware := MiddlewareWithPriority{
+                ID:       middlewareID.String,
+                Priority: int(priority.Int64),
+            }
+            resourceMiddlewares[resourceID] = append(resourceMiddlewares[resourceID], middleware)
         }
         
         resourceInfo[resourceID] = struct {
@@ -309,6 +320,11 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
             log.Printf("Warning: Resource info not found for %s", resourceID)
             continue
         }
+        
+        // Sort middlewares by priority (higher numbers first)
+        sort.Slice(middlewares, func(i, j int) bool {
+            return middlewares[i].Priority > middlewares[j].Priority
+        })
         
         // Process entrypoints (comma-separated list to array)
         entrypoints := []string{"websecure"} // Default
@@ -349,26 +365,33 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
                 
                 // Add reference with file provider suffix
                 customHeadersMiddleware = fmt.Sprintf("%s@file", customHeadersMiddlewareID)
-                
-                // Add to middlewares list if not already present
-                if !stringSliceContains(middlewares, customHeadersMiddleware) {
-                    // Add at beginning to ensure the headers are set before other middlewares process the request
-                    middlewares = append([]string{customHeadersMiddleware}, middlewares...)
-                }
             }
         }
         
+        // Extract middleware IDs from the sorted slice
+        var middlewareIDs []string
+        
+        // Add custom headers middleware at the beginning if it exists
+        if customHeadersMiddleware != "" {
+            middlewareIDs = append(middlewareIDs, customHeadersMiddleware)
+        }
+        
+        // Add sorted middlewares
+        for _, mw := range middlewares {
+            middlewareIDs = append(middlewareIDs, mw.ID)
+        }
+        
         // Add "badger" middleware with http provider suffix if not already present
-        if !stringSliceContains(middlewares, "badger@http") {
-            middlewares = append(middlewares, "badger@http")
+        if !stringSliceContains(middlewareIDs, "badger@http") {
+            middlewareIDs = append(middlewareIDs, "badger@http")
         }
 
         // Process middleware references to add provider suffixes
-        for i, middleware := range middlewares {
+        for i, middleware := range middlewareIDs {
             // If this is not already a fully qualified middleware reference and not the Pangolin badger middleware
             if !strings.Contains(middleware, "@") && middleware != "badger@http" && middleware != customHeadersMiddleware {
                 // Assume it's from our file provider
-                middlewares[i] = fmt.Sprintf("%s@file", middleware)
+                middlewareIDs[i] = fmt.Sprintf("%s@file", middleware)
             }
         }
 
@@ -380,7 +403,7 @@ func (cg *ConfigGenerator) processResources(config *TraefikConfig) error {
             "rule":        fmt.Sprintf("Host(`%s`)", info.Host),
             "service":     fmt.Sprintf("%s@http", info.ServiceID),  // Reference service from http provider
             "entryPoints": entrypoints,
-            "middlewares": middlewares,
+            "middlewares": middlewareIDs,
             "priority":    100, // Higher than Pangolin's default
         }
         

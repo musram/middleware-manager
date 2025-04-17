@@ -2160,6 +2160,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
               onChange={handleTypeChange}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
+              disabled={isEditing}
             >
               {middlewareTypes.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -2167,6 +2168,11 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
                 </option>
               ))}
             </select>
+            {isEditing && (
+              <p className="text-xs text-gray-500 mt-1">
+                Middleware type cannot be changed after creation
+              </p>
+            )}
           </div>
 
           <div className="mb-4">
