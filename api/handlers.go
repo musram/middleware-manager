@@ -342,7 +342,61 @@ func (s *Server) updateMiddleware(c *gin.Context) {
 		"config": middleware.Config,
 	})
 }
+// sanitizeMiddlewareConfig ensures proper formatting of duration values and strings
+func sanitizeMiddlewareConfig(config map[string]interface{}) {
+	// List of keys that should be treated as duration values
+	durationKeys := map[string]bool{
+		"checkPeriod":      true,
+		"fallbackDuration": true,
+		"recoveryDuration": true,
+		"initialInterval":  true,
+		"retryTimeout":     true,
+		"gracePeriod":      true,
+	}
 
+	// Process the configuration recursively
+	sanitizeConfigRecursive(config, durationKeys)
+}
+
+// sanitizeConfigRecursive processes config values recursively
+func sanitizeConfigRecursive(data interface{}, durationKeys map[string]bool) {
+	// Process based on data type
+	switch v := data.(type) {
+	case map[string]interface{}:
+		// Process each key-value pair in the map
+		for key, value := range v {
+			// Handle different value types
+			switch innerVal := value.(type) {
+			case string:
+				// Check if this is a duration field and ensure proper format
+				if durationKeys[key] {
+					// Check if the string has extra quotes
+					if len(innerVal) > 2 && strings.HasPrefix(innerVal, "\"") && strings.HasSuffix(innerVal, "\"") {
+						// Remove the extra quotes
+						v[key] = strings.Trim(innerVal, "\"")
+					}
+				}
+			case map[string]interface{}, []interface{}:
+				// Recursively process nested structures
+				sanitizeConfigRecursive(innerVal, durationKeys)
+			}
+		}
+	case []interface{}:
+		// Process each item in the array
+		for i, item := range v {
+			switch innerVal := item.(type) {
+			case map[string]interface{}, []interface{}:
+				// Recursively process nested structures
+				sanitizeConfigRecursive(innerVal, durationKeys)
+			case string:
+				// Check if string has unnecessary quotes
+				if len(innerVal) > 2 && strings.HasPrefix(innerVal, "\"") && strings.HasSuffix(innerVal, "\"") {
+					v[i] = strings.Trim(innerVal, "\"")
+				}
+			}
+		}
+	}
+}
 // deleteMiddleware deletes a middleware configuration
 func (s *Server) deleteMiddleware(c *gin.Context) {
 	id := c.Param("id")

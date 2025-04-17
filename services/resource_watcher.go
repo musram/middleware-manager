@@ -133,9 +133,9 @@ func (rw *ResourceWatcher) checkResources() error {
 	// Process routers to find resources
 	for routerID, router := range config.HTTP.Routers {
 		// Skip non-SSL routers (usually HTTP redirects)
-		if router.TLS.CertResolver == "" {
-			continue
-		}
+		// if router.TLS.CertResolver == "" {
+			// continue
+		//}
 
 		// Extract host from rule (e.g., "Host(`example.com`)")
 		host := extractHostFromRule(router.Rule)

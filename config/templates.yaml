@@ -87,18 +87,18 @@ middlewares:
         - PUT
       browserXssFilter: true
       contentTypeNosniff: true
-      customFrameOptionsValue: "\"SAMEORIGIN\""
+      customFrameOptionsValue: "SAMEORIGIN"
       customResponseHeaders:
-        X-Forwarded-Proto: "\"https\""
-        X-Robots-Tag: "\"none,noarchive,nosnippet,notranslate,noimageindex\""
+        X-Forwarded-Proto: "https"
+        X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
         server: ""
       forceSTSHeader: true
       hostsProxyHeaders:
         - X-Forwarded-Host
-      permissionsPolicy: "\"camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()\""
-      referrerPolicy: "\"same-origin\""
+      permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()"
+      referrerPolicy: "same-origin"
       sslProxyHeaders:
-        X-Forwarded-Proto: "\"https\""
+        X-Forwarded-Proto: "https"
       stsIncludeSubdomains: true
       stsPreload: true
       stsSeconds: 63072000
@@ -125,7 +125,7 @@ middlewares:
     name: Add Prefix
     type: addPrefix
     config:
-      prefix: "\"/api\""
+      prefix: "/api"
 
   - id: strip-prefix
     name: Strip Prefix
@@ -147,30 +147,30 @@ middlewares:
     name: Replace Path
     type: replacePath
     config:
-      path: "\"/api\""
+      path: "/api"
 
   - id: replace-path-regex
     name: Replace Path Regex
     type: replacePathRegex
     config:
-      regex: "\"^/foo/(.*)\""
-      replacement: "\"/bar/$1\""
+      regex: "^/foo/(.*)"
+      replacement: "/bar/$1"
 
   # Redirect middlewares
   - id: redirect-regex
     name: Redirect Regex
     type: redirectRegex
     config:
-      regex: "\"^http://localhost/(.*)\""
-      replacement: "\"https://example.com/${1}\""
+      regex: "^http://localhost/(.*)"
+      replacement: "https://example.com/${1}"
       permanent: true
 
   - id: redirect-scheme
     name: Redirect to HTTPS
     type: redirectScheme
     config:
-      scheme: "\"https\""
-      port: "\"443\""
+      scheme: "https"
+      port: "443"
       permanent: true
 
   # Content processing middlewares
@@ -197,7 +197,7 @@ middlewares:
       memRequestBodyBytes: 2000000
       maxResponseBodyBytes: 5000000
       memResponseBodyBytes: 2000000
-      retryExpression: "\"IsNetworkError() && Attempts() < 2\""
+      retryExpression: "IsNetworkError() && Attempts() < 2"
 
   - id: content-type
     name: Content Type Auto-Detector
@@ -209,10 +209,10 @@ middlewares:
     name: Circuit Breaker
     type: circuitBreaker
     config:
-      expression: "\"NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25\""
-      checkPeriod: "\"10s\""
-      fallbackDuration: "\"30s\""
-      recoveryDuration: "\"60s\""
+      expression: "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
+      checkPeriod: "10s"
+      fallbackDuration: "30s"
+      recoveryDuration: "60s"
       responseCode: 503
 
   - id: retry
@@ -220,7 +220,7 @@ middlewares:
     type: retry
     config:
       attempts: 3
-      initialInterval: "\"100ms\""
+      initialInterval: "100ms"
 
   - id: error-pages
     name: Custom Error Pages
@@ -228,8 +228,8 @@ middlewares:
     config:
       status:
         - "500-599"
-      service: "\"error-handler-service\""
-      query: "\"/{status}.html\""
+      service: "error-handler-service"
+      query: "/{status}.html"
 
   - id: grpc-web
     name: gRPC Web
@@ -252,20 +252,20 @@ middlewares:
     name: Nextcloud WebDAV Redirect
     type: replacePathRegex
     config:
-      regex: "\"^/.well-known/ca(l|rd)dav\""
-      replacement: "\"/remote.php/dav/\""
+      regex: "^/.well-known/ca(l|rd)dav"
+      replacement: "/remote.php/dav/"
   
-  # Custom headers example with properly quoted values
+  # Custom headers example with properly formatted values
   - id: custom-headers-example
     name: Custom Headers Example
     type: headers
     config:
       customRequestHeaders:
-        X-Script-Name: "\"test\""
-        X-Custom-Value: "\"value with spaces\""
+        X-Script-Name: "test"
+        X-Custom-Value: "value with spaces"
         X-Custom-Request-Header: ""
       customResponseHeaders:
-        X-Custom-Response-Header: "\"value\""
+        X-Custom-Response-Header: "value"
         Server: ""
   
   # Plugin middleware templates
@@ -279,12 +279,12 @@ middlewares:
         logLocalRequests: false
         logAllowedRequests: false
         logApiRequests: false
-        api: "\"https://get.geojs.io/v1/ip/country/{ip}\""
+        api: "https://get.geojs.io/v1/ip/country/{ip}"
         apiTimeoutMs: 750
         cacheSize: 15
         forceMonthlyUpdate: false
         allowUnknownCountries: false
-        unknownCountryApiResponse: "\"nil\""
+        unknownCountryApiResponse: "nil"
         blackListMode: false
         addCountryHeader: false
         countries:
@@ -307,7 +307,7 @@ middlewares:
         crowdsecAppsecFailureBlock: true
         crowdsecAppsecUnreachableBlock: true
         crowdsecAppsecBodyLimit: 10485760  # Using plain number to avoid scientific notation
-        crowdsecLapiKey: "\"PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK\""
+        crowdsecLapiKey: "PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK"
         crowdsecLapiHost: "crowdsec:8080"
         crowdsecLapiScheme: "http"
         forwardedHeadersTrustedIPs:

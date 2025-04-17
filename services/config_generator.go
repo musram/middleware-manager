@@ -214,6 +214,9 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 			continue
 		}
 
+		// Process time durations and string values to ensure proper formatting
+		sanitizeConfigValues(middlewareConfig)
+
 		// Special handling for chain middlewares to ensure proper provider prefixes
 		if typ == "chain" && middlewareConfig["middlewares"] != nil {
 			if middlewares, ok := middlewareConfig["middlewares"].([]interface{}); ok {
@@ -242,7 +245,49 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 
 	return nil
 }
+func sanitizeConfigValues(config map[string]interface{}) {
+	// List of keys that should be treated as duration values
+	durationKeys := map[string]bool{
+		"checkPeriod": true,
+		"fallbackDuration": true,
+		"recoveryDuration": true,
+		"initialInterval": true,
+		"retryTimeout": true,
+		"gracePeriod": true,
+	}
 
+	for key, value := range config {
+		switch v := value.(type) {
+		case string:
+			// Check if this is a duration value that needs fixing
+			if durationKeys[key] {
+				// If it looks like a quoted string (starts and ends with quote)
+				if len(v) > 2 && strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"") {
+					// Remove the extra quotes
+					config[key] = v[1 : len(v)-1]
+				}
+			} else if strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"") {
+				// For other string values, also remove unnecessary quotes if present
+				config[key] = v[1 : len(v)-1]
+			}
+		case map[string]interface{}:
+			// Recursively process nested maps
+			sanitizeConfigValues(v)
+		case []interface{}:
+			// Process array values
+			for i, item := range v {
+				if subMap, ok := item.(map[string]interface{}); ok {
+					sanitizeConfigValues(subMap)
+				} else if str, ok := item.(string); ok {
+					// Check if string has unnecessary quotes
+					if len(str) > 2 && strings.HasPrefix(str, "\"") && strings.HasSuffix(str, "\"") {
+						v[i] = str[1 : len(str)-1]
+					}
+				}
+			}
+		}
+	}
+}
 // MiddlewareWithPriority represents a middleware with its priority value
 type MiddlewareWithPriority struct {
     ID       string
