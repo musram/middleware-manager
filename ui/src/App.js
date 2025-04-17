@@ -1779,7 +1779,8 @@ const MiddlewaresList = ({ navigateTo }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [middlewareToDelete, setMiddlewareToDelete] = useState(null);
 
   // Fetch all middlewares
   const fetchMiddlewares = async () => {
@@ -1800,22 +1801,38 @@ const MiddlewaresList = ({ navigateTo }) => {
     fetchMiddlewares();
   }, []);
 
-  // Handle middleware deletion
-  const handleDeleteMiddleware = async (id) => {
+  // Open confirmation modal before deleting
+  const confirmDelete = (middleware) => {
+    setMiddlewareToDelete(middleware);
+    setShowDeleteModal(true);
+  };
+
+  // Handle middleware deletion after confirmation
+  const handleDeleteMiddleware = async () => {
+    if (!middlewareToDelete) return;
+    
     try {
-      await api.deleteMiddleware(id);
-      setConfirmDelete(null);
-      fetchMiddlewares();
+      await api.deleteMiddleware(middlewareToDelete.id);
+      setShowDeleteModal(false);
+      setMiddlewareToDelete(null);
+      await fetchMiddlewares();
     } catch (err) {
-      alert(`Failed to delete middleware: ${err.message || 'Unknown error'}`);
+      alert('Failed to delete middleware');
       console.error('Delete middleware error:', err);
     }
   };
 
+  // Cancel deletion
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setMiddlewareToDelete(null);
+  };
+
   // Filter middlewares based on search term
-  const filteredMiddlewares = middlewares.filter((middleware) =>
-    middleware.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    middleware.type.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMiddlewares = middlewares.filter(
+    (middleware) =>
+      middleware.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      middleware.type.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -1831,19 +1848,19 @@ const MiddlewaresList = ({ navigateTo }) => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => navigateTo('middleware-form')}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Create Middleware
-          </button>
+        <div className="space-x-3">
           <button
             onClick={fetchMiddlewares}
             className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
             disabled={loading}
           >
             Refresh
+          </button>
+          <button
+            onClick={() => navigateTo('middleware-form')}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Create Middleware
           </button>
         </div>
       </div>
@@ -1856,13 +1873,13 @@ const MiddlewaresList = ({ navigateTo }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
                   Actions
                 </th>
               </tr>
@@ -1870,27 +1887,30 @@ const MiddlewaresList = ({ navigateTo }) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredMiddlewares.map((middleware) => (
                 <tr key={middleware.id}>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{middleware.name}</div>
+                  <td className="px-6 py-4 whitespace-nowrap font-medium">
+                    {middleware.name}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {middleware.type}
+                      {middleware.type === 'chain' && " (Middleware Chain)"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap flex space-x-2">
-                    <button
-                      onClick={() => navigateTo('middleware-form', middleware.id)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(middleware)}
-                      className="text-red-600 hover:text-red-900 ml-3"
-                    >
-                      Delete
-                    </button>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => navigateTo('middleware-form', middleware.id)}
+                        className="bg-blue-500 text-white px-4 py-2 rounded"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(middleware)}
+                        className="bg-red-500 text-white px-4 py-2 rounded"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1909,28 +1929,34 @@ const MiddlewaresList = ({ navigateTo }) => {
         </div>
       )}
 
-      {/* Confirmation Modal */}
-      {confirmDelete && (
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
-            <p className="mb-4">
-              Are you sure you want to delete the middleware "{confirmDelete.name}"?
-              This cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteMiddleware(confirmDelete.id)}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Delete
-              </button>
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-red-600">Confirm Deletion</h3>
+            </div>
+            <div className="px-6 py-4">
+              <p className="mb-4">
+                Are you sure you want to delete the middleware "{middlewareToDelete?.name}"?
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                This action cannot be undone and may affect any resources currently using this middleware.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteMiddleware}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>
