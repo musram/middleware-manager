@@ -1873,13 +1873,13 @@ const MiddlewaresList = ({ navigateTo }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Type
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -1887,7 +1887,7 @@ const MiddlewaresList = ({ navigateTo }) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredMiddlewares.map((middleware) => (
                 <tr key={middleware.id}>
-                  <td className="px-6 py-4 whitespace-nowrap font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     {middleware.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -1896,17 +1896,17 @@ const MiddlewaresList = ({ navigateTo }) => {
                       {middleware.type === 'chain' && " (Middleware Chain)"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex justify-end space-x-2">
                       <button
                         onClick={() => navigateTo('middleware-form', middleware.id)}
-                        className="bg-blue-500 text-white px-4 py-2 rounded"
+                        className="text-blue-600 hover:text-blue-900 mr-3"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => confirmDelete(middleware)}
-                        className="bg-red-500 text-white px-4 py-2 rounded"
+                        className="text-red-600 hover:text-red-900"
                       >
                         Delete
                       </button>
