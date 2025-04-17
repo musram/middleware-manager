@@ -214,8 +214,8 @@ templates := DefaultTemplates{
 			Name: "Rate Limit",
 			Type: "rateLimit",
 			Config: map[string]interface{}{
-				"average": float64(100),
-				"burst":   float64(50),
+				"average": int(100),
+				"burst":   int(50),
 			},
 		},
 		{
@@ -247,7 +247,7 @@ templates := DefaultTemplates{
 				},
 				"stsIncludeSubdomains": true,
 				"stsPreload":           true,
-				"stsSeconds":           float64(63072000),
+				"stsSeconds":           int(63072000),
 			},
 		},
 		{
@@ -255,10 +255,10 @@ templates := DefaultTemplates{
 			Name: "In-Flight Request Limiter",
 			Type: "inFlightReq",
 			Config: map[string]interface{}{
-				"amount": float64(10),
+				"amount": int(10),
 				"sourceCriterion": map[string]interface{}{
 					"ipStrategy": map[string]interface{}{
-						"depth": float64(2),
+						"depth": int(2),
 						"excludedIPs": []string{
 							"127.0.0.1/32",
 						},
@@ -360,7 +360,7 @@ templates := DefaultTemplates{
 					"text/plain",
 					"application/json",
 				},
-				"minResponseBodyBytes": float64(1024),
+				"minResponseBodyBytes": int(1024),
 				"encodings": []string{
 					"gzip",
 					"br",
@@ -372,10 +372,10 @@ templates := DefaultTemplates{
 			Name: "Request/Response Buffering",
 			Type: "buffering",
 			Config: map[string]interface{}{
-				"maxRequestBodyBytes":  float64(5000000),
-				"memRequestBodyBytes":  float64(2000000),
-				"maxResponseBodyBytes": float64(5000000),
-				"memResponseBodyBytes": float64(2000000),
+				"maxRequestBodyBytes":  int(5000000),
+				"memRequestBodyBytes":  int(2000000),
+				"maxResponseBodyBytes": int(5000000),
+				"memResponseBodyBytes": int(2000000),
 				"retryExpression":      "\"IsNetworkError() && Attempts() < 2\"",
 			},
 		},
@@ -396,7 +396,7 @@ templates := DefaultTemplates{
 				"checkPeriod":       "\"10s\"",
 				"fallbackDuration":  "\"30s\"",
 				"recoveryDuration":  "\"60s\"",
-				"responseCode":      float64(503),
+				"responseCode":      int(503),
 			},
 		},
 		{
@@ -404,7 +404,7 @@ templates := DefaultTemplates{
 			Name: "Retry Failed Requests",
 			Type: "retry",
 			Config: map[string]interface{}{
-				"attempts":        float64(3),
+				"attempts":        int(3),
 				"initialInterval": "\"100ms\"",
 			},
 		},
@@ -453,16 +453,16 @@ templates := DefaultTemplates{
 				"crowdsec": map[string]interface{}{
 					"enabled":                     true,
 					"logLevel":                    "INFO",
-					"updateIntervalSeconds":       float64(15),
-					"updateMaxFailure":            float64(0),
-					"defaultDecisionSeconds":      float64(15),
-					"httpTimeoutSeconds":          float64(10),
+					"updateIntervalSeconds":       int(15),
+					"updateMaxFailure":            int(0),
+					"defaultDecisionSeconds":      int(15),
+					"httpTimeoutSeconds":          int(10),
 					"crowdsecMode":                "live",
 					"crowdsecAppsecEnabled":       true,
 					"crowdsecAppsecHost":          "crowdsec:7422",
 					"crowdsecAppsecFailureBlock":  true,
 					"crowdsecAppsecUnreachableBlock": true,
-					"crowdsecAppsecBodyLimit":     float64(10485760),  // Use float64 instead of integer to avoid scientific notation
+					"crowdsecAppsecBodyLimit":     int(10485760),  // Use int instead of integer to avoid scientific notation
 					"crowdsecLapiKey":             "PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK",
 					"crowdsecLapiHost":            "crowdsec:8080",
 					"crowdsecLapiScheme":          "http",

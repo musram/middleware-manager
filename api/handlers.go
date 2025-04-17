@@ -83,30 +83,41 @@ func (s *Server) createMiddleware(c *gin.Context) {
 	}
 	
 	// If something goes wrong, rollback
+	var txErr error
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			tx.Rollback()
+			log.Printf("Transaction rolled back due to error: %v", txErr)
 		}
 	}()
 	
-	_, err = tx.Exec(
+	log.Printf("Attempting to insert middleware with ID=%s, name=%s, type=%s", 
+		id, middleware.Name, middleware.Type)
+	
+	result, txErr := tx.Exec(
 		"INSERT INTO middlewares (id, name, type, config) VALUES (?, ?, ?, ?)",
 		id, middleware.Name, middleware.Type, string(configJSON),
 	)
 	
-	if err != nil {
-		log.Printf("Error inserting middleware: %v", err)
+	if txErr != nil {
+		log.Printf("Error inserting middleware: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to save middleware")
 		return
 	}
 	
+	rowsAffected, err := result.RowsAffected()
+	if err == nil {
+		log.Printf("Insert affected %d rows", rowsAffected)
+	}
+	
 	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
+	if txErr = tx.Commit(); txErr != nil {
+		log.Printf("Error committing transaction: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
+	log.Printf("Successfully created middleware %s (%s)", middleware.Name, id)
 	c.JSON(http.StatusCreated, gin.H{
 		"id":     id,
 		"name":   middleware.Name,
@@ -136,6 +147,7 @@ func (s *Server) getMiddleware(c *gin.Context) {
 
 	c.JSON(http.StatusOK, middleware)
 }
+
 // updateRouterPriority updates the router priority for a resource
 func (s *Server) updateRouterPriority(c *gin.Context) {
     id := c.Param("id")
@@ -172,23 +184,54 @@ func (s *Server) updateRouterPriority(c *gin.Context) {
         return
     }
     
-    // Update the resource
-    _, err = s.db.Exec(
+    // Update the resource within a transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        log.Printf("Error beginning transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    var txErr error
+    defer func() {
+        if txErr != nil {
+            tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
+        }
+    }()
+    
+    log.Printf("Updating router priority for resource %s to %d", id, input.RouterPriority)
+    
+    result, txErr := tx.Exec(
         "UPDATE resources SET router_priority = ?, updated_at = ? WHERE id = ?",
         input.RouterPriority, time.Now(), id,
     )
     
-    if err != nil {
-        log.Printf("Error updating router priority: %v", err)
+    if txErr != nil {
+        log.Printf("Error updating router priority: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Failed to update router priority")
         return
     }
     
+    rowsAffected, err := result.RowsAffected()
+    if err == nil {
+        log.Printf("Update affected %d rows", rowsAffected)
+    }
+    
+    // Commit the transaction
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    log.Printf("Successfully updated router priority for resource %s", id)
     c.JSON(http.StatusOK, gin.H{
         "id": id,
         "router_priority": input.RouterPriority,
     })
 }
+
 // updateMiddleware updates a middleware configuration
 func (s *Server) updateMiddleware(c *gin.Context) {
 	id := c.Param("id")
@@ -243,30 +286,55 @@ func (s *Server) updateMiddleware(c *gin.Context) {
 	}
 	
 	// If something goes wrong, rollback
+	var txErr error
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			tx.Rollback()
+			log.Printf("Transaction rolled back due to error: %v", txErr)
 		}
 	}()
 	
-	_, err = tx.Exec(
+	log.Printf("Attempting to update middleware %s with name=%s, type=%s", 
+		id, middleware.Name, middleware.Type)
+	
+	result, txErr := tx.Exec(
 		"UPDATE middlewares SET name = ?, type = ?, config = ?, updated_at = ? WHERE id = ?",
 		middleware.Name, middleware.Type, string(configJSON), time.Now(), id,
 	)
 	
-	if err != nil {
-		log.Printf("Error updating middleware: %v", err)
+	if txErr != nil {
+		log.Printf("Error updating middleware: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to update middleware")
 		return
 	}
 	
+	rowsAffected, err := result.RowsAffected()
+	if err == nil {
+		log.Printf("Update affected %d rows", rowsAffected)
+		if rowsAffected == 0 {
+			log.Printf("Warning: Update query succeeded but no rows were affected")
+		}
+	}
+	
 	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
+	if txErr = tx.Commit(); txErr != nil {
+		log.Printf("Error committing transaction: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
+	// Double-check that the middleware was updated
+	var updatedName string
+	err = s.db.QueryRow("SELECT name FROM middlewares WHERE id = ?", id).Scan(&updatedName)
+	if err != nil {
+		log.Printf("Warning: Could not verify middleware update: %v", err)
+	} else if updatedName != middleware.Name {
+		log.Printf("Warning: Name mismatch after update. Expected '%s', got '%s'", middleware.Name, updatedName)
+	} else {
+		log.Printf("Successfully verified middleware update for %s", id)
+	}
+
+	// Return the updated middleware
 	c.JSON(http.StatusOK, gin.H{
 		"id":     id,
 		"name":   middleware.Name,
@@ -306,15 +374,19 @@ func (s *Server) deleteMiddleware(c *gin.Context) {
 	}
 	
 	// If something goes wrong, rollback
+	var txErr error
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			tx.Rollback()
+			log.Printf("Transaction rolled back due to error: %v", txErr)
 		}
 	}()
 	
-	result, err := tx.Exec("DELETE FROM middlewares WHERE id = ?", id)
-	if err != nil {
-		log.Printf("Error deleting middleware: %v", err)
+	log.Printf("Attempting to delete middleware %s", id)
+	
+	result, txErr := tx.Exec("DELETE FROM middlewares WHERE id = ?", id)
+	if txErr != nil {
+		log.Printf("Error deleting middleware: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to delete middleware")
 		return
 	}
@@ -331,13 +403,16 @@ func (s *Server) deleteMiddleware(c *gin.Context) {
 		return
 	}
 	
+	log.Printf("Delete affected %d rows", rowsAffected)
+	
 	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
+	if txErr = tx.Commit(); txErr != nil {
+		log.Printf("Error committing transaction: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
+	log.Printf("Successfully deleted middleware %s", id)
 	c.JSON(http.StatusOK, gin.H{"message": "Middleware deleted successfully"})
 }
 
@@ -409,24 +484,28 @@ func (s *Server) deleteResource(c *gin.Context) {
 	}
 	
 	// If something goes wrong, rollback
+	var txErr error
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			tx.Rollback()
+			log.Printf("Transaction rolled back due to error: %v", txErr)
 		}
 	}()
 	
 	// First delete any middleware relationships
-	_, err = tx.Exec("DELETE FROM resource_middlewares WHERE resource_id = ?", id)
-	if err != nil {
-		log.Printf("Error removing resource middlewares: %v", err)
+	log.Printf("Removing middleware relationships for resource %s", id)
+	_, txErr = tx.Exec("DELETE FROM resource_middlewares WHERE resource_id = ?", id)
+	if txErr != nil {
+		log.Printf("Error removing resource middlewares: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to delete resource")
 		return
 	}
 	
 	// Then delete the resource
-	result, err := tx.Exec("DELETE FROM resources WHERE id = ?", id)
-	if err != nil {
-		log.Printf("Error deleting resource: %v", err)
+	log.Printf("Deleting resource %s", id)
+	result, txErr := tx.Exec("DELETE FROM resources WHERE id = ?", id)
+	if txErr != nil {
+		log.Printf("Error deleting resource: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to delete resource")
 		return
 	}
@@ -443,13 +522,16 @@ func (s *Server) deleteResource(c *gin.Context) {
 		return
 	}
 	
+	log.Printf("Delete affected %d rows", rowsAffected)
+	
 	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
+	if txErr = tx.Commit(); txErr != nil {
+		log.Printf("Error committing transaction: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
+	log.Printf("Successfully deleted resource %s", id)
 	c.JSON(http.StatusOK, gin.H{"message": "Resource deleted successfully"})
 }
 
@@ -515,41 +597,54 @@ func (s *Server) assignMiddleware(c *gin.Context) {
 	}
 	
 	// If something goes wrong, rollback
+	var txErr error
 	defer func() {
-		if err != nil {
+		if txErr != nil {
 			tx.Rollback()
+			log.Printf("Transaction rolled back due to error: %v", txErr)
 		}
 	}()
 	
 	// First delete any existing relationship
-	_, err = tx.Exec(
+	log.Printf("Removing existing middleware relationship: resource=%s, middleware=%s",
+		resourceID, input.MiddlewareID)
+	_, txErr = tx.Exec(
 		"DELETE FROM resource_middlewares WHERE resource_id = ? AND middleware_id = ?",
 		resourceID, input.MiddlewareID,
 	)
-	if err != nil {
-		log.Printf("Error removing existing relationship: %v", err)
+	if txErr != nil {
+		log.Printf("Error removing existing relationship: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 	
 	// Then insert the new relationship
-	_, err = tx.Exec(
+	log.Printf("Creating new middleware relationship: resource=%s, middleware=%s, priority=%d",
+		resourceID, input.MiddlewareID, input.Priority)
+	result, txErr := tx.Exec(
 		"INSERT INTO resource_middlewares (resource_id, middleware_id, priority) VALUES (?, ?, ?)",
 		resourceID, input.MiddlewareID, input.Priority,
 	)
-	if err != nil {
-		log.Printf("Error assigning middleware: %v", err)
+	if txErr != nil {
+		log.Printf("Error assigning middleware: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to assign middleware")
 		return
 	}
 	
+	rowsAffected, err := result.RowsAffected()
+	if err == nil {
+		log.Printf("Insert affected %d rows", rowsAffected)
+	}
+	
 	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
+	if txErr = tx.Commit(); txErr != nil {
+		log.Printf("Error committing transaction: %v", txErr)
 		ResponseWithError(c, http.StatusInternalServerError, "Database error")
 		return
 	}
 
+	log.Printf("Successfully assigned middleware %s to resource %s with priority %d",
+		input.MiddlewareID, resourceID, input.Priority)
 	c.JSON(http.StatusOK, gin.H{
 		"resource_id":   resourceID,
 		"middleware_id": input.MiddlewareID,
@@ -605,14 +700,18 @@ func (s *Server) assignMultipleMiddlewares(c *gin.Context) {
     }
     
     // If something goes wrong, rollback
+    var txErr error
     defer func() {
-        if err != nil {
+        if txErr != nil {
             tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
         }
     }()
 
     // Process each middleware
     successful := make([]map[string]interface{}, 0)
+    log.Printf("Assigning %d middlewares to resource %s", len(input.Middlewares), resourceID)
+    
     for _, mw := range input.Middlewares {
         // Default priority is 100 if not specified
         if mw.Priority <= 0 {
@@ -633,40 +732,52 @@ func (s *Server) assignMultipleMiddlewares(c *gin.Context) {
         }
 
         // First delete any existing relationship
-        _, err = tx.Exec(
+        log.Printf("Removing existing relationship: resource=%s, middleware=%s",
+            resourceID, mw.MiddlewareID)
+        _, txErr = tx.Exec(
             "DELETE FROM resource_middlewares WHERE resource_id = ? AND middleware_id = ?",
             resourceID, mw.MiddlewareID,
         )
-        if err != nil {
-            log.Printf("Error removing existing relationship: %v", err)
+        if txErr != nil {
+            log.Printf("Error removing existing relationship: %v", txErr)
             ResponseWithError(c, http.StatusInternalServerError, "Database error")
             return
         }
         
         // Then insert the new relationship
-        _, err = tx.Exec(
+        log.Printf("Creating new relationship: resource=%s, middleware=%s, priority=%d",
+            resourceID, mw.MiddlewareID, mw.Priority)
+        result, txErr := tx.Exec(
             "INSERT INTO resource_middlewares (resource_id, middleware_id, priority) VALUES (?, ?, ?)",
             resourceID, mw.MiddlewareID, mw.Priority,
         )
-        if err != nil {
-            log.Printf("Error assigning middleware: %v", err)
+        if txErr != nil {
+            log.Printf("Error assigning middleware: %v", txErr)
             ResponseWithError(c, http.StatusInternalServerError, "Failed to assign middleware")
             return
         }
-
-        successful = append(successful, map[string]interface{}{
-            "middleware_id": mw.MiddlewareID,
-            "priority": mw.Priority,
-        })
+        
+        rowsAffected, err := result.RowsAffected()
+        if err == nil && rowsAffected > 0 {
+            log.Printf("Successfully assigned middleware %s with priority %d", 
+                mw.MiddlewareID, mw.Priority)
+            successful = append(successful, map[string]interface{}{
+                "middleware_id": mw.MiddlewareID,
+                "priority": mw.Priority,
+            })
+        } else {
+            log.Printf("Warning: Insertion query succeeded but affected %d rows", rowsAffected)
+        }
     }
     
     // Commit the transaction
-    if err = tx.Commit(); err != nil {
-        log.Printf("Error committing transaction: %v", err)
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Database error")
         return
     }
 
+    log.Printf("Successfully assigned %d middlewares to resource %s", len(successful), resourceID)
     c.JSON(http.StatusOK, gin.H{
         "resource_id": resourceID,
         "middlewares": successful,
@@ -683,6 +794,8 @@ func (s *Server) removeMiddleware(c *gin.Context) {
         return
     }
 
+    log.Printf("Removing middleware %s from resource %s", middlewareID, resourceID)
+
     // Delete the relationship using a transaction
     tx, err := s.db.Begin()
     if err != nil {
@@ -692,19 +805,21 @@ func (s *Server) removeMiddleware(c *gin.Context) {
     }
     
     // If something goes wrong, rollback
+    var txErr error
     defer func() {
-        if err != nil {
+        if txErr != nil {
             tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
         }
     }()
     
-    result, err := tx.Exec(
+    result, txErr := tx.Exec(
         "DELETE FROM resource_middlewares WHERE resource_id = ? AND middleware_id = ?",
         resourceID, middlewareID,
     )
     
-    if err != nil {
-        log.Printf("Error removing middleware: %v", err)
+    if txErr != nil {
+        log.Printf("Error removing middleware: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Failed to remove middleware")
         return
     }
@@ -717,20 +832,23 @@ func (s *Server) removeMiddleware(c *gin.Context) {
     }
     
     if rowsAffected == 0 {
+        log.Printf("No relationship found between resource %s and middleware %s", resourceID, middlewareID)
         ResponseWithError(c, http.StatusNotFound, "Resource middleware relationship not found")
         return
     }
     
+    log.Printf("Delete affected %d rows", rowsAffected)
+    
     // Commit the transaction
-    if err = tx.Commit(); err != nil {
-        log.Printf("Error committing transaction: %v", err)
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Database error")
         return
     }
 
+    log.Printf("Successfully removed middleware %s from resource %s", middlewareID, resourceID)
     c.JSON(http.StatusOK, gin.H{"message": "Middleware removed from resource successfully"})
 }
-
 // updateHTTPConfig updates the HTTP router entrypoints configuration
 func (s *Server) updateHTTPConfig(c *gin.Context) {
     id := c.Param("id")
@@ -772,18 +890,51 @@ func (s *Server) updateHTTPConfig(c *gin.Context) {
         input.Entrypoints = "websecure" // Default
     }
     
-    // Update the resource
-    _, err = s.db.Exec(
+    // Update the resource within a transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        log.Printf("Error beginning transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    var txErr error
+    defer func() {
+        if txErr != nil {
+            tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
+        }
+    }()
+    
+    log.Printf("Updating HTTP entrypoints for resource %s: %s", id, input.Entrypoints)
+    
+    result, txErr := tx.Exec(
         "UPDATE resources SET entrypoints = ?, updated_at = ? WHERE id = ?",
         input.Entrypoints, time.Now(), id,
     )
     
-    if err != nil {
-        log.Printf("Error updating resource entrypoints: %v", err)
+    if txErr != nil {
+        log.Printf("Error updating resource entrypoints: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Failed to update resource")
         return
     }
     
+    rowsAffected, err := result.RowsAffected()
+    if err == nil {
+        log.Printf("Update affected %d rows", rowsAffected)
+        if rowsAffected == 0 {
+            log.Printf("Warning: Update query succeeded but no rows were affected")
+        }
+    }
+    
+    // Commit the transaction
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    log.Printf("Successfully updated HTTP entrypoints for resource %s", id)
     c.JSON(http.StatusOK, gin.H{
         "id": id,
         "entrypoints": input.Entrypoints,
@@ -826,18 +977,51 @@ func (s *Server) updateTLSConfig(c *gin.Context) {
         return
     }
     
-    // Update the resource
-    _, err = s.db.Exec(
+    // Update the resource within a transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        log.Printf("Error beginning transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    var txErr error
+    defer func() {
+        if txErr != nil {
+            tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
+        }
+    }()
+    
+    log.Printf("Updating TLS domains for resource %s: %s", id, input.TLSDomains)
+    
+    result, txErr := tx.Exec(
         "UPDATE resources SET tls_domains = ?, updated_at = ? WHERE id = ?",
         input.TLSDomains, time.Now(), id,
     )
     
-    if err != nil {
-        log.Printf("Error updating TLS domains: %v", err)
+    if txErr != nil {
+        log.Printf("Error updating TLS domains: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Failed to update TLS domains")
         return
     }
     
+    rowsAffected, err := result.RowsAffected()
+    if err == nil {
+        log.Printf("Update affected %d rows", rowsAffected)
+        if rowsAffected == 0 {
+            log.Printf("Warning: Update query succeeded but no rows were affected")
+        }
+    }
+    
+    // Commit the transaction
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    log.Printf("Successfully updated TLS domains for resource %s", id)
     c.JSON(http.StatusOK, gin.H{
         "id": id,
         "tls_domains": input.TLSDomains,
@@ -902,18 +1086,52 @@ func (s *Server) updateTCPConfig(c *gin.Context) {
         tcpEnabled = 1
     }
     
-    // Update the resource
-    _, err = s.db.Exec(
+    // Update the resource within a transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        log.Printf("Error beginning transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    var txErr error
+    defer func() {
+        if txErr != nil {
+            tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
+        }
+    }()
+    
+    log.Printf("Updating TCP config for resource %s: enabled=%t, entrypoints=%s", 
+        id, input.TCPEnabled, input.TCPEntrypoints)
+    
+    result, txErr := tx.Exec(
         "UPDATE resources SET tcp_enabled = ?, tcp_entrypoints = ?, tcp_sni_rule = ?, updated_at = ? WHERE id = ?",
         tcpEnabled, input.TCPEntrypoints, input.TCPSNIRule, time.Now(), id,
     )
     
-    if err != nil {
-        log.Printf("Error updating TCP config: %v", err)
+    if txErr != nil {
+        log.Printf("Error updating TCP config: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Failed to update TCP configuration")
         return
     }
     
+    rowsAffected, err := result.RowsAffected()
+    if err == nil {
+        log.Printf("Update affected %d rows", rowsAffected)
+        if rowsAffected == 0 {
+            log.Printf("Warning: Update query succeeded but no rows were affected")
+        }
+    }
+    
+    // Commit the transaction
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    log.Printf("Successfully updated TCP configuration for resource %s", id)
     c.JSON(http.StatusOK, gin.H{
         "id":              id,
         "tcp_enabled":     input.TCPEnabled,
@@ -922,14 +1140,6 @@ func (s *Server) updateTCPConfig(c *gin.Context) {
     })
 }
 
-// generateID generates a random 16-character hex string
-func generateID() (string, error) {
-	bytes := make([]byte, 8)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-	return hex.EncodeToString(bytes), nil
-}
 // updateHeadersConfig updates the custom headers configuration
 func (s *Server) updateHeadersConfig(c *gin.Context) {
     id := c.Param("id")
@@ -974,23 +1184,77 @@ func (s *Server) updateHeadersConfig(c *gin.Context) {
         return
     }
     
-    // Update the resource
-    _, err = s.db.Exec(
+    // Update the resource within a transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        log.Printf("Error beginning transaction: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    var txErr error
+    defer func() {
+        if txErr != nil {
+            tx.Rollback()
+            log.Printf("Transaction rolled back due to error: %v", txErr)
+        }
+    }()
+    
+    log.Printf("Updating custom headers for resource %s with %d headers", 
+        id, len(input.CustomHeaders))
+    
+    result, txErr := tx.Exec(
         "UPDATE resources SET custom_headers = ?, updated_at = ? WHERE id = ?",
         string(headersJSON), time.Now(), id,
     )
     
-    if err != nil {
-        log.Printf("Error updating custom headers: %v", err)
+    if txErr != nil {
+        log.Printf("Error updating custom headers: %v", txErr)
         ResponseWithError(c, http.StatusInternalServerError, "Failed to update custom headers")
         return
     }
     
+    rowsAffected, err := result.RowsAffected()
+    if err == nil {
+        log.Printf("Update affected %d rows", rowsAffected)
+        if rowsAffected == 0 {
+            log.Printf("Warning: Update query succeeded but no rows were affected")
+        }
+    }
+    
+    // Commit the transaction
+    if txErr = tx.Commit(); txErr != nil {
+        log.Printf("Error committing transaction: %v", txErr)
+        ResponseWithError(c, http.StatusInternalServerError, "Database error")
+        return
+    }
+    
+    // Verify the update by reading back the custom_headers
+    var storedHeaders string
+    verifyErr := s.db.QueryRow("SELECT custom_headers FROM resources WHERE id = ?", id).Scan(&storedHeaders)
+    if verifyErr != nil {
+        log.Printf("Warning: Could not verify headers update: %v", verifyErr)
+    } else if storedHeaders == "" {
+        log.Printf("Warning: Headers may be empty after update for resource %s", id)
+    } else {
+        log.Printf("Successfully verified headers update for resource %s", id)
+    }
+    
+    log.Printf("Successfully updated custom headers for resource %s", id)
     c.JSON(http.StatusOK, gin.H{
         "id": id,
         "custom_headers": input.CustomHeaders,
     })
 }
+// generateID generates a random 16-character hex string
+func generateID() (string, error) {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
 // isValidMiddlewareType checks if a middleware type is valid
 func isValidMiddlewareType(typ string) bool {
 	validTypes := map[string]bool{
