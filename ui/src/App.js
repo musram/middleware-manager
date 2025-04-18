@@ -84,7 +84,45 @@ const api = {
     fetch(`${API_URL}/resources/${resourceId}/middlewares/${middlewareId}`, {
       method: 'DELETE',
     }).then((res) => res.json()),
-
+  
+  // HTTP entrypoints config
+updateHTTPConfig: (resourceId, data) =>
+  fetch(`${API_URL}/resources/${resourceId}/config/http`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then((res) => res.json()),
+  
+// TLS domains config  
+updateTLSConfig: (resourceId, data) =>
+  fetch(`${API_URL}/resources/${resourceId}/config/tls`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then((res) => res.json()),
+  
+// TCP SNI config
+updateTCPConfig: (resourceId, data) =>
+  fetch(`${API_URL}/resources/${resourceId}/config/tcp`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then((res) => res.json()),
+  
+  // Headers config
+  updateHeadersConfig: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/headers`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
+  // Add to API service object
+  updateRouterPriority: (resourceId, data) =>
+    fetch(`${API_URL}/resources/${resourceId}/config/priority`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
   // Middleware-related API calls
   getMiddlewares: () =>
     fetch(`${API_URL}/middlewares`).then((res) => res.json()),
@@ -811,6 +849,45 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
   const [priority, setPriority] = useState(100);
+  // HTTP Router Configuration
+  const [entrypoints, setEntrypoints] = useState('websecure');
+  const [showHTTPConfigModal, setShowHTTPConfigModal] = useState(false);
+
+  // TLS Certificate Domains Configuration
+  const [tlsDomains, setTLSDomains] = useState('');
+  const [showTLSConfigModal, setShowTLSConfigModal] = useState(false);
+
+  // TCP SNI Router Configuration
+  const [tcpEnabled, setTCPEnabled] = useState(false);
+  const [tcpEntrypoints, setTCPEntrypoints] = useState('tcp');
+  const [tcpSNIRule, setTCPSNIRule] = useState('');
+  const [showTCPConfigModal, setShowTCPConfigModal] = useState(false);
+
+  // new state variables for headers
+  const [customHeaders, setCustomHeaders] = useState({});
+  const [showHeadersConfigModal, setShowHeadersConfigModal] = useState(false);
+  const [headerKey, setHeaderKey] = useState('');
+  const [headerValue, setHeaderValue] = useState('');
+  const [routerPriority, setRouterPriority] = useState(100);
+
+  // Add this useEffect to load the router priority when the resource data loads
+  useEffect(() => {
+    if (resource) {
+      setRouterPriority(resource.router_priority || 100);
+    }
+  }, [resource]);
+
+  // Add this handler function
+  const handleUpdateRouterPriority = async () => {
+    try {
+      await api.updateRouterPriority(id, { router_priority: routerPriority });
+      alert('Router priority updated successfully');
+      fetchData(); // Refresh data
+    } catch (err) {
+      alert('Failed to update router priority');
+      console.error('Update router priority error:', err);
+    }
+  };
 
   // Fetch resource and middleware data
   const fetchData = async () => {
@@ -823,6 +900,26 @@ const ResourceDetail = ({ id, navigateTo }) => {
 
       setResource(resourceData);
       setMiddlewares(middlewaresData);
+      // Set HTTP config
+      setEntrypoints(resourceData.entrypoints || 'websecure');
+      // Set TLS domains config
+      setTLSDomains(resourceData.tls_domains || '');
+      // Set TCP config
+      setTCPEnabled(resourceData.tcp_enabled || false);
+      setTCPEntrypoints(resourceData.tcp_entrypoints || 'tcp');
+      setTCPSNIRule(resourceData.tcp_sni_rule || '');
+
+      // Add this code here for custom headers parsing
+    if (resourceData.custom_headers) {
+      try {
+        setCustomHeaders(JSON.parse(resourceData.custom_headers));
+      } catch (e) {
+        console.error("Error parsing custom headers:", e);
+        setCustomHeaders({});
+      }
+    } else {
+      setCustomHeaders({});
+    }
 
       // Parse assigned middlewares
       const middlewaresList = parseMiddlewares(resourceData.middlewares);
@@ -846,6 +943,95 @@ const ResourceDetail = ({ id, navigateTo }) => {
   useEffect(() => {
     fetchData();
   }, [id]);
+  const handleUpdateHTTPConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateHTTPConfig(id, { entrypoints });
+      setShowHTTPConfigModal(false);
+      fetchData();
+      alert('HTTP router configuration updated successfully');
+    } catch (err) {
+      alert('Failed to update HTTP router configuration');
+      console.error('Update HTTP config error:', err);
+    }
+  };
+  
+  const handleUpdateTLSConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateTLSConfig(id, { tls_domains: tlsDomains });
+      setShowTLSConfigModal(false);
+      fetchData();
+      alert('TLS certificate domains updated successfully');
+    } catch (err) {
+      alert('Failed to update TLS certificate domains');
+      console.error('Update TLS config error:', err);
+    }
+    try {
+      await api.updateHeadersConfig(id, { custom_headers: customHeaders });
+      setShowHeadersConfigModal(false);
+      fetchData();
+      alert('Custom headers updated successfully');
+    } catch (err) {
+      alert('Failed to update custom headers');
+      console.error('Update headers config error:', err);
+    }
+  };
+  
+  const handleUpdateTCPConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateTCPConfig(id, {
+        tcp_enabled: tcpEnabled,
+        tcp_entrypoints: tcpEntrypoints,
+        tcp_sni_rule: tcpSNIRule
+      });
+      setShowTCPConfigModal(false);
+      fetchData();
+      alert('TCP SNI router configuration updated successfully');
+    } catch (err) {
+      alert('Failed to update TCP SNI router configuration');
+      console.error('Update TCP config error:', err);
+    }
+  };
+  const handleUpdateHeadersConfig = async (e) => {
+    e.preventDefault();
+    
+    try {
+      await api.updateHeadersConfig(id, { custom_headers: customHeaders });
+      setShowHeadersConfigModal(false);
+      fetchData();
+      alert('Custom headers updated successfully');
+    } catch (err) {
+      alert('Failed to update custom headers');
+      console.error('Update headers config error:', err);
+    }
+  };
+  // Function to add new header
+const addHeader = () => {
+  if (!headerKey.trim()) {
+    alert('Header key cannot be empty');
+    return;
+  }
+  
+  setCustomHeaders({
+    ...customHeaders,
+    [headerKey]: headerValue
+  });
+  
+  setHeaderKey('');
+  setHeaderValue('');
+};
+
+// Function to remove header
+const removeHeader = (key) => {
+  const newHeaders = {...customHeaders};
+  delete newHeaders[key];
+  setCustomHeaders(newHeaders);
+};
 
   // Handle multiple middleware selection
   const handleMiddlewareSelection = (e) => {
@@ -933,7 +1119,6 @@ const ResourceDetail = ({ id, navigateTo }) => {
   }
 
   const isDisabled = resource.status === 'disabled';
-
   return (
     <div>
       <div className="mb-6 flex items-center">
@@ -950,7 +1135,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </span>
         )}
       </div>
-
+  
       {/* Disabled Resource Warning */}
       {isDisabled && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
@@ -971,8 +1156,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-red-700">
-                This resource has been removed from Pangolin and is now
-                disabled. Any changes to middleware will not take effect.
+                This resource has been removed from Pangolin and is now disabled. Any changes to middleware will not take effect.
               </p>
               <div className="mt-2 flex space-x-4">
                 <button
@@ -995,10 +1179,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
                           navigateTo('resources');
                         })
                         .catch((error) => {
-                          console.error(
-                            'Error deleting resource:',
-                            error
-                          );
+                          console.error('Error deleting resource:', error);
                           alert('Failed to delete resource');
                         });
                     }
@@ -1012,7 +1193,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
-
+  
       {/* Resource Details */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-xl font-semibold mb-4">Resource Details</h2>
@@ -1061,7 +1242,122 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       </div>
+  
+      {/* Router Configuration Section */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Router Configuration</h2>
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={() => setShowHTTPConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            HTTP Router Configuration
+          </button>
+          <button
+            onClick={() => setShowTLSConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            TLS Certificate Domains
+          </button>
+          <button
+            onClick={() => setShowTCPConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            TCP SNI Routing
+          </button>
 
+          {/* Add the Custom Headers button here */}
+          <button
+            onClick={() => setShowHeadersConfigModal(true)}
+            disabled={isDisabled}
+            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Custom Headers
+          </button>
+        </div>
+  
+        {/* Current Configuration Summary */}
+        <div className="mt-4 p-4 bg-gray-50 rounded border">
+          <h3 className="font-medium mb-2">Current Configuration</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">HTTP Entrypoints</p>
+              <p className="font-medium">{entrypoints || 'websecure'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">TLS Certificate Domains</p>
+              <p className="font-medium">{tlsDomains || 'None'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">TCP SNI Routing</p>
+              <p className="font-medium">{tcpEnabled ? 'Enabled' : 'Disabled'}</p>
+            </div>
+            {tcpEnabled && (
+              <>
+                <div>
+                  <p className="text-sm text-gray-500">TCP Entrypoints</p>
+                  <p className="font-medium">{tcpEntrypoints || 'tcp'}</p>
+                </div>
+                {tcpSNIRule && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500">TCP SNI Rule</p>
+                    <p className="font-medium font-mono text-sm break-all">{tcpSNIRule}</p>
+                  </div>
+                )}
+              </>
+            )}
+            {/* Add Custom Headers summary here */}
+      {Object.keys(customHeaders).length > 0 && (
+        <div>
+          <p className="text-sm text-gray-500">Custom Headers</p>
+          <div className="font-medium">
+            {Object.entries(customHeaders).map(([key, value]) => (
+              <div key={key} className="text-sm">
+                <span className="font-mono">{key}</span>: <span className="font-mono">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Add the Router Priority Configuration here */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Router Priority</h2>
+        <div className="mb-4">
+          <p className="text-gray-700">
+            Set the priority of this router. When multiple routers match the same request, 
+            the router with the highest priority (highest number) will be selected first.
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Note: This is different from middleware priority, which controls the order middlewares 
+            are applied within a router.
+          </p>
+        </div>
+        
+        <div className="flex items-center">
+          <input
+            type="number"
+            value={routerPriority}
+            onChange={(e) => setRouterPriority(parseInt(e.target.value) || 100)}
+            className="w-24 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            min="1"
+            max="1000"
+          />
+          <button
+            onClick={handleUpdateRouterPriority}
+            className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Update Priority
+          </button>
+        </div>
+      </div>
+  
       {/* Middlewares Section */}
       <div className="bg-white p-6 rounded-lg shadow">
         <div className="flex justify-between items-center mb-4">
@@ -1102,14 +1398,11 @@ const ResourceDetail = ({ id, navigateTo }) => {
                     name: middleware.name,
                     type: 'unknown',
                   };
-
+  
                 return (
                   <tr key={middleware.id}>
                     <td className="px-6 py-4">
-                      {formatMiddlewareDisplay(
-                        middlewareDetails,
-                        middlewares
-                      )}
+                      {formatMiddlewareDisplay(middlewareDetails, middlewares)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {middleware.priority}
@@ -1130,7 +1423,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </table>
         )}
       </div>
-
+  
       {/* Add Middleware Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
@@ -1149,9 +1442,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
             <div className="px-6 py-4">
               {availableMiddlewares.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">
-                  <p>
-                    All middlewares have been assigned to this resource.
-                  </p>
+                  <p>All middlewares have been assigned to this resource.</p>
                   <button
                     onClick={() => navigateTo('middleware-form')}
                     className="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -1173,18 +1464,13 @@ const ResourceDetail = ({ id, navigateTo }) => {
                       size={5}
                     >
                       {availableMiddlewares.map((middleware) => (
-                        <option
-                          key={middleware.id}
-                          value={middleware.id}
-                        >
+                        <option key={middleware.id} value={middleware.id}>
                           {middleware.name} ({middleware.type})
                         </option>
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Hold Ctrl (or Cmd) to select multiple middlewares.
-                      All selected middlewares will be assigned with the
-                      same priority.
+                      Hold Ctrl (or Cmd) to select multiple middlewares. All selected middlewares will be assigned with the same priority.
                     </p>
                   </div>
                   <div className="mb-4">
@@ -1201,8 +1487,7 @@ const ResourceDetail = ({ id, navigateTo }) => {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Higher priority middlewares are applied first
-                      (1-1000)
+                      Higher priority middlewares are applied first (1-1000)
                     </p>
                   </div>
                   <div className="flex justify-end space-x-3">
@@ -1227,6 +1512,321 @@ const ResourceDetail = ({ id, navigateTo }) => {
           </div>
         </div>
       )}
+  
+      {/* HTTP Config Modal */}
+      {showHTTPConfigModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">HTTP Router Configuration</h3>
+              <button
+                onClick={() => setShowHTTPConfigModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <form onSubmit={handleUpdateHTTPConfig}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">
+                    HTTP Entry Points (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={entrypoints}
+                    onChange={(e) => setEntrypoints(e.target.value)}
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="websecure,metrics,api"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Standard entrypoints: websecure (HTTPS), web (HTTP). Default: websecure
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <strong>Note:</strong> Entrypoints must be defined in your Traefik static configuration file
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowHTTPConfigModal(false)}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Save Configuration
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+  
+      {/* TLS Certificate Domains Modal */}
+      {showTLSConfigModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">TLS Certificate Domains</h3>
+              <button
+                onClick={() => setShowTLSConfigModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <form onSubmit={handleUpdateTLSConfig}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">
+                    Additional Certificate Domains (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={tlsDomains}
+                    onChange={(e) => setTLSDomains(e.target.value)}
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="example.com,*.example.com"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Extra domains to include in the TLS certificate (Subject Alternative Names)
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Main domain ({resource.host}) will be automatically included
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTLSConfigModal(false)}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    Save Certificate Domains
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+  
+      {/* TCP SNI Routing Modal */}
+      {showTCPConfigModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">TCP SNI Routing Configuration</h3>
+              <button
+                onClick={() => setShowTCPConfigModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <form onSubmit={handleUpdateTCPConfig}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2 flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={tcpEnabled}
+                      onChange={(e) => setTCPEnabled(e.target.checked)}
+                      className="mr-2"
+                    />
+                    Enable TCP SNI Routing
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Creates a separate TCP router with SNI matching rules
+                  </p>
+                </div>
+                {tcpEnabled && (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-gray-700 text-sm font-bold mb-2">
+                        TCP Entry Points (comma-separated)
+                      </label>
+                      <input
+                        type="text"
+                        value={tcpEntrypoints}
+                        onChange={(e) => setTCPEntrypoints(e.target.value)}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="tcp"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Standard TCP entrypoint: tcp. Default: tcp
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        <strong>Note:</strong> Entrypoints must be defined in your Traefik static configuration file
+                      </p>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-gray-700 text-sm font-bold mb-2">
+                        TCP SNI Matching Rule
+                      </label>
+                      <input
+                        type="text"
+                        value={tcpSNIRule}
+                        onChange={(e) => setTCPSNIRule(e.target.value)}
+                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={`HostSNI(\`${resource.host}\`)`}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        SNI rule using HostSNI or HostSNIRegexp matchers
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Examples:</p>
+                      <ul className="text-xs text-gray-500 mt-1 list-disc pl-5">
+                        <li>Match specific domain: <code>{`HostSNI(\`${resource.host}\`)`}</code></li>
+                        <li>Match with wildcard: <code>{`HostSNIRegexp(\`^.+\\.example\\.com$\`)`}</code></li>
+                        <li>Complex rule: <code>{`HostSNI(\`${resource.host}\`) || (HostSNI(\`other.example.com\`) && !ALPN(\`h2\`))`}</code></li>
+                      </ul>
+                      <p className="text-xs text-gray-500 mt-1">
+                        If empty, defaults to <code>{`HostSNI(\`${resource.host}\`)`}</code>
+                      </p>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTCPConfigModal(false)}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                  >
+                    Save TCP Configuration
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add Custom Headers Modal here */}
+      {showHeadersConfigModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="flex justify-between items-center px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">Custom Headers Configuration</h3>
+              <button
+                onClick={() => setShowHeadersConfigModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <form onSubmit={handleUpdateHeadersConfig}>
+                <div className="mb-4">
+                  <label className="block text-gray-700 text-sm font-bold mb-2">
+                    Custom Request Headers
+                  </label>
+                  
+                  {/* Current headers list */}
+                  {Object.keys(customHeaders).length > 0 ? (
+                    <div className="mb-4 border rounded p-3">
+                      <h4 className="text-sm font-semibold mb-2">Current Headers</h4>
+                      <ul className="space-y-2">
+                        {Object.entries(customHeaders).map(([key, value]) => (
+                          <li key={key} className="flex justify-between items-center">
+                            <div>
+                              <span className="font-medium">{key}:</span> {value}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeHeader(key)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-4">No custom headers configured.</p>
+                  )}
+                  
+                  {/* Add new header */}
+                  <div className="border rounded p-3">
+                    <h4 className="text-sm font-semibold mb-2">Add New Header</h4>
+                    <div className="grid grid-cols-5 gap-2 mb-2">
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={headerKey}
+                          onChange={(e) => setHeaderKey(e.target.value)}
+                          placeholder="Header name"
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={headerValue}
+                          onChange={(e) => setHeaderValue(e.target.value)}
+                          placeholder="Header value"
+                          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <button
+                          type="button"
+                          onClick={addHeader}
+                          className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Common examples: Host, X-Forwarded-Host
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>Host</strong>: To modify the hostname sent to the backend service
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>X-Forwarded-Host</strong>: To pass the original hostname to the backend
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowHeadersConfigModal(false)}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                  >
+                    Save Headers
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1237,6 +1837,8 @@ const MiddlewaresList = ({ navigateTo }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [middlewareToDelete, setMiddlewareToDelete] = useState(null);
 
   // Fetch all middlewares
   const fetchMiddlewares = async () => {
@@ -1257,23 +1859,31 @@ const MiddlewaresList = ({ navigateTo }) => {
     fetchMiddlewares();
   }, []);
 
-  // Handle middleware deletion with confirmation
-  const handleDeleteMiddleware = async (id, name) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the middleware "${name}"?`
-      )
-    ) {
-      return;
-    }
+  // Open confirmation modal before deleting
+  const confirmDelete = (middleware) => {
+    setMiddlewareToDelete(middleware);
+    setShowDeleteModal(true);
+  };
 
+  // Handle middleware deletion after confirmation
+  const handleDeleteMiddleware = async () => {
+    if (!middlewareToDelete) return;
+    
     try {
-      await api.deleteMiddleware(id);
-      fetchMiddlewares();
+      await api.deleteMiddleware(middlewareToDelete.id);
+      setShowDeleteModal(false);
+      setMiddlewareToDelete(null);
+      await fetchMiddlewares();
     } catch (err) {
       alert('Failed to delete middleware');
       console.error('Delete middleware error:', err);
     }
+  };
+
+  // Cancel deletion
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setMiddlewareToDelete(null);
   };
 
   // Filter middlewares based on search term
@@ -1341,30 +1951,24 @@ const MiddlewaresList = ({ navigateTo }) => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                       {middleware.type}
+                      {middleware.type === 'chain' && " (Middleware Chain)"}
                     </span>
-                    {middleware.type === 'chain' && (
-                      <span className="ml-2 text-xs text-gray-500">
-                        (Middleware Chain)
-                      </span>
-                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() =>
-                        navigateTo('middleware-form', middleware.id)
-                      }
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleDeleteMiddleware(middleware.id, middleware.name)
-                      }
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => navigateTo('middleware-form', middleware.id)}
+                        className="text-blue-600 hover:text-blue-900 mr-3"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(middleware)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1382,416 +1986,396 @@ const MiddlewaresList = ({ navigateTo }) => {
           </table>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-red-600">Confirm Deletion</h3>
+            </div>
+            <div className="px-6 py-4">
+              <p className="mb-4">
+                Are you sure you want to delete the middleware "{middlewareToDelete?.name}"?
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                This action cannot be undone and may affect any resources currently using this middleware.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteMiddleware}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // --- Middleware Form Component ---
 const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
-  const [name, setName] = useState('');
-  const [type, setType] = useState('forwardAuth');
-  const [config, setConfig] = useState('{}');
-  const [loading, setLoading] = useState(id ? true : false);
+  const [middleware, setMiddleware] = useState({
+    name: '',
+    type: 'basicAuth',
+    config: {}
+  });
+  const [configText, setConfigText] = useState('{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}');
+  const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState(null);
-  const [jsonError, setJsonError] = useState(null);
+  
+  // Add state for available middlewares and selected middlewares (for chain type)
   const [availableMiddlewares, setAvailableMiddlewares] = useState([]);
   const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
-
-  // Middleware type options
+  
+  // Available middleware types
   const middlewareTypes = [
     { value: 'basicAuth', label: 'Basic Authentication' },
+    { value: 'digestAuth', label: 'Digest Authentication' },
     { value: 'forwardAuth', label: 'Forward Authentication' },
     { value: 'ipWhiteList', label: 'IP Whitelist' },
+    { value: 'ipAllowList', label: 'IP Allow List' },
     { value: 'rateLimit', label: 'Rate Limiting' },
-    { value: 'headers', label: 'Headers' },
+    { value: 'headers', label: 'HTTP Headers' },
     { value: 'stripPrefix', label: 'Strip Prefix' },
+    { value: 'stripPrefixRegex', label: 'Strip Prefix Regex' },
     { value: 'addPrefix', label: 'Add Prefix' },
     { value: 'redirectRegex', label: 'Redirect Regex' },
     { value: 'redirectScheme', label: 'Redirect Scheme' },
+    { value: 'replacePath', label: 'Replace Path' },
+    { value: 'replacePathRegex', label: 'Replace Path Regex' },
     { value: 'chain', label: 'Middleware Chain' },
-    { value: 'replacepathregex', label: 'RegEx Path Replacement' },
     { value: 'plugin', label: 'Traefik Plugin' },
+    { value: 'buffering', label: 'Buffering' },
+    { value: 'circuitBreaker', label: 'Circuit Breaker' },
+    { value: 'compress', label: 'Compression' },
+    { value: 'contentType', label: 'Content Type' },
+    { value: 'errors', label: 'Error Pages' },
+    { value: 'grpcWeb', label: 'gRPC Web' },
+    { value: 'inFlightReq', label: 'In-Flight Request Limiter' },
+    { value: 'passTLSClientCert', label: 'Pass TLS Client Certificate' },
+    { value: 'retry', label: 'Retry' }
   ];
 
-  // Configuration templates for different middleware types
-  const templates = {
-    forwardAuth: {
-      address: 'http://auth-service:9000/verify',
-      trustForwardHeader: true,
-      authResponseHeaders: ['X-Remote-User', 'X-Remote-Email', 'X-Remote-Groups'],
-    },
-    basicAuth: {
-      users: ['admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/'],
-    },
-    ipWhiteList: {
-      sourceRange: ['127.0.0.1/32', '192.168.1.0/24'],
-    },
-    rateLimit: {
-      average: 100,
-      burst: 50,
-    },
-    headers: {
-      accessControlAllowMethods: ['GET', 'OPTIONS', 'PUT'],
-      browserXssFilter: true,
-      contentTypeNosniff: true,
-      customFrameOptionsValue: 'SAMEORIGIN',
-      customResponseHeaders: {
-        'X-Robots-Tag': 'none,noarchive,nosnippet,notranslate,noimageindex',
-        server: '',
-      },
-    },
-    chain: {
-      middlewares: [],
-    },
-    replacepathregex: {
-      regex: '^/path/to/replace',
-      replacement: '/new/path',
-    },
-    redirectRegex: {
-      regex: '^/path/to/redirect',
-      replacement: '/new/path',
-      permanent: false,
-    },
-    plugin: {},
-    geoblock: {
-      geoblock: {
-        silentStartUp: false,
-        allowLocalRequests: false,
-        logLocalRequests: false,
-        logAllowedRequests: false,
-        logApiRequests: false,
-        api: 'https://get.geojs.io/v1/ip/country/{ip}',
-        apiTimeoutMs: 750,
-        cacheSize: 15,
-        forceMonthlyUpdate: false,
-        allowUnknownCountries: false,
-        unknownCountryApiResponse: 'nil',
-        blackListMode: false,
-        addCountryHeader: false,
-        countries: ['DE'],
-      },
-    },
-    crowdsec: {
-      crowdsec: {
-        enabled: true,
-        logLevel: 'INFO',
-        updateIntervalSeconds: 15,
-        updateMaxFailure: 0,
-        defaultDecisionSeconds: 15,
-        httpTimeoutSeconds: 10,
-        crowdsecMode: 'live',
-        crowdsecAppsecEnabled: true,
-        crowdsecAppsecHost: 'crowdsec:7422',
-        crowdsecAppsecFailureBlock: true,
-        crowdsecAppsecUnreachableBlock: true,
-        crowdsecAppsecBodyLimit: 10485760,
-        crowdsecLapiKey: 'PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK',
-        crowdsecLapiHost: 'crowdsec:8080',
-        crowdsecLapiScheme: 'http',
-        forwardedHeadersTrustedIPs: ['0.0.0.0/0'],
-        clientTrustedIPs: [
-          '10.0.0.0/8',
-          '172.16.0.0/12',
-          '192.168.0.0/16',
-          '100.89.137.0/20',
-        ],
-      },
-    },
+  // Template configs for different middleware types
+  const configTemplates = {
+    basicAuth: '{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}',
+    digestAuth: '{\n  "users": [\n    "test:traefik:a2688e031edb4be6a3797f3882655c05"\n  ]\n}',
+    forwardAuth: '{\n  "address": "http://auth-service:9090/auth",\n  "trustForwardHeader": true,\n  "authResponseHeaders": [\n    "X-Auth-User",\n    "X-Auth-Roles"\n  ]\n}',
+    ipWhiteList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
+    ipAllowList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
+    rateLimit: '{\n  "average": 100,\n  "burst": 50\n}',
+    headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000,\n  "customResponseHeaders": {\n    "X-Custom-Header": "value",\n    "Server": ""\n  }\n}',
+    stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ],\n  "forceSlash": true\n}',
+    addPrefix: '{\n  "prefix": "/api"\n}',
+    redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}",\n  "permanent": true\n}',
+    redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
+    chain: '{\n  "middlewares": []\n}',
+    replacePath: '{\n  "path": "/newpath"\n}',
+    replacePathRegex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/bar/$1"\n}',
+    stripPrefixRegex: '{\n  "regex": [\n    "^/api/v\\\\d+/"\n  ]\n}',
+    plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}',
+    buffering: '{\n  "maxRequestBodyBytes": 5000000,\n  "memRequestBodyBytes": 2000000,\n  "maxResponseBodyBytes": 5000000,\n  "memResponseBodyBytes": 2000000,\n  "retryExpression": "IsNetworkError() && Attempts() < 2"\n}',
+    circuitBreaker: '{\n  "expression": "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",\n  "checkPeriod": "10s",\n  "fallbackDuration": "30s",\n  "recoveryDuration": "60s"\n}',
+    compress: '{\n  "excludedContentTypes": [\n    "text/event-stream"\n  ],\n  "minResponseBodyBytes": 1024\n}',
+    contentType: '{}',
+    errors: '{\n  "status": ["500-599"],\n  "service": "error-handler-service",\n  "query": "/{status}.html"\n}',
+    grpcWeb: '{\n  "allowOrigins": ["*"]\n}',
+    inFlightReq: '{\n  "amount": 10,\n  "sourceCriterion": {\n    "ipStrategy": {\n      "depth": 2,\n      "excludedIPs": ["127.0.0.1/32"]\n    }\n  }\n}',
+    passTLSClientCert: '{\n  "pem": true\n}',
+    retry: '{\n  "attempts": 3,\n  "initialInterval": "100ms"\n}'
   };
 
-  // Load middleware data when editing
-  useEffect(() => {
-    if (id) {
-      setLoading(true);
-      api
-        .getMiddleware(id)
-        .then((data) => {
-          setName(data.name);
-          setType(data.type);
-          let configData = data.config;
-          if (typeof configData === 'string') {
-            try {
-              configData = JSON.parse(configData);
-            } catch (e) {
-              console.error('Error parsing config JSON:', e);
-            }
-          }
-          setConfig(JSON.stringify(configData, null, 2));
-          setLoading(false);
-        })
-        .catch((err) => {
-          setError('Failed to load middleware');
-          console.error('Middleware fetch error:', err);
-          setLoading(false);
-        });
-    } else {
-      // Set default template for new middleware
-      setConfig(JSON.stringify(templates[type] || {}, null, 2));
-    }
-  }, [id, type]);
+  // Custom JSON parser that preserves empty strings
+  const parseJSONPreservingEmptyStrings = (jsonString) => {
+    return JSON.parse(jsonString, (key, value) => {
+      // Explicitly preserve empty strings
+      if (value === "") return "";
+      return value;
+    });
+  };
 
-  // Update template when type changes (new middleware only)
-  useEffect(() => {
-    if (!id) {
-      setConfig(JSON.stringify(templates[type] || {}, null, 2));
-    }
-  }, [type, id]);
+  // Custom JSON stringifier to format with proper indentation
+  // and ensure empty strings are preserved
+  const stringifyJSONWithEmptyStrings = (obj) => {
+    return JSON.stringify(obj, (key, value) => {
+      // Ensure empty strings are preserved
+      if (value === "") return "";
+      return value;
+    }, 2);
+  };
 
-// Fetch available middlewares for chain type
-useEffect(() => {
-  if (type === 'chain') {
-    // Fetch all middlewares for chain configuration
-    api
-      .getMiddlewares()
-      .then((data) => {
-        // Exclude current middleware when editing to prevent self-referencing
-        const filtered = id ? data.filter((m) => m.id !== id) : data;
-        setAvailableMiddlewares(filtered);
-
-        // Initialize selected middlewares from config when editing
-        if (id && config) {
-          try {
-            const configObj = JSON.parse(config);
-            if (Array.isArray(configObj.middlewares)) {
-              // Add a check to prevent unnecessary updates
-              const currentMiddlewares = JSON.stringify(configObj.middlewares);
-              const selectedMiddlewaresStr = JSON.stringify(selectedMiddlewares);
-              if (currentMiddlewares !== selectedMiddlewaresStr) {
-                setSelectedMiddlewares(configObj.middlewares);
-              }
-            }
-          } catch (e) {
-            console.error('Error parsing chain config:', e);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch middlewares for chain:', err);
-        setError('Failed to load available middlewares');
-      });
-  }
-}, [type, id, config]);
-
-// Synchronize chain config with selected middlewares
-useEffect(() => {
-  if (type === 'chain') {
-    // Add a check to prevent unnecessary updates
+  // Function to fetch available middlewares
+  const fetchAvailableMiddlewares = async () => {
     try {
-      const currentConfig = JSON.parse(config);
-      const currentMiddlewares = currentConfig.middlewares || [];
+      const response = await api.getMiddlewares();
+      // Filter out the current middleware if we're editing
+      const middlewares = isEditing 
+        ? response.filter(mw => mw.id !== id)
+        : response;
       
-      // Only update if the arrays are different
-      if (JSON.stringify(currentMiddlewares) !== JSON.stringify(selectedMiddlewares)) {
-        const chainConfig = {
-          middlewares: selectedMiddlewares,
-        };
-        setConfig(JSON.stringify(chainConfig, null, 2));
-      }
-    } catch (e) {
-      // If parsing fails, update the config anyway
-      const chainConfig = {
-        middlewares: selectedMiddlewares,
-      };
-      setConfig(JSON.stringify(chainConfig, null, 2));
-    }
-  }
-}, [selectedMiddlewares, type]);
-
-  // Validate JSON configuration
-  const validateJson = (json) => {
-    try {
-      JSON.parse(json);
-      setJsonError(null);
-      return true;
+      setAvailableMiddlewares(middlewares);
     } catch (err) {
-      setJsonError(err.message);
-      return false;
+      console.error("Error fetching middlewares:", err);
+      setError("Failed to load available middlewares");
     }
   };
 
-  // Handle config changes and validate JSON
-  const handleConfigChange = (e) => {
-    const newConfig = e.target.value;
-    setConfig(newConfig);
-    validateJson(newConfig);
-
-    // For chain middleware, sync selected middlewares with config
-    if (type === 'chain') {
-      try {
-        const configObj = JSON.parse(newConfig);
-        if (Array.isArray(configObj.middlewares)) {
-          setSelectedMiddlewares(configObj.middlewares);
+  // Fetch middleware details if editing
+  useEffect(() => {
+    // First, fetch all available middlewares if we're dealing with chain type
+    if (middleware.type === 'chain' || !isEditing) {
+      fetchAvailableMiddlewares();
+    }
+    
+    if (isEditing && id) {
+      const fetchMiddleware = async () => {
+        try {
+          setLoading(true);
+          const data = await api.getMiddleware(id);
+          setMiddleware({
+            name: data.name,
+            type: data.type,
+            config: data.config
+          });
+          
+          // Format config as pretty JSON string, preserving empty strings
+          const configJson = typeof data.config === 'string' 
+            ? data.config 
+            : stringifyJSONWithEmptyStrings(data.config);
+          
+          setConfigText(configJson);
+          
+          // If this is a chain middleware, fetch available middlewares and parse the selected ones
+          if (data.type === 'chain') {
+            fetchAvailableMiddlewares();
+            
+            // Extract the middleware IDs from the config
+            if (data.config && data.config.middlewares) {
+              setSelectedMiddlewares(data.config.middlewares);
+            }
+          }
+          
+          setError(null);
+        } catch (err) {
+          setError('Failed to load middleware details');
+          console.error('Middleware fetch error:', err);
+        } finally {
+          setLoading(false);
         }
-      } catch (e) {
-        // Ignore invalid JSON until corrected
-      }
+      };
+
+      fetchMiddleware();
+    }
+  }, [id, isEditing, middleware.type]);
+
+  // Update config template when type changes
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    setMiddleware({ ...middleware, type: newType });
+    
+    // For chain type, initialize with empty middlewares array and fetch available middlewares
+    if (newType === 'chain') {
+      setConfigText('{\n  "middlewares": []\n}');
+      setSelectedMiddlewares([]);
+      fetchAvailableMiddlewares();
+    } else {
+      setConfigText(configTemplates[newType] || '{}');
     }
   };
 
-  // Handle middleware selection for chain type
+  // Handle selection of middlewares for chain type
   const handleMiddlewareSelection = (e) => {
     const options = e.target.options;
     const selected = Array.from(options)
-      .filter((option) => option.selected)
-      .map((option) => option.value);
+      .filter(option => option.selected)
+      .map(option => option.value);
+    
     setSelectedMiddlewares(selected);
+    
+    // Update the config text to reflect the selected middlewares
+    const configObj = {
+      middlewares: selected
+    };
+    setConfigText(stringifyJSONWithEmptyStrings(configObj));
   };
 
-  // Provide helper text for specific middleware types
-  const getTypeHelperText = () => {
-    switch (type) {
-      case 'plugin':
-        return (
-          <div className="text-xs text-gray-500 mt-1">
-            <p>Configure a Traefik plugin middleware.</p>
-            <div className="mt-2">
-              <h4 className="font-semibold">GeoBlock Configuration</h4>
-              <ul className="list-disc pl-5">
-                <li>
-                  <strong>blackListMode</strong>: When false, countries
-                  list is a whitelist; when true, it’s a blacklist
-                </li>
-                <li>
-                  <strong>countries</strong>: Array of two-letter ISO
-                  country codes
-                </li>
-                <li>
-                  <strong>allowLocalRequests</strong>: When true, allows
-                  requests from private IP ranges
-                </li>
-                <li>
-                  <strong>api</strong>: Geolocation API endpoint for IP
-                  lookups
-                </li>
-              </ul>
-            </div>
-            <div className="mt-2">
-              <h4 className="font-semibold">CrowdSec Configuration</h4>
-              <ul className="list-disc pl-5">
-                <li>
-                  <strong>crowdsecLapiKey</strong>: Your CrowdSec bouncer
-                  API key
-                </li>
-                <li>
-                  <strong>crowdsecLapiHost</strong>: CrowdSec service
-                  address (e.g., "crowdsec:8080")
-                </li>
-                <li>
-                  <strong>forwardedHeadersTrustedIPs</strong>: IP ranges
-                  to trust for forwarded headers
-                </li>
-                <li>
-                  <strong>clientTrustedIPs</strong>: IP ranges to exempt
-                  from CrowdSec checks
-                </li>
-              </ul>
-            </div>
-            <p className="mt-2 italic">
-              Note: Plugins must be installed on your Traefik instances
-              for this configuration to work.
-            </p>
-          </div>
-        );
-      case 'replacepathregex':
-        return (
-          <div className="text-xs text-gray-500 mt-1">
-            <p>
-              The RegEx Path Replacement middleware rewrites the URL path
-              based on regex match.
-            </p>
-            <p>Common use cases:</p>
-            <ul className="list-disc pl-5 mt-1">
-              <li>
-                WebDAV redirects:{' '}
-                <code>^/.well-known/ca(l|rd)dav</code> →{' '}
-                <code>/remote.php/dav/</code>
-              </li>
-              <li>
-                Hiding paths:{' '}
-                <code>^/api/internal/(.*)</code> →{' '}
-                <code>/api/public/$1</code>
-              </li>
-            </ul>
-          </div>
-        );
-      case 'chain':
-        return (
-          <div className="text-xs text-gray-500 mt-1">
-            <p>
-              The Chain middleware combines multiple middlewares into a
-              single unit.
-            </p>
-            <p>
-              Order matters - middlewares are executed sequentially from
-              top to bottom.
-            </p>
-            <p className="mt-2 italic">
-              Note: Ensure selected middlewares are compatible and avoid
-              circular references.
-            </p>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  // Handle form submission for creating/updating middleware
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!name.trim()) {
-      alert('Please enter a name');
-      return;
-    }
-
-    if (!validateJson(config)) {
-      alert('Invalid JSON configuration');
-      return;
-    }
-
+    
     try {
-      const configObj = JSON.parse(config);
-      if (id) {
-        // Update existing middleware
-        await api.updateMiddleware(id, {
-          name,
-          type,
-          config: configObj,
-        });
+      // Parse config JSON, preserving empty strings
+      let configObj;
+      
+      if (middleware.type === 'chain') {
+        // For chain type, create configuration from selected middlewares
+        configObj = {
+          middlewares: selectedMiddlewares
+        };
+      } else {
+        try {
+          configObj = parseJSONPreservingEmptyStrings(configText);
+        } catch (err) {
+          alert('Invalid JSON configuration. Please check the format.');
+          return;
+        }
+      }
+      
+      // Process specific middleware types to ensure correct data types
+      // and string formats are preserved
+      switch (middleware.type) {
+        case 'headers':
+          // Ensure empty strings are preserved in headers
+          processHeadersConfig(configObj);
+          break;
+        case 'redirectRegex':
+        case 'redirectScheme':
+        case 'replacePath':
+        case 'replacePathRegex':
+        case 'stripPrefix':
+        case 'stripPrefixRegex':
+          // Ensure regex patterns are properly formatted
+          processPathConfig(configObj, middleware.type);
+          break;
+        case 'rateLimit':
+        case 'inFlightReq':
+          // Ensure numeric values are actually numbers, not strings
+          processNumericConfig(configObj);
+          break;
+        case 'plugin':
+          // Special handling for plugin configs
+          processPluginConfig(configObj);
+          break;
+      }
+      
+      const middlewareData = {
+        name: middleware.name,
+        type: middleware.type,
+        config: configObj
+      };
+      
+      setLoading(true);
+      
+      if (isEditing) {
+        await api.updateMiddleware(id, middlewareData);
         alert('Middleware updated successfully');
       } else {
-        // Create new middleware
-        await api.createMiddleware({
-          name,
-          type,
-          config: configObj,
-        });
+        await api.createMiddleware(middlewareData);
         alert('Middleware created successfully');
       }
+      
       navigateTo('middlewares');
     } catch (err) {
-      alert('Failed to save middleware');
-      console.error('Save middleware error:', err);
+      setError(`Failed to ${isEditing ? 'update' : 'create'} middleware`);
+      console.error('Middleware form error:', err);
+      alert(`Error: ${err.message || 'Unknown error occurred'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return <div className="flex justify-center p-12">Loading...</div>;
-  }
+  // Process headers configuration to ensure empty strings are preserved
+  const processHeadersConfig = (config) => {
+    // Process customResponseHeaders
+    if (config.customResponseHeaders) {
+      Object.keys(config.customResponseHeaders).forEach(key => {
+        if (config.customResponseHeaders[key] === "") {
+          // Explicitly set empty strings to ensure they're preserved
+          config.customResponseHeaders[key] = "";
+        }
+      });
+    }
+    
+    // Process customRequestHeaders
+    if (config.customRequestHeaders) {
+      Object.keys(config.customRequestHeaders).forEach(key => {
+        if (config.customRequestHeaders[key] === "") {
+          // Explicitly set empty strings to ensure they're preserved
+          config.customRequestHeaders[key] = "";
+        }
+      });
+    }
+  };
 
-  if (error) {
-    return (
-      <div className="bg-red-100 text-red-700 p-4 rounded">
-        {error}
-        <button
-          className="ml-4 text-blue-600 hover:underline"
-          onClick={() => navigateTo('middlewares')}
-        >
-          Back to Middlewares
-        </button>
-      </div>
-    );
+  // Process path-related configurations
+  const processPathConfig = (config, type) => {
+    // Regex patterns need special handling to ensure they're properly formatted
+    if (config.regex) {
+      // If regex is an array (like in stripPrefixRegex)
+      if (Array.isArray(config.regex)) {
+        config.regex = config.regex.map(pattern => String(pattern));
+      } else {
+        // Ensure regex is a string
+        config.regex = String(config.regex);
+      }
+    }
+    
+    // Ensure replacement is a string
+    if (config.replacement) {
+      config.replacement = String(config.replacement);
+    }
+    
+    // Ensure path is a string
+    if (config.path) {
+      config.path = String(config.path);
+    }
+  };
+
+  // Process numeric configurations
+  const processNumericConfig = (config) => {
+    // Convert numeric string values to actual numbers
+    if (config.average && typeof config.average === 'string') {
+      config.average = Number(config.average);
+    }
+    
+    if (config.burst && typeof config.burst === 'string') {
+      config.burst = Number(config.burst);
+    }
+    
+    if (config.amount && typeof config.amount === 'string') {
+      config.amount = Number(config.amount);
+    }
+    
+    // Handle nested ipStrategy.depth
+    if (config.sourceCriterion?.ipStrategy?.depth && 
+        typeof config.sourceCriterion.ipStrategy.depth === 'string') {
+      config.sourceCriterion.ipStrategy.depth = Number(config.sourceCriterion.ipStrategy.depth);
+    }
+  };
+
+  // Process plugin configurations
+  const processPluginConfig = (config) => {
+    // Iterate through plugin objects
+    Object.keys(config).forEach(pluginName => {
+      const pluginConfig = config[pluginName];
+      
+      if (typeof pluginConfig === 'object') {
+        // Process API keys to ensure they're preserved exactly
+        const keyFields = ['key', 'apiKey', 'token', 'secret', 'password', 'crowdsecLapiKey'];
+        
+        keyFields.forEach(field => {
+          if (field in pluginConfig && pluginConfig[field] === "") {
+            // Explicitly preserve empty strings
+            pluginConfig[field] = "";
+          }
+        });
+      }
+    });
+  };
+
+  if (loading && isEditing) {
+    return <div className="flex justify-center p-12">Loading...</div>;
   }
 
   return (
@@ -1804,9 +2388,14 @@ useEffect(() => {
           Back
         </button>
         <h1 className="text-2xl font-bold">
-          {id ? `Edit Middleware: ${name}` : 'Create New Middleware'}
+          {isEditing ? 'Edit Middleware' : 'Create Middleware'}
         </h1>
       </div>
+
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-6">{error}</div>
+      )}
+
       <div className="bg-white p-6 rounded-lg shadow">
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -1815,109 +2404,126 @@ useEffect(() => {
             </label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={middleware.name}
+              onChange={(e) => setMiddleware({ ...middleware, name: e.target.value })}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., Authelia Authentication"
+              placeholder="e.g., production-authentication"
               required
             />
           </div>
+
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Middleware Type
             </label>
             <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
+              value={middleware.type}
+              onChange={handleTypeChange}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
-              disabled={!!id}
+              disabled={isEditing}
             >
-              {middlewareTypes.map((typeOption) => (
-                <option
-                  key={typeOption.value}
-                  value={typeOption.value}
-                >
-                  {typeOption.label}
+              {middlewareTypes.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
                 </option>
               ))}
             </select>
-            {getTypeHelperText()}
-          </div>
-          {type === 'plugin' && (
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Plugin Type
-              </label>
-              <select
-                onChange={(e) => {
-                  const pluginType = e.target.value;
-                  if (pluginType === 'geoblock') {
-                    setConfig(JSON.stringify(templates.geoblock, null, 2));
-                  } else if (pluginType === 'crowdsec') {
-                    setConfig(JSON.stringify(templates.crowdsec, null, 2));
-                  }
-                }}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- Select a plugin --</option>
-                <option value="geoblock">
-                  GeoBlock - Geographic Access Control
-                </option>
-                <option value="crowdsec">
-                  CrowdSec - Threat Protection
-                </option>
-              </select>
+            {isEditing && (
               <p className="text-xs text-gray-500 mt-1">
-                Select a plugin type to load its configuration template.
+                Middleware type cannot be changed after creation
               </p>
-            </div>
-          )}
-          {type === 'chain' && (
+            )}
+          </div>
+
+          {middleware.type === 'chain' ? (
             <div className="mb-4">
               <label className="block text-gray-700 text-sm font-bold mb-2">
                 Select Middlewares for Chain
               </label>
-              <select
-                multiple
-                value={selectedMiddlewares}
-                onChange={handleMiddlewareSelection}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                size={5}
-              >
-                {availableMiddlewares.map((middleware) => (
-                  <option
-                    key={middleware.id}
-                    value={middleware.id}
+              {availableMiddlewares.length > 0 ? (
+                <>
+                  <select
+                    multiple
+                    value={selectedMiddlewares}
+                    onChange={handleMiddlewareSelection}
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    size={Math.min(8, availableMiddlewares.length)}
                   >
-                    {middleware.name} ({middleware.type})
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Hold Ctrl (or Cmd) to select multiple middlewares. Order
-                matters - middlewares are applied from top to bottom.
-              </p>
+                    {availableMiddlewares.map((mw) => (
+                      <option key={mw.id} value={mw.id}>
+                        {mw.name} ({mw.type})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Hold Ctrl (or Cmd) to select multiple middlewares. Middlewares will be applied in the order selected.
+                  </p>
+                  
+                  {/* Display selected middlewares */}
+                  {selectedMiddlewares.length > 0 ? (
+                    <div className="mt-4 p-3 bg-gray-50 rounded border">
+                      <h4 className="font-semibold mb-2">Chain Execution Order:</h4>
+                      <ol className="list-decimal ml-5">
+                        {selectedMiddlewares.map((mwId) => {
+                          const mw = availableMiddlewares.find(m => m.id === mwId);
+                          return (
+                            <li key={mwId} className="mb-1">
+                              {mw ? `${mw.name} (${mw.type})` : mwId}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700">
+                      <p className="text-sm">No middlewares selected. Please select at least one middleware to create a chain.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded text-blue-700">
+                  <p className="mb-2">You need to create other middlewares first before creating a chain.</p>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('middleware-form')}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Create a new middleware
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Configuration (JSON)
+              </label>
+              <textarea
+                value={configText}
+                onChange={(e) => setConfigText(e.target.value)}
+                className="w-full px-3 py-2 border font-mono h-64 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter JSON configuration"
+                required
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                <p>Configuration must be valid JSON for the selected middleware type</p>
+                {middleware.type === 'headers' && (
+                  <p className="mt-1 text-amber-600 font-medium">
+                    Special note for Headers middleware: Use empty strings ("") to remove headers. 
+                    Example: <code className="bg-gray-100 px-1 rounded">{'{"Server": ""}'}</code>
+                  </p>
+                )}
+                {(middleware.type === 'redirectRegex' || middleware.type === 'replacePathRegex') && (
+                  <p className="mt-1 text-amber-600 font-medium">
+                    Special note for Regex patterns: Make sure regex and replacement values are properly formatted.
+                    Example: <code className="bg-gray-100 px-1 rounded">{'{"regex": "^/foo/(.*)"}'}</code>
+                  </p>
+                )}
+              </div>
             </div>
           )}
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Configuration (JSON)
-            </label>
-            <textarea
-              value={config}
-              onChange={handleConfigChange}
-              className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono h-64 ${
-                jsonError ? 'border-red-500' : ''
-              }`}
-              spellCheck="false"
-            ></textarea>
-            {jsonError && (
-              <p className="text-red-500 text-xs mt-1">
-                JSON Error: {jsonError}
-              </p>
-            )}
-          </div>
+
           <div className="flex justify-end space-x-3">
             <button
               type="button"
@@ -1929,9 +2535,9 @@ useEffect(() => {
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              disabled={!!jsonError}
+              disabled={loading || (middleware.type === 'chain' && selectedMiddlewares.length === 0)}
             >
-              {id ? 'Update Middleware' : 'Create Middleware'}
+              {loading ? 'Saving...' : isEditing ? 'Update Middleware' : 'Create Middleware'}
             </button>
           </div>
         </form>

@@ -133,8 +133,8 @@ func (rw *ResourceWatcher) checkResources() error {
 	// Process routers to find resources
 	for routerID, router := range config.HTTP.Routers {
 		// Skip non-SSL routers (usually HTTP redirects)
-		if router.TLS.CertResolver == "" {
-			continue
+		 if router.TLS.CertResolver == "" {
+			 continue
 		}
 
 		// Extract host from rule (e.g., "Host(`example.com`)")
@@ -183,9 +183,16 @@ func (rw *ResourceWatcher) updateOrCreateResource(resourceID, host, serviceID st
 	// Check if resource already exists
 	var exists int
 	var status string
-	err := rw.db.QueryRow("SELECT 1, status FROM resources WHERE id = ?", resourceID).Scan(&exists, &status)
+	var entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule string
+	var tcpEnabled int
+	
+	err := rw.db.QueryRow(`
+		SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule 
+		FROM resources WHERE id = ?
+	`, resourceID).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule)
+	
 	if err == nil {
-		// Resource exists, update if needed and ensure status is active
+		// Resource exists, update essential fields but preserve custom configuration
 		_, err = rw.db.Exec(
 			"UPDATE resources SET host = ?, service_id = ?, status = 'active', updated_at = ? WHERE id = ?",
 			host, serviceID, time.Now(), resourceID,
@@ -201,11 +208,14 @@ func (rw *ResourceWatcher) updateOrCreateResource(resourceID, host, serviceID st
 		return nil
 	}
 
-	// Create new resource (with placeholder org_id and site_id)
-	_, err = rw.db.Exec(
-		"INSERT INTO resources (id, host, service_id, org_id, site_id, status) VALUES (?, ?, ?, ?, ?, 'active')",
-		resourceID, host, serviceID, "unknown", "unknown",
-	)
+	// Create new resource with default configuration
+	_, err = rw.db.Exec(`
+		INSERT INTO resources (
+			id, host, service_id, org_id, site_id, status, 
+			entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule
+		) VALUES (?, ?, ?, ?, ?, 'active', 'websecure', '', 0, 'tcp', '')
+	`, resourceID, host, serviceID, "unknown", "unknown")
+	
 	if err != nil {
 		return fmt.Errorf("failed to create resource %s: %w", resourceID, err)
 	}
