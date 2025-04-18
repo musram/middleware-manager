@@ -449,7 +449,7 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 			
 		case "redirectRegex", "redirectScheme", "replacePath", "replacePathRegex", "stripPrefix", "stripPrefixRegex":
 			// Path manipulation middlewares need special handling for regex and path values
-			processPathMiddleware(middlewareConfig, typ)
+			processPathMiddleware(middlewareConfig)
 			
 		case "basicAuth", "digestAuth", "forwardAuth":
 			// Authentication middlewares often have URLs and tokens
@@ -486,20 +486,18 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 }
 
 // processChainingMiddleware handles chain middleware special processing
-func processChainingMiddleware(config map[string]interface{}) {
-	if middlewares, ok := config["middlewares"].([]interface{}); ok {
+func processChainingMiddleware(config map[string]any) {
+	// Do not add any suffixes to middleware names in the chain
+	if middlewares, ok := config["middlewares"].([]any); ok {
 		for i, middleware := range middlewares {
 			if middlewareStr, ok := middleware.(string); ok {
-				// If this is not already a fully qualified middleware reference
-				if !strings.Contains(middlewareStr, "@") {
-					// Assume it's from our file provider
-					middlewares[i] = fmt.Sprintf("%s@file", middlewareStr)
-				}
+				// Keep middleware name as is, do not append "@file"
+				middlewares[i] = middlewareStr
 			}
 		}
 		config["middlewares"] = middlewares
 	}
-	
+
 	// Process other chain configuration values
 	preserveTraefikValues(config)
 }
@@ -544,7 +542,7 @@ func processHeadersMiddleware(config map[string]interface{}) {
 }
 
 // processPathMiddleware handles path manipulation middlewares
-func processPathMiddleware(config map[string]interface{}, middlewareType string) {
+func processPathMiddleware(config map[string]interface{}) {
 	// Special handling for regex patterns - these need exact preservation
 	if regex, ok := config["regex"].(string); ok {
 		// Preserve regex pattern exactly
