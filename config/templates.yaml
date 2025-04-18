@@ -5,51 +5,51 @@ middlewares:
     name: Authelia
     type: forwardAuth
     config:
-      address: "http://authelia:9091/api/authz/forward-auth"
+      address: http://authelia:9091/api/authz/forward-auth
       trustForwardHeader: true
       authResponseHeaders:
-        - "Remote-User"
-        - "Remote-Groups"
-        - "Remote-Name"
-        - "Remote-Email"
+        - Remote-User
+        - Remote-Groups
+        - Remote-Name
+        - Remote-Email
 
   - id: authentik
     name: Authentik
     type: forwardAuth
     config:
-      address: "http://authentik:9000/outpost.goauthentik.io/auth/traefik"
+      address: http://authentik:9000/outpost.goauthentik.io/auth/traefik
       trustForwardHeader: true
       authResponseHeaders:
-        - "X-authentik-username"
-        - "X-authentik-groups"
-        - "X-authentik-email"
-        - "X-authentik-name"
-        - "X-authentik-uid"
+        - X-authentik-username
+        - X-authentik-groups
+        - X-authentik-email
+        - X-authentik-name
+        - X-authentik-uid
 
   - id: basic-auth
     name: Basic Auth
     type: basicAuth
     config:
       users:
-        - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"
+        - admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/
 
   - id: digest-auth
     name: Digest Auth
     type: digestAuth
     config:
       users:
-        - "test:traefik:a2688e031edb4be6a3797f3882655c05"
+        - test:traefik:a2688e031edb4be6a3797f3882655c05
 
   - id: jwt-auth
     name: JWT Authentication
     type: forwardAuth
     config:
-      address: "http://jwt-auth:8080/verify"
+      address: http://jwt-auth:8080/verify
       trustForwardHeader: true
       authResponseHeaders:
-        - "X-JWT-Sub"
-        - "X-JWT-Name"
-        - "X-JWT-Email"
+        - X-JWT-Sub
+        - X-JWT-Name
+        - X-JWT-Email
 
   # Security middlewares
   - id: ip-whitelist
@@ -57,18 +57,18 @@ middlewares:
     type: ipWhiteList
     config:
       sourceRange:
-        - "127.0.0.1/32"
-        - "192.168.1.0/24"
-        - "10.0.0.0/8"
+        - 127.0.0.1/32
+        - 192.168.1.0/24
+        - 10.0.0.0/8
 
   - id: ip-allowlist
     name: IP Allow List
     type: ipAllowList
     config:
       sourceRange:
-        - "127.0.0.1/32"
-        - "192.168.1.0/24"
-        - "10.0.0.0/8"
+        - 127.0.0.1/32
+        - 192.168.1.0/24
+        - 10.0.0.0/8
 
   - id: rate-limit
     name: Rate Limit
@@ -87,18 +87,18 @@ middlewares:
         - PUT
       browserXssFilter: true
       contentTypeNosniff: true
-      customFrameOptionsValue: "SAMEORIGIN"
+      customFrameOptionsValue: SAMEORIGIN
       customResponseHeaders:
-        X-Forwarded-Proto: "https"
-        X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+        X-Forwarded-Proto: https
+        X-Robots-Tag: none,noarchive,nosnippet,notranslate,noimageindex
         server: ""
       forceSTSHeader: true
       hostsProxyHeaders:
         - X-Forwarded-Host
-      permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()"
-      referrerPolicy: "same-origin"
+      permissionsPolicy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), vr=()
+      referrerPolicy: same-origin
       sslProxyHeaders:
-        X-Forwarded-Proto: "https"
+        X-Forwarded-Proto: https
       stsIncludeSubdomains: true
       stsPreload: true
       stsSeconds: 63072000
@@ -112,7 +112,7 @@ middlewares:
         ipStrategy:
           depth: 2
           excludedIPs:
-            - "127.0.0.1/32"
+            - 127.0.0.1/32
 
   - id: pass-tls-cert
     name: Pass TLS Client Certificate
@@ -125,15 +125,15 @@ middlewares:
     name: Add Prefix
     type: addPrefix
     config:
-      prefix: "/api"
+      prefix: /api
 
   - id: strip-prefix
     name: Strip Prefix
     type: stripPrefix
     config:
       prefixes:
-        - "/api"
-        - "/v1"
+        - /api
+        - /v1
       forceSlash: true
 
   - id: strip-prefix-regex
@@ -141,36 +141,36 @@ middlewares:
     type: stripPrefixRegex
     config:
       regex:
-        - "/foo/[a-z0-9]+/[0-9]+/"
+        - /foo/[a-z0-9]+/[0-9]+/
 
   - id: replace-path
     name: Replace Path
     type: replacePath
     config:
-      path: "/api"
+      path: /api
 
   - id: replace-path-regex
     name: Replace Path Regex
     type: replacePathRegex
     config:
-      regex: "^/foo/(.*)"
-      replacement: "/bar/$1"
+      regex: ^/foo/(.*)
+      replacement: /bar/$1
 
   # Redirect middlewares
   - id: redirect-regex
     name: Redirect Regex
     type: redirectRegex
     config:
-      regex: "^http://localhost/(.*)"
-      replacement: "https://example.com/${1}"
+      regex: ^http://localhost/(.*)
+      replacement: https://example.com/${1}
       permanent: true
 
   - id: redirect-scheme
     name: Redirect to HTTPS
     type: redirectScheme
     config:
-      scheme: "https"
-      port: "443"
+      scheme: https
+      port: 443
       permanent: true
 
   # Content processing middlewares
@@ -197,7 +197,7 @@ middlewares:
       memRequestBodyBytes: 2000000
       maxResponseBodyBytes: 5000000
       memResponseBodyBytes: 2000000
-      retryExpression: "IsNetworkError() && Attempts() < 2"
+      retryExpression: IsNetworkError() && Attempts() < 2
 
   - id: content-type
     name: Content Type Auto-Detector
@@ -209,10 +209,10 @@ middlewares:
     name: Circuit Breaker
     type: circuitBreaker
     config:
-      expression: "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
-      checkPeriod: "10s"
-      fallbackDuration: "30s"
-      recoveryDuration: "60s"
+      expression: NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25
+      checkPeriod: 10s
+      fallbackDuration: 30s
+      recoveryDuration: 60s
       responseCode: 503
 
   - id: retry
@@ -220,16 +220,16 @@ middlewares:
     type: retry
     config:
       attempts: 3
-      initialInterval: "100ms"
+      initialInterval: 100ms
 
   - id: error-pages
     name: Custom Error Pages
     type: errors
     config:
       status:
-        - "500-599"
-      service: "error-handler-service"
-      query: "/{status}.html"
+        - 500-599
+      service: error-handler-service
+      query: /{status}.html
 
   - id: grpc-web
     name: gRPC Web
@@ -252,8 +252,8 @@ middlewares:
     name: Nextcloud WebDAV Redirect
     type: replacePathRegex
     config:
-      regex: "^/.well-known/ca(l|rd)dav"
-      replacement: "/remote.php/dav/"
+      regex: ^/.well-known/ca(l|rd)dav
+      replacement: /remote.php/dav/
   
   # Custom headers example with properly formatted values
   - id: custom-headers-example
@@ -261,11 +261,11 @@ middlewares:
     type: headers
     config:
       customRequestHeaders:
-        X-Script-Name: "test"
-        X-Custom-Value: "value with spaces"
+        X-Script-Name: test
+        X-Custom-Value: value with spaces
         X-Custom-Request-Header: ""
       customResponseHeaders:
-        X-Custom-Response-Header: "value"
+        X-Custom-Response-Header: value
         Server: ""
   
   # Plugin middleware templates
@@ -279,12 +279,12 @@ middlewares:
         logLocalRequests: false
         logAllowedRequests: false
         logApiRequests: false
-        api: "https://get.geojs.io/v1/ip/country/{ip}"
+        api: https://get.geojs.io/v1/ip/country/{ip}
         apiTimeoutMs: 750
         cacheSize: 15
         forceMonthlyUpdate: false
         allowUnknownCountries: false
-        unknownCountryApiResponse: "nil"
+        unknownCountryApiResponse: nil
         blackListMode: false
         addCountryHeader: false
         countries:
@@ -303,17 +303,17 @@ middlewares:
         httpTimeoutSeconds: 10
         crowdsecMode: live
         crowdsecAppsecEnabled: true
-        crowdsecAppsecHost: "crowdsec:7422"
+        crowdsecAppsecHost: crowdsec:7422
         crowdsecAppsecFailureBlock: true
         crowdsecAppsecUnreachableBlock: true
         crowdsecAppsecBodyLimit: 10485760  # Using plain number to avoid scientific notation
-        crowdsecLapiKey: "PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK"
-        crowdsecLapiHost: "crowdsec:8080"
-        crowdsecLapiScheme: "http"
+        crowdsecLapiKey: PUT_YOUR_BOUNCER_KEY_HERE_OR_IT_WILL_NOT_WORK
+        crowdsecLapiHost: crowdsec:8080
+        crowdsecLapiScheme: http
         forwardedHeadersTrustedIPs:
-          - "0.0.0.0/0"
+          - 0.0.0.0/0
         clientTrustedIPs:
-          - "10.0.0.0/8"
-          - "172.16.0.0/12"
-          - "192.168.0.0/16"
-          - "100.89.137.0/20"
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+          - 100.89.137.0/20
