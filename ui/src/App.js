@@ -2034,6 +2034,10 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState(null);
   
+  // Add state for available middlewares and selected middlewares (for chain type)
+  const [availableMiddlewares, setAvailableMiddlewares] = useState([]);
+  const [selectedMiddlewares, setSelectedMiddlewares] = useState([]);
+  
   // Available middleware types
   const middlewareTypes = [
     { value: 'basicAuth', label: 'Basic Authentication' },
@@ -2076,7 +2080,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     addPrefix: '{\n  "prefix": "/api"\n}',
     redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}",\n  "permanent": true\n}',
     redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
-    chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
+    chain: '{\n  "middlewares": []\n}',
     replacePath: '{\n  "path": "/newpath"\n}',
     replacePathRegex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/bar/$1"\n}',
     stripPrefixRegex: '{\n  "regex": [\n    "^/api/v\\\\d+/"\n  ]\n}',
@@ -2111,8 +2115,29 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     }, 2);
   };
 
+  // Function to fetch available middlewares
+  const fetchAvailableMiddlewares = async () => {
+    try {
+      const response = await api.getMiddlewares();
+      // Filter out the current middleware if we're editing
+      const middlewares = isEditing 
+        ? response.filter(mw => mw.id !== id)
+        : response;
+      
+      setAvailableMiddlewares(middlewares);
+    } catch (err) {
+      console.error("Error fetching middlewares:", err);
+      setError("Failed to load available middlewares");
+    }
+  };
+
   // Fetch middleware details if editing
   useEffect(() => {
+    // First, fetch all available middlewares if we're dealing with chain type
+    if (middleware.type === 'chain' || !isEditing) {
+      fetchAvailableMiddlewares();
+    }
+    
     if (isEditing && id) {
       const fetchMiddleware = async () => {
         try {
@@ -2130,6 +2155,17 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
             : stringifyJSONWithEmptyStrings(data.config);
           
           setConfigText(configJson);
+          
+          // If this is a chain middleware, fetch available middlewares and parse the selected ones
+          if (data.type === 'chain') {
+            fetchAvailableMiddlewares();
+            
+            // Extract the middleware IDs from the config
+            if (data.config && data.config.middlewares) {
+              setSelectedMiddlewares(data.config.middlewares);
+            }
+          }
+          
           setError(null);
         } catch (err) {
           setError('Failed to load middleware details');
@@ -2141,13 +2177,37 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
 
       fetchMiddleware();
     }
-  }, [id, isEditing]);
+  }, [id, isEditing, middleware.type]);
 
   // Update config template when type changes
   const handleTypeChange = (e) => {
     const newType = e.target.value;
     setMiddleware({ ...middleware, type: newType });
-    setConfigText(configTemplates[newType] || '{}');
+    
+    // For chain type, initialize with empty middlewares array and fetch available middlewares
+    if (newType === 'chain') {
+      setConfigText('{\n  "middlewares": []\n}');
+      setSelectedMiddlewares([]);
+      fetchAvailableMiddlewares();
+    } else {
+      setConfigText(configTemplates[newType] || '{}');
+    }
+  };
+
+  // Handle selection of middlewares for chain type
+  const handleMiddlewareSelection = (e) => {
+    const options = e.target.options;
+    const selected = Array.from(options)
+      .filter(option => option.selected)
+      .map(option => option.value);
+    
+    setSelectedMiddlewares(selected);
+    
+    // Update the config text to reflect the selected middlewares
+    const configObj = {
+      middlewares: selected
+    };
+    setConfigText(stringifyJSONWithEmptyStrings(configObj));
   };
 
   // Handle form submission
@@ -2157,11 +2217,19 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     try {
       // Parse config JSON, preserving empty strings
       let configObj;
-      try {
-        configObj = parseJSONPreservingEmptyStrings(configText);
-      } catch (err) {
-        alert('Invalid JSON configuration. Please check the format.');
-        return;
+      
+      if (middleware.type === 'chain') {
+        // For chain type, create configuration from selected middlewares
+        configObj = {
+          middlewares: selectedMiddlewares
+        };
+      } else {
+        try {
+          configObj = parseJSONPreservingEmptyStrings(configText);
+        } catch (err) {
+          alert('Invalid JSON configuration. Please check the format.');
+          return;
+        }
       }
       
       // Process specific middleware types to ensure correct data types
@@ -2368,33 +2436,93 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
             )}
           </div>
 
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Configuration (JSON)
-            </label>
-            <textarea
-              value={configText}
-              onChange={(e) => setConfigText(e.target.value)}
-              className="w-full px-3 py-2 border font-mono h-64 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter JSON configuration"
-              required
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              <p>Configuration must be valid JSON for the selected middleware type</p>
-              {middleware.type === 'headers' && (
-                <p className="mt-1 text-amber-600 font-medium">
-                  Special note for Headers middleware: Use empty strings ("") to remove headers. 
-                  Example: <code className="bg-gray-100 px-1 rounded">{'{"Server": ""}'}</code>
-                </p>
-              )}
-              {(middleware.type === 'redirectRegex' || middleware.type === 'replacePathRegex') && (
-                <p className="mt-1 text-amber-600 font-medium">
-                  Special note for Regex patterns: Make sure regex and replacement values are properly formatted.
-                  Example: <code className="bg-gray-100 px-1 rounded">{'{"regex": "^/foo/(.*)"}'}</code>
-                </p>
+          {middleware.type === 'chain' ? (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Select Middlewares for Chain
+              </label>
+              {availableMiddlewares.length > 0 ? (
+                <>
+                  <select
+                    multiple
+                    value={selectedMiddlewares}
+                    onChange={handleMiddlewareSelection}
+                    className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    size={Math.min(8, availableMiddlewares.length)}
+                  >
+                    {availableMiddlewares.map((mw) => (
+                      <option key={mw.id} value={mw.id}>
+                        {mw.name} ({mw.type})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Hold Ctrl (or Cmd) to select multiple middlewares. Middlewares will be applied in the order selected.
+                  </p>
+                  
+                  {/* Display selected middlewares */}
+                  {selectedMiddlewares.length > 0 ? (
+                    <div className="mt-4 p-3 bg-gray-50 rounded border">
+                      <h4 className="font-semibold mb-2">Chain Execution Order:</h4>
+                      <ol className="list-decimal ml-5">
+                        {selectedMiddlewares.map((mwId) => {
+                          const mw = availableMiddlewares.find(m => m.id === mwId);
+                          return (
+                            <li key={mwId} className="mb-1">
+                              {mw ? `${mw.name} (${mw.type})` : mwId}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700">
+                      <p className="text-sm">No middlewares selected. Please select at least one middleware to create a chain.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded text-blue-700">
+                  <p className="mb-2">You need to create other middlewares first before creating a chain.</p>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('middleware-form')}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Create a new middleware
+                  </button>
+                </div>
               )}
             </div>
-          </div>
+          ) : (
+            <div className="mb-4">
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Configuration (JSON)
+              </label>
+              <textarea
+                value={configText}
+                onChange={(e) => setConfigText(e.target.value)}
+                className="w-full px-3 py-2 border font-mono h-64 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter JSON configuration"
+                required
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                <p>Configuration must be valid JSON for the selected middleware type</p>
+                {middleware.type === 'headers' && (
+                  <p className="mt-1 text-amber-600 font-medium">
+                    Special note for Headers middleware: Use empty strings ("") to remove headers. 
+                    Example: <code className="bg-gray-100 px-1 rounded">{'{"Server": ""}'}</code>
+                  </p>
+                )}
+                {(middleware.type === 'redirectRegex' || middleware.type === 'replacePathRegex') && (
+                  <p className="mt-1 text-amber-600 font-medium">
+                    Special note for Regex patterns: Make sure regex and replacement values are properly formatted.
+                    Example: <code className="bg-gray-100 px-1 rounded">{'{"regex": "^/foo/(.*)"}'}</code>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3">
             <button
@@ -2407,7 +2535,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              disabled={loading}
+              disabled={loading || (middleware.type === 'chain' && selectedMiddlewares.length === 0)}
             >
               {loading ? 'Saving...' : isEditing ? 'Update Middleware' : 'Create Middleware'}
             </button>
