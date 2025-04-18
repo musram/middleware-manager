@@ -2063,118 +2063,53 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'retry', label: 'Retry' }
   ];
 
-// Replace the existing configTemplates object with this properly formatted version
-const configTemplates = {
-  basicAuth: '{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}',
-  digestAuth: '{\n  "users": [\n    "test:traefik:a2688e031edb4be6a3797f3882655c05"\n  ]\n}',
-  forwardAuth: '{\n  "address": "http://auth-service:9090/auth",\n  "trustForwardHeader": true,\n  "authResponseHeaders": [\n    "X-Auth-User",\n    "X-Auth-Roles"\n  ]\n}',
-  ipWhiteList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
-  ipAllowList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
-  rateLimit: '{\n  "average": 100,\n  "burst": 50\n}',
-  headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000,\n  "customResponseHeaders": {\n    "X-Custom-Header": "value",\n    "Server": ""\n  }\n}',
-  stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ],\n  "forceSlash": true\n}',
-  addPrefix: '{\n  "prefix": "/api"\n}',
-  // Notice how regex and replacement are explicitly quoted
-  redirectRegex: '{\n  "regex": "^http://localhost/(.*)",\n  "replacement": "https://example.com/${1}",\n  "permanent": true\n}',
-  redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
-  chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
-  replacePath: '{\n  "path": "/newpath"\n}',
-  // Note the explicit quotes for regex and replacement
-  replacePathRegex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/bar/$1"\n}',
-  stripPrefixRegex: '{\n  "regex": [\n    "^/api/v\\\\d+/"\n  ]\n}',
-  plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}',
-  buffering: '{\n  "maxRequestBodyBytes": 5000000,\n  "memRequestBodyBytes": 2000000,\n  "maxResponseBodyBytes": 5000000,\n  "memResponseBodyBytes": 2000000,\n  "retryExpression": "IsNetworkError() && Attempts() < 2"\n}',
-  circuitBreaker: '{\n  "expression": "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",\n  "checkPeriod": "10s",\n  "fallbackDuration": "30s",\n  "recoveryDuration": "60s",\n  "responseCode": 503\n}',
-  compress: '{\n  "excludedContentTypes": [\n    "text/event-stream"\n  ],\n  "minResponseBodyBytes": 1024\n}',
-  contentType: '{}',
-  errors: '{\n  "status": ["500-599"],\n  "service": "error-handler-service",\n  "query": "{status}.html"\n}',
-  grpcWeb: '{\n  "allowOrigins": ["*"]\n}',
-  inFlightReq: '{\n  "amount": 10,\n  "sourceCriterion": {\n    "ipStrategy": {\n      "depth": 2,\n      "excludedIPs": ["127.0.0.1/32"]\n    }\n  }\n}',
-  passTLSClientCert: '{\n  "pem": true\n}',
-  retry: '{\n  "attempts": 3,\n  "initialInterval": "100ms"\n}'
-};
-
-// Add this sanitization function to the MiddlewareForm component
-const sanitizeConfigBeforeSubmit = (configObj) => {
-  // Keys that should be treated as duration values
-  const durationKeys = {
-    'checkPeriod': true,
-    'fallbackDuration': true,
-    'recoveryDuration': true,
-    'initialInterval': true,
-    'gracePeriod': true
+  // Template configs for different middleware types
+  const configTemplates = {
+    basicAuth: '{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}',
+    digestAuth: '{\n  "users": [\n    "test:traefik:a2688e031edb4be6a3797f3882655c05"\n  ]\n}',
+    forwardAuth: '{\n  "address": "http://auth-service:9090/auth",\n  "trustForwardHeader": true,\n  "authResponseHeaders": [\n    "X-Auth-User",\n    "X-Auth-Roles"\n  ]\n}',
+    ipWhiteList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
+    ipAllowList: '{\n  "sourceRange": [\n    "127.0.0.1/32",\n    "192.168.1.0/24"\n  ]\n}',
+    rateLimit: '{\n  "average": 100,\n  "burst": 50\n}',
+    headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000,\n  "customResponseHeaders": {\n    "X-Custom-Header": "value",\n    "Server": ""\n  }\n}',
+    stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ],\n  "forceSlash": true\n}',
+    addPrefix: '{\n  "prefix": "/api"\n}',
+    redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}",\n  "permanent": true\n}',
+    redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
+    chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
+    replacePath: '{\n  "path": "/newpath"\n}',
+    replacePathRegex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/bar/$1"\n}',
+    stripPrefixRegex: '{\n  "regex": [\n    "^/api/v\\\\d+/"\n  ]\n}',
+    plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}',
+    buffering: '{\n  "maxRequestBodyBytes": 5000000,\n  "memRequestBodyBytes": 2000000,\n  "maxResponseBodyBytes": 5000000,\n  "memResponseBodyBytes": 2000000,\n  "retryExpression": "IsNetworkError() && Attempts() < 2"\n}',
+    circuitBreaker: '{\n  "expression": "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",\n  "checkPeriod": "10s",\n  "fallbackDuration": "30s",\n  "recoveryDuration": "60s"\n}',
+    compress: '{\n  "excludedContentTypes": [\n    "text/event-stream"\n  ],\n  "minResponseBodyBytes": 1024\n}',
+    contentType: '{}',
+    errors: '{\n  "status": ["500-599"],\n  "service": "error-handler-service",\n  "query": "/{status}.html"\n}',
+    grpcWeb: '{\n  "allowOrigins": ["*"]\n}',
+    inFlightReq: '{\n  "amount": 10,\n  "sourceCriterion": {\n    "ipStrategy": {\n      "depth": 2,\n      "excludedIPs": ["127.0.0.1/32"]\n    }\n  }\n}',
+    passTLSClientCert: '{\n  "pem": true\n}',
+    retry: '{\n  "attempts": 3,\n  "initialInterval": "100ms"\n}'
   };
 
-    // Keys that should always be quoted in the output
-    const needsQuotes = {
-      'regex': true,
-      'replacement': true,
-      'path': true,
-      'prefix': true,
-      'expression': true,
-      'retryExpression': true
-    };
-    
-    // Helper function to process values recursively
-    const processValue = (value, key) => {
-      if (typeof value === 'string') {
-        // For duration keys, ensure they don't have extra quotes
-        if (durationKeys[key]) {
-          // If it looks like a quoted duration, remove quotes
-          if (value.startsWith('"') && value.endsWith('"')) {
-            return value.substring(1, value.length - 1);
-          }
-          return value;
-        }
-        
-        // For regex and other string values that need quotes in the output
-        if (needsQuotes[key]) {
-          // If it's not already quoted, add quotes
-          if (!value.startsWith('"') || !value.endsWith('"')) {
-            return `"${value}"`;
-          }
-          // Otherwise, keep as is - it's already properly quoted
-          return value;
-        }
-        
-        // For other string values
-        return value;
-      } else if (Array.isArray(value)) {
-        return value.map((item, index) => processValue(item, `${key}_item${index}`));
-      } else if (typeof value === 'object' && value !== null) {
-        const result = {};
-        for (const [k, v] of Object.entries(value)) {
-          result[k] = processValue(v, k);
-        }
-        return result;
-      }
+  // Custom JSON parser that preserves empty strings
+  const parseJSONPreservingEmptyStrings = (jsonString) => {
+    return JSON.parse(jsonString, (key, value) => {
+      // Explicitly preserve empty strings
+      if (value === "") return "";
       return value;
-    };
-  
-    // Process the entire config object
-    const processed = {};
-    for (const [key, value] of Object.entries(configObj)) {
-      processed[key] = processValue(value, key);
-    }
-    
-    return processed;
+    });
   };
-  
-  // Add this helper function to properly handle form submission
-  const handleTextareaChange = (e) => {
-    const newText = e.target.value;
-    setConfigText(newText);
-    
-    // Optionally provide real-time validation/formatting feedback
-    try {
-      const parsed = JSON.parse(newText);
-      const formattedRegex = JSON.stringify(sanitizeConfigBeforeSubmit(parsed), null, 2);
-      // You could show a preview or validation indicator based on this
-    } catch (err) {
-      // Invalid JSON, no need to do anything
-    }
+
+  // Custom JSON stringifier to format with proper indentation
+  // and ensure empty strings are preserved
+  const stringifyJSONWithEmptyStrings = (obj) => {
+    return JSON.stringify(obj, (key, value) => {
+      // Ensure empty strings are preserved
+      if (value === "") return "";
+      return value;
+    }, 2);
   };
-    
 
   // Fetch middleware details if editing
   useEffect(() => {
@@ -2189,10 +2124,10 @@ const sanitizeConfigBeforeSubmit = (configObj) => {
             config: data.config
           });
           
-          // Format config as JSON string
+          // Format config as pretty JSON string, preserving empty strings
           const configJson = typeof data.config === 'string' 
             ? data.config 
-            : JSON.stringify(data.config, null, 2);
+            : stringifyJSONWithEmptyStrings(data.config);
           
           setConfigText(configJson);
           setError(null);
@@ -2220,13 +2155,40 @@ const sanitizeConfigBeforeSubmit = (configObj) => {
     e.preventDefault();
     
     try {
-      // Parse config JSON
+      // Parse config JSON, preserving empty strings
       let configObj;
       try {
-        configObj = JSON.parse(configText);
+        configObj = parseJSONPreservingEmptyStrings(configText);
       } catch (err) {
         alert('Invalid JSON configuration. Please check the format.');
         return;
+      }
+      
+      // Process specific middleware types to ensure correct data types
+      // and string formats are preserved
+      switch (middleware.type) {
+        case 'headers':
+          // Ensure empty strings are preserved in headers
+          processHeadersConfig(configObj);
+          break;
+        case 'redirectRegex':
+        case 'redirectScheme':
+        case 'replacePath':
+        case 'replacePathRegex':
+        case 'stripPrefix':
+        case 'stripPrefixRegex':
+          // Ensure regex patterns are properly formatted
+          processPathConfig(configObj, middleware.type);
+          break;
+        case 'rateLimit':
+        case 'inFlightReq':
+          // Ensure numeric values are actually numbers, not strings
+          processNumericConfig(configObj);
+          break;
+        case 'plugin':
+          // Special handling for plugin configs
+          processPluginConfig(configObj);
+          break;
       }
       
       const middlewareData = {
@@ -2253,6 +2215,95 @@ const sanitizeConfigBeforeSubmit = (configObj) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Process headers configuration to ensure empty strings are preserved
+  const processHeadersConfig = (config) => {
+    // Process customResponseHeaders
+    if (config.customResponseHeaders) {
+      Object.keys(config.customResponseHeaders).forEach(key => {
+        if (config.customResponseHeaders[key] === "") {
+          // Explicitly set empty strings to ensure they're preserved
+          config.customResponseHeaders[key] = "";
+        }
+      });
+    }
+    
+    // Process customRequestHeaders
+    if (config.customRequestHeaders) {
+      Object.keys(config.customRequestHeaders).forEach(key => {
+        if (config.customRequestHeaders[key] === "") {
+          // Explicitly set empty strings to ensure they're preserved
+          config.customRequestHeaders[key] = "";
+        }
+      });
+    }
+  };
+
+  // Process path-related configurations
+  const processPathConfig = (config, type) => {
+    // Regex patterns need special handling to ensure they're properly formatted
+    if (config.regex) {
+      // If regex is an array (like in stripPrefixRegex)
+      if (Array.isArray(config.regex)) {
+        config.regex = config.regex.map(pattern => String(pattern));
+      } else {
+        // Ensure regex is a string
+        config.regex = String(config.regex);
+      }
+    }
+    
+    // Ensure replacement is a string
+    if (config.replacement) {
+      config.replacement = String(config.replacement);
+    }
+    
+    // Ensure path is a string
+    if (config.path) {
+      config.path = String(config.path);
+    }
+  };
+
+  // Process numeric configurations
+  const processNumericConfig = (config) => {
+    // Convert numeric string values to actual numbers
+    if (config.average && typeof config.average === 'string') {
+      config.average = Number(config.average);
+    }
+    
+    if (config.burst && typeof config.burst === 'string') {
+      config.burst = Number(config.burst);
+    }
+    
+    if (config.amount && typeof config.amount === 'string') {
+      config.amount = Number(config.amount);
+    }
+    
+    // Handle nested ipStrategy.depth
+    if (config.sourceCriterion?.ipStrategy?.depth && 
+        typeof config.sourceCriterion.ipStrategy.depth === 'string') {
+      config.sourceCriterion.ipStrategy.depth = Number(config.sourceCriterion.ipStrategy.depth);
+    }
+  };
+
+  // Process plugin configurations
+  const processPluginConfig = (config) => {
+    // Iterate through plugin objects
+    Object.keys(config).forEach(pluginName => {
+      const pluginConfig = config[pluginName];
+      
+      if (typeof pluginConfig === 'object') {
+        // Process API keys to ensure they're preserved exactly
+        const keyFields = ['key', 'apiKey', 'token', 'secret', 'password', 'crowdsecLapiKey'];
+        
+        keyFields.forEach(field => {
+          if (field in pluginConfig && pluginConfig[field] === "") {
+            // Explicitly preserve empty strings
+            pluginConfig[field] = "";
+          }
+        });
+      }
+    });
   };
 
   if (loading && isEditing) {
@@ -2328,9 +2379,21 @@ const sanitizeConfigBeforeSubmit = (configObj) => {
               placeholder="Enter JSON configuration"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Configuration must be valid JSON for the selected middleware type
-            </p>
+            <div className="text-xs text-gray-500 mt-1">
+              <p>Configuration must be valid JSON for the selected middleware type</p>
+              {middleware.type === 'headers' && (
+                <p className="mt-1 text-amber-600 font-medium">
+                  Special note for Headers middleware: Use empty strings ("") to remove headers. 
+                  Example: <code className="bg-gray-100 px-1 rounded">{'{"Server": ""}'}</code>
+                </p>
+              )}
+              {(middleware.type === 'redirectRegex' || middleware.type === 'replacePathRegex') && (
+                <p className="mt-1 text-amber-600 font-medium">
+                  Special note for Regex patterns: Make sure regex and replacement values are properly formatted.
+                  Example: <code className="bg-gray-100 px-1 rounded">{'{"regex": "^/foo/(.*)"}'}</code>
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3">

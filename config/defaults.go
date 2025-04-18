@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"fmt"
 
 	"github.com/hhftechnology/middleware-manager/database"
 	"gopkg.in/yaml.v3"
@@ -65,6 +67,26 @@ func LoadDefaultTemplates(db *database.DB) error {
 		return err
 	}
 	
+	// Process templates to ensure proper value preservation based on middleware type
+	for i := range templates.Middlewares {
+		// Apply middleware-specific processing based on type
+		switch templates.Middlewares[i].Type {
+		case "headers":
+			processHeadersMiddleware(&templates.Middlewares[i].Config)
+		case "redirectRegex", "redirectScheme", "replacePath", "replacePathRegex", "stripPrefix", "stripPrefixRegex":
+			processPathMiddleware(&templates.Middlewares[i].Config, templates.Middlewares[i].Type)
+		case "basicAuth", "digestAuth", "forwardAuth":
+			processAuthMiddleware(&templates.Middlewares[i].Config, templates.Middlewares[i].Type)
+		case "plugin":
+			processPluginMiddleware(&templates.Middlewares[i].Config)
+		case "chain":
+			processChainingMiddleware(&templates.Middlewares[i].Config)
+		default:
+			// General processing for other middleware types
+			templates.Middlewares[i].Config = preserveTraefikValues(templates.Middlewares[i].Config).(map[string]interface{})
+		}
+	}
+
 	// Add templates to the database if they don't exist
 	for _, middleware := range templates.Middlewares {
 		// Check if the middleware already exists
@@ -74,9 +96,6 @@ func LoadDefaultTemplates(db *database.DB) error {
 			// Middleware exists, skip
 			continue
 		}
-		
-		// Process the config to ensure proper string formatting for specific fields
-		processConfigForDB(&middleware.Config)
 		
 		// Convert config to JSON string
 		configJSON, err := json.Marshal(middleware.Config)
@@ -102,49 +121,364 @@ func LoadDefaultTemplates(db *database.DB) error {
 	return nil
 }
 
-// processConfigForDB ensures proper string formatting for database storage
-func processConfigForDB(config *map[string]interface{}) {
-	// Keys that should be quoted in the output
-	needsQuotes := map[string]bool{
-		"regex":       true,
-		"replacement": true,
-		"path":        true,
-		"prefix":      true,
-		"expression":  true,
-		"retryExpression": true,
+// preserveTraefikValues ensures all values in Traefik configurations are properly handled
+// This handles special cases in different middleware types and ensures precise value preservation
+func preserveTraefikValues(data interface{}) interface{} {
+	if data == nil {
+		return nil
+	}
+
+	switch v := data.(type) {
+	case map[string]interface{}:
+		// Process each key-value pair in the map
+		for key, val := range v {
+			// Process values based on key names that might need special handling
+			switch {
+			// URL or path related fields
+			case key == "path" || key == "url" || key == "address" || strings.HasSuffix(key, "Path"):
+				// Ensure path strings keep their exact format
+				if strVal, ok := val.(string); ok && strVal != "" {
+					// Keep exact string formatting
+					v[key] = strVal
+				} else {
+					v[key] = preserveTraefikValues(val)
+				}
+			
+			// Regex and replacement patterns
+			case key == "regex" || key == "replacement" || strings.HasSuffix(key, "Regex"):
+				// Ensure regex patterns are preserved exactly
+				if strVal, ok := val.(string); ok && strVal != "" {
+					// Keep exact string formatting with special characters
+					v[key] = strVal
+				} else {
+					v[key] = preserveTraefikValues(val)
+				}
+			
+			// API keys and security tokens
+			case key == "key" || key == "token" || key == "secret" || 
+				 strings.Contains(key, "Key") || strings.Contains(key, "Token") || 
+				 strings.Contains(key, "Secret") || strings.Contains(key, "Password"):
+				// Ensure API keys and tokens are preserved exactly
+				if strVal, ok := val.(string); ok {
+					// Always preserve keys/tokens exactly as-is, even if empty
+					v[key] = strVal
+				} else {
+					v[key] = preserveTraefikValues(val)
+				}
+			
+			// Empty header values (common in security headers middleware)
+			case key == "Server" || key == "X-Powered-By" || strings.HasPrefix(key, "X-"):
+				// Empty string values are often used to remove headers
+				if strVal, ok := val.(string); ok {
+					// Preserve empty strings exactly
+					v[key] = strVal
+				} else {
+					v[key] = preserveTraefikValues(val)
+				}
+			
+			// IP addresses and networks
+			case key == "ip" || key == "clientIP" || strings.Contains(key, "IP") ||
+				 key == "sourceRange" || key == "excludedIPs":
+				// IP addresses often need exact formatting
+				v[key] = preserveTraefikValues(val)
+			
+			// Boolean flags that control behavior
+			case strings.HasPrefix(key, "is") || strings.HasPrefix(key, "has") || 
+				 strings.HasPrefix(key, "enable") || strings.HasSuffix(key, "enabled") ||
+				 strings.HasSuffix(key, "Enabled") || key == "permanent" || key == "forceSlash":
+				// Ensure boolean values are preserved as actual booleans
+				if boolVal, ok := val.(bool); ok {
+					v[key] = boolVal
+				} else if strVal, ok := val.(string); ok {
+					// Convert string "true"/"false" to actual boolean if needed
+					if strVal == "true" {
+						v[key] = true
+					} else if strVal == "false" {
+						v[key] = false
+					} else {
+						v[key] = strVal // Keep as is if not a boolean string
+					}
+				} else {
+					v[key] = preserveTraefikValues(val)
+				}
+			
+			// Integer values like timeouts, ports, limits
+			case key == "amount" || key == "burst" || key == "port" || 
+				 strings.HasSuffix(key, "Seconds") || strings.HasSuffix(key, "Limit") || 
+				 strings.HasSuffix(key, "Timeout") || strings.HasSuffix(key, "Size") ||
+				 key == "depth" || key == "priority" || key == "statusCode" || 
+				 key == "attempts" || key == "responseCode":
+				// Ensure numeric values are preserved as numbers
+				switch numVal := val.(type) {
+				case int:
+					v[key] = numVal
+				case float64:
+					// Keep as float if it has decimal part, otherwise convert to int
+					if numVal == float64(int(numVal)) {
+						v[key] = int(numVal)
+					} else {
+						v[key] = numVal
+					}
+				case string:
+					// Try to convert string to number if it looks like one
+					if i, err := strconv.Atoi(numVal); err == nil {
+						v[key] = i
+					} else if f, err := strconv.ParseFloat(numVal, 64); err == nil {
+						v[key] = f
+					} else {
+						v[key] = numVal // Keep as string if not numeric
+					}
+				default:
+					v[key] = preserveTraefikValues(val)
+				}
+			
+			// Default handling for other keys
+			default:
+				v[key] = preserveTraefikValues(val)
+			}
+		}
+		return v
+	
+	case []interface{}:
+		// Process each element in the array
+		for i, item := range v {
+			v[i] = preserveTraefikValues(item)
+		}
+		return v
+	
+	case string:
+		// Preserve all string values exactly as they are
+		return v
+	
+	case int, float64, bool:
+		// Preserve primitive types as they are
+		return v
+	
+	default:
+		// For any other type, return as is
+		return v
+	}
+}
+
+// processHeadersMiddleware handles the headers middleware special processing
+func processHeadersMiddleware(config *map[string]interface{}) {
+	// Special handling for response headers which might contain empty strings
+	if customResponseHeaders, ok := (*config)["customResponseHeaders"].(map[string]interface{}); ok {
+		for key, value := range customResponseHeaders {
+			// Ensure empty strings are preserved exactly
+			if strValue, ok := value.(string); ok {
+				customResponseHeaders[key] = strValue
+			}
+		}
 	}
 	
-	// Process all config values
-	for key, value := range *config {
-		switch v := value.(type) {
-		case string:
-			// For keys that need quotes
-			if needsQuotes[key] {
-				// If it's not already quoted, add quotes
-				if !strings.HasPrefix(v, "\"") || !strings.HasSuffix(v, "\"") {
-					(*config)[key] = "\"" + v + "\""
+	// Special handling for request headers which might contain empty strings
+	if customRequestHeaders, ok := (*config)["customRequestHeaders"].(map[string]interface{}); ok {
+		for key, value := range customRequestHeaders {
+			// Ensure empty strings are preserved exactly
+			if strValue, ok := value.(string); ok {
+				customRequestHeaders[key] = strValue
+			}
+		}
+	}
+	
+	// Process header fields that are often quoted strings
+	specialStringFields := []string{
+		"customFrameOptionsValue", "contentSecurityPolicy", 
+		"referrerPolicy", "permissionsPolicy",
+	}
+	
+	for _, field := range specialStringFields {
+		if value, ok := (*config)[field].(string); ok {
+			// Preserve string exactly, especially if it contains quotes
+			(*config)[field] = value
+		}
+	}
+	
+	// Process other header configuration values
+	*config = preserveTraefikValues(*config).(map[string]interface{})
+}
+
+// processChainingMiddleware handles chain middleware special processing
+func processChainingMiddleware(config *map[string]interface{}) {
+	if middlewares, ok := (*config)["middlewares"].([]interface{}); ok {
+		for i, middleware := range middlewares {
+			if middlewareStr, ok := middleware.(string); ok {
+				// If this is not already a fully qualified middleware reference
+				if !strings.Contains(middlewareStr, "@") {
+					// Assume it's from our file provider
+					middlewares[i] = fmt.Sprintf("%s@file", middlewareStr)
 				}
 			}
-		case map[string]interface{}:
-			// Process nested maps
-			processConfigForDB(&v)
-			(*config)[key] = v
-		case []interface{}:
-			// Process arrays
-			for i, item := range v {
-				if subMap, ok := item.(map[string]interface{}); ok {
-					processConfigForDB(&subMap)
-					v[i] = subMap
-				} else if str, ok := item.(string); ok {
-					// For array entries that might need quotes (like regex patterns in arrays)
-					if needsQuotes[key+"_item"] && (!strings.HasPrefix(str, "\"") || !strings.HasSuffix(str, "\"")) {
-						v[i] = "\"" + str + "\""
+		}
+		(*config)["middlewares"] = middlewares
+	}
+	
+	// Process other chain configuration values
+	*config = preserveTraefikValues(*config).(map[string]interface{})
+}
+
+// processPathMiddleware handles path manipulation middlewares
+func processPathMiddleware(config *map[string]interface{}, middlewareType string) {
+	// Special handling for regex patterns - these need exact preservation
+	if regex, ok := (*config)["regex"].(string); ok {
+		// Preserve regex pattern exactly
+		(*config)["regex"] = regex
+	} else if regexList, ok := (*config)["regex"].([]interface{}); ok {
+		// Handle regex arrays (like in stripPrefixRegex)
+		for i, r := range regexList {
+			if regexStr, ok := r.(string); ok {
+				regexList[i] = regexStr
+			}
+		}
+	}
+	
+	// Special handling for replacement patterns
+	if replacement, ok := (*config)["replacement"].(string); ok {
+		// Preserve replacement pattern exactly
+		(*config)["replacement"] = replacement
+	}
+	
+	// Special handling for path values
+	if path, ok := (*config)["path"].(string); ok {
+		// Preserve path exactly
+		(*config)["path"] = path
+	}
+	
+	// Special handling for prefixes arrays
+	if prefixes, ok := (*config)["prefixes"].([]interface{}); ok {
+		for i, prefix := range prefixes {
+			if prefixStr, ok := prefix.(string); ok {
+				prefixes[i] = prefixStr
+			}
+		}
+	}
+	
+	// Special handling for scheme
+	if scheme, ok := (*config)["scheme"].(string); ok {
+		// Preserve scheme exactly
+		(*config)["scheme"] = scheme
+	}
+	
+	// Process boolean options
+	if forceSlash, ok := (*config)["forceSlash"].(bool); ok {
+		(*config)["forceSlash"] = forceSlash
+	}
+	
+	if permanent, ok := (*config)["permanent"].(bool); ok {
+		(*config)["permanent"] = permanent
+	}
+	
+	// Process other path manipulation configuration values
+	*config = preserveTraefikValues(*config).(map[string]interface{})
+}
+
+// processAuthMiddleware handles authentication middleware special processing
+func processAuthMiddleware(config *map[string]interface{}, middlewareType string) {
+	// ForwardAuth middleware special handling
+	if middlewareType == "forwardAuth" {
+		if address, ok := (*config)["address"].(string); ok {
+			// Preserve address URL exactly
+			(*config)["address"] = address
+		}
+		
+		// Process trust settings
+		if trustForward, ok := (*config)["trustForwardHeader"].(bool); ok {
+			(*config)["trustForwardHeader"] = trustForward
+		}
+		
+		// Process headers array
+		if headers, ok := (*config)["authResponseHeaders"].([]interface{}); ok {
+			for i, header := range headers {
+				if headerStr, ok := header.(string); ok {
+					headers[i] = headerStr
+				}
+			}
+		}
+	}
+	
+	// BasicAuth/DigestAuth middleware special handling
+	if middlewareType == "basicAuth" || middlewareType == "digestAuth" {
+		// Preserve exact format of users array
+		if users, ok := (*config)["users"].([]interface{}); ok {
+			for i, user := range users {
+				if userStr, ok := user.(string); ok {
+					users[i] = userStr
+				}
+			}
+		}
+	}
+	
+	// Process other auth configuration values
+	*config = preserveTraefikValues(*config).(map[string]interface{})
+}
+
+// processPluginMiddleware handles plugin middleware special processing
+func processPluginMiddleware(config *map[string]interface{}) {
+	// Process plugins (including CrowdSec)
+	for _, pluginCfg := range *config {
+		if pluginConfig, ok := pluginCfg.(map[string]interface{}); ok {
+			// Process special fields in plugin configurations
+			
+			// Process API keys and secrets - must be preserved exactly
+			keyFields := []string{
+				"crowdsecLapiKey", "apiKey", "token", "secret", "password", 
+				"key", "accessKey", "secretKey", "captchaSiteKey", "captchaSecretKey",
+			}
+			
+			for _, field := range keyFields {
+				if val, exists := pluginConfig[field]; exists {
+					if strVal, ok := val.(string); ok {
+						// Ensure keys are preserved exactly as-is
+						pluginConfig[field] = strVal
 					}
 				}
 			}
-			(*config)[key] = v
+			
+			// Process boolean options
+			boolFields := []string{
+				"enabled", "failureBlock", "unreachableBlock", "insecureVerify",
+				"allowLocalRequests", "logLocalRequests", "logAllowedRequests",
+				"logApiRequests", "silentStartUp", "forceMonthlyUpdate",
+				"allowUnknownCountries", "blackListMode", "addCountryHeader",
+			}
+			
+			for _, field := range boolFields {
+				for configKey, val := range pluginConfig {
+					if strings.Contains(configKey, field) {
+						if boolVal, ok := val.(bool); ok {
+							pluginConfig[configKey] = boolVal
+						}
+					}
+				}
+			}
+			
+			// Process arrays
+			arrayFields := []string{
+				"forwardedHeadersTrustedIPs", "clientTrustedIPs", "countries",
+			}
+			
+			for _, field := range arrayFields {
+				for configKey, val := range pluginConfig {
+					if strings.Contains(configKey, field) {
+						if arrayVal, ok := val.([]interface{}); ok {
+							for i, item := range arrayVal {
+								if strItem, ok := item.(string); ok {
+									arrayVal[i] = strItem
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			// Process remaining fields
+			pluginConfig = preserveTraefikValues(pluginConfig).(map[string]interface{})
 		}
 	}
+
+	// Process the entire config
+	*config = preserveTraefikValues(*config).(map[string]interface{})
 }
 
 // EnsureConfigDirectory ensures the configuration directory exists
@@ -282,7 +616,7 @@ func SaveTemplateFile(templatesDir string) error {
 					"customResponseHeaders": map[string]string{
 						"X-Forwarded-Proto": "https",
 						"X-Robots-Tag":      "none,noarchive,nosnippet,notranslate,noimageindex",
-						"server":            "",
+						"Server":            "", // Empty string to remove header
 					},
 					"forceSTSHeader": true,
 					"hostsProxyHeaders": []string{
@@ -323,7 +657,7 @@ func SaveTemplateFile(templatesDir string) error {
 				},
 			},
 			
-			// Path manipulation middlewares - with explicit quotes for regex patterns
+			// Path manipulation middlewares - with properly formatted regex patterns
 			{
 				ID:   "add-prefix",
 				Name: "Add Prefix",
@@ -367,19 +701,19 @@ func SaveTemplateFile(templatesDir string) error {
 				Name: "Replace Path Regex",
 				Type: "replacePathRegex",
 				Config: map[string]interface{}{
-					"regex":       "\"^/foo/(.*)\"",  // Note the explicit quotes
-					"replacement": "\"/bar/$1\"",     // Note the explicit quotes
+					"regex":       "^/foo/(.*)",
+					"replacement": "/bar/$1",
 				},
 			},
 			
-			// Redirect middlewares - with explicit quotes for regex patterns
+			// Redirect middlewares - with properly formatted regex patterns
 			{
 				ID:   "redirect-regex",
 				Name: "Redirect Regex",
 				Type: "redirectRegex",
 				Config: map[string]interface{}{
-					"regex":       "\"^http://localhost/(.*)\"",  // Note the explicit quotes
-					"replacement": "\"https://example.com/${1}\"", // Note the explicit quotes
+					"regex":       "^http://localhost/(.*)",
+					"replacement": "https://example.com/${1}",
 					"permanent":   true,
 				},
 			},
@@ -424,7 +758,7 @@ func SaveTemplateFile(templatesDir string) error {
 					"memRequestBodyBytes":  int(2000000),
 					"maxResponseBodyBytes": int(5000000),
 					"memResponseBodyBytes": int(2000000),
-					"retryExpression":      "\"IsNetworkError() && Attempts() < 2\"",  // Note the explicit quotes
+					"retryExpression":      "IsNetworkError() && Attempts() < 2",
 				},
 			},
 			{
@@ -440,7 +774,7 @@ func SaveTemplateFile(templatesDir string) error {
 				Name: "Circuit Breaker",
 				Type: "circuitBreaker",
 				Config: map[string]interface{}{
-					"expression":        "\"NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25\"",  // Note the explicit quotes
+					"expression":        "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",
 					"checkPeriod":       "10s",
 					"fallbackDuration":  "30s",
 					"recoveryDuration":  "60s",
@@ -492,7 +826,7 @@ func SaveTemplateFile(templatesDir string) error {
 				},
 			},
 			
-			// Crowdsec plugin middleware with fixed number formatting
+			// Crowdsec plugin middleware with proper API key handling
 			{
 				ID:   "crowdsec",
 				Name: "Crowdsec",
@@ -526,18 +860,18 @@ func SaveTemplateFile(templatesDir string) error {
 				},
 			},
 			
-			// Special use case middlewares - with explicit quotes for regex pattern
+			// Special use case middlewares - with properly formatted regex pattern
 			{
 				ID:   "nextcloud-dav",
 				Name: "Nextcloud WebDAV Redirect",
 				Type: "replacePathRegex",
 				Config: map[string]interface{}{
-					"regex":       "\"^/.well-known/ca(l|rd)dav\"",  // Note the explicit quotes
-					"replacement": "\"/remote.php/dav/\"",           // Note the explicit quotes
+					"regex":       "^/.well-known/ca(l|rd)dav",
+					"replacement": "/remote.php/dav/",
 				},
 			},
 			
-			// Custom headers example
+			// Custom headers example with empty string preservation
 			{
 				ID:   "custom-headers-example",
 				Name: "Custom Headers Example",
@@ -546,28 +880,122 @@ func SaveTemplateFile(templatesDir string) error {
 					"customRequestHeaders": map[string]string{
 						"X-Script-Name":        "test",
 						"X-Custom-Value":       "value with spaces",
-						"X-Custom-Request-Header": "",  // Remove header
+						"X-Custom-Request-Header": "",  // Empty string to remove header
 					},
 					"customResponseHeaders": map[string]string{
 						"X-Custom-Response-Header": "value",
-						"Server":                  "",  // Remove header
+						"Server":                  "",  // Empty string to remove header
 					},
 				},
 			},
 		},
 	}
 	
-	// Process all templates to ensure proper quoting
+	// Process all templates to ensure proper value preservation
 	for i := range templates.Middlewares {
-		processConfigForDB(&templates.Middlewares[i].Config)
+		// Apply middleware-specific processing based on type
+		switch templates.Middlewares[i].Type {
+		case "headers":
+			processHeadersMiddleware(&templates.Middlewares[i].Config)
+		case "redirectRegex", "redirectScheme", "replacePath", "replacePathRegex", "stripPrefix", "stripPrefixRegex":
+			processPathMiddleware(&templates.Middlewares[i].Config, templates.Middlewares[i].Type)
+		case "basicAuth", "digestAuth", "forwardAuth":
+			processAuthMiddleware(&templates.Middlewares[i].Config, templates.Middlewares[i].Type)
+		case "plugin":
+			processPluginMiddleware(&templates.Middlewares[i].Config)
+		case "chain":
+			processChainingMiddleware(&templates.Middlewares[i].Config)
+		default:
+			// General processing for other middleware types
+			templates.Middlewares[i].Config = preserveTraefikValues(templates.Middlewares[i].Config).(map[string]interface{})
+		}
 	}
 	
-	// Convert to YAML
-	data, err := yaml.Marshal(templates)
+	// Create a custom YAML encoder that preserves string formatting
+	yamlNode := &yaml.Node{}
+	err := yamlNode.Encode(templates)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to encode templates to YAML node: %w", err)
+	}
+	
+	// Apply additional string preservation to the YAML node
+	preserveStringsInYamlNode(yamlNode)
+	
+	// Marshal the processed node
+	data, err := yaml.Marshal(yamlNode)
+	if err != nil {
+		return fmt.Errorf("failed to marshal YAML node: %w", err)
 	}
 	
 	// Write to file
 	return ioutil.WriteFile(templatesFile, data, 0644)
+}
+
+// preserveStringsInYamlNode ensures that string values, especially empty strings,
+// are preserved correctly in the YAML node structure before marshaling
+func preserveStringsInYamlNode(node *yaml.Node) {
+	if node == nil {
+		return
+	}
+	
+	// Process node based on its kind
+	switch node.Kind {
+	case yaml.DocumentNode, yaml.SequenceNode:
+		// Process all content/items
+		for i := range node.Content {
+			preserveStringsInYamlNode(node.Content[i])
+		}
+	
+	case yaml.MappingNode:
+		// Process all key-value pairs
+		for i := 0; i < len(node.Content); i += 2 {
+			// Get key and value
+			keyNode := node.Content[i]
+			valueNode := node.Content[i+1]
+			
+			// Process based on key content
+			if keyNode.Value == "Server" || keyNode.Value == "X-Powered-By" || 
+			   strings.HasPrefix(keyNode.Value, "X-") {
+				// These are likely header fields where empty strings are important
+				if valueNode.Kind == yaml.ScalarNode && valueNode.Value == "" {
+					// Ensure empty strings are properly encoded
+					valueNode.Style = yaml.DoubleQuotedStyle
+				}
+			}
+			
+			// Special handling for known fields that need exact string preservation
+			if containsSpecialField(keyNode.Value) && valueNode.Kind == yaml.ScalarNode {
+				// Use double quotes for these fields to ensure proper encoding
+				valueNode.Style = yaml.DoubleQuotedStyle
+			}
+			
+			// Continue recursion
+			preserveStringsInYamlNode(keyNode)
+			preserveStringsInYamlNode(valueNode)
+		}
+	
+	case yaml.ScalarNode:
+		// For scalar nodes (including strings), ensure empty strings are properly quoted
+		if node.Value == "" {
+			node.Style = yaml.DoubleQuotedStyle
+		}
+	}
+}
+
+// containsSpecialField checks if a field name is one that needs special handling
+// for correct string value preservation
+func containsSpecialField(fieldName string) bool {
+	specialFields := []string{
+		"key", "token", "secret", "apiKey", "Key", "Token", "Secret", "Password",
+		"regex", "replacement", "Regex", "path", "scheme", "url", "address", "Path",
+		"prefix", "prefixes", "expression", "rule",
+	}
+	
+	for _, field := range specialFields {
+		if strings.Contains(fieldName, field) {
+			return true
+		}
+	}
+	
+	return false
 }
