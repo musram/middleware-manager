@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hhftechnology/middleware-manager/database"
 	"gopkg.in/yaml.v3"
@@ -74,6 +75,9 @@ func LoadDefaultTemplates(db *database.DB) error {
 			continue
 		}
 		
+		// Process the config to ensure proper string formatting for specific fields
+		processConfigForDB(&middleware.Config)
+		
 		// Convert config to JSON string
 		configJSON, err := json.Marshal(middleware.Config)
 		if err != nil {
@@ -96,6 +100,51 @@ func LoadDefaultTemplates(db *database.DB) error {
 	}
 	
 	return nil
+}
+
+// processConfigForDB ensures proper string formatting for database storage
+func processConfigForDB(config *map[string]interface{}) {
+	// Keys that should be quoted in the output
+	needsQuotes := map[string]bool{
+		"regex":       true,
+		"replacement": true,
+		"path":        true,
+		"prefix":      true,
+		"expression":  true,
+		"retryExpression": true,
+	}
+	
+	// Process all config values
+	for key, value := range *config {
+		switch v := value.(type) {
+		case string:
+			// For keys that need quotes
+			if needsQuotes[key] {
+				// If it's not already quoted, add quotes
+				if !strings.HasPrefix(v, "\"") || !strings.HasSuffix(v, "\"") {
+					(*config)[key] = "\"" + v + "\""
+				}
+			}
+		case map[string]interface{}:
+			// Process nested maps
+			processConfigForDB(&v)
+			(*config)[key] = v
+		case []interface{}:
+			// Process arrays
+			for i, item := range v {
+				if subMap, ok := item.(map[string]interface{}); ok {
+					processConfigForDB(&subMap)
+					v[i] = subMap
+				} else if str, ok := item.(string); ok {
+					// For array entries that might need quotes (like regex patterns in arrays)
+					if needsQuotes[key+"_item"] && (!strings.HasPrefix(str, "\"") || !strings.HasSuffix(str, "\"")) {
+						v[i] = "\"" + str + "\""
+					}
+				}
+			}
+			(*config)[key] = v
+		}
+	}
 }
 
 // EnsureConfigDirectory ensures the configuration directory exists
@@ -274,7 +323,7 @@ func SaveTemplateFile(templatesDir string) error {
 				},
 			},
 			
-			// Path manipulation middlewares
+			// Path manipulation middlewares - with explicit quotes for regex patterns
 			{
 				ID:   "add-prefix",
 				Name: "Add Prefix",
@@ -318,19 +367,19 @@ func SaveTemplateFile(templatesDir string) error {
 				Name: "Replace Path Regex",
 				Type: "replacePathRegex",
 				Config: map[string]interface{}{
-					"regex":       "^/foo/(.*)",
-					"replacement": "/bar/$1",
+					"regex":       "\"^/foo/(.*)\"",  // Note the explicit quotes
+					"replacement": "\"/bar/$1\"",     // Note the explicit quotes
 				},
 			},
 			
-			// Redirect middlewares
+			// Redirect middlewares - with explicit quotes for regex patterns
 			{
 				ID:   "redirect-regex",
 				Name: "Redirect Regex",
 				Type: "redirectRegex",
 				Config: map[string]interface{}{
-					"regex":       "^http://localhost/(.*)",
-					"replacement": "https://example.com/${1}",
+					"regex":       "\"^http://localhost/(.*)\"",  // Note the explicit quotes
+					"replacement": "\"https://example.com/${1}\"", // Note the explicit quotes
 					"permanent":   true,
 				},
 			},
@@ -375,7 +424,7 @@ func SaveTemplateFile(templatesDir string) error {
 					"memRequestBodyBytes":  int(2000000),
 					"maxResponseBodyBytes": int(5000000),
 					"memResponseBodyBytes": int(2000000),
-					"retryExpression":      "IsNetworkError() && Attempts() < 2",
+					"retryExpression":      "\"IsNetworkError() && Attempts() < 2\"",  // Note the explicit quotes
 				},
 			},
 			{
@@ -391,7 +440,7 @@ func SaveTemplateFile(templatesDir string) error {
 				Name: "Circuit Breaker",
 				Type: "circuitBreaker",
 				Config: map[string]interface{}{
-					"expression":        "NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25",
+					"expression":        "\"NetworkErrorRatio() > 0.20 || ResponseCodeRatio(500, 600, 0, 600) > 0.25\"",  // Note the explicit quotes
 					"checkPeriod":       "10s",
 					"fallbackDuration":  "30s",
 					"recoveryDuration":  "60s",
@@ -477,14 +526,14 @@ func SaveTemplateFile(templatesDir string) error {
 				},
 			},
 			
-			// Special use case middlewares
+			// Special use case middlewares - with explicit quotes for regex pattern
 			{
 				ID:   "nextcloud-dav",
 				Name: "Nextcloud WebDAV Redirect",
 				Type: "replacePathRegex",
 				Config: map[string]interface{}{
-					"regex":       "^/.well-known/ca(l|rd)dav",
-					"replacement": "/remote.php/dav/",
+					"regex":       "\"^/.well-known/ca(l|rd)dav\"",  // Note the explicit quotes
+					"replacement": "\"/remote.php/dav/\"",           // Note the explicit quotes
 				},
 			},
 			
@@ -506,6 +555,11 @@ func SaveTemplateFile(templatesDir string) error {
 				},
 			},
 		},
+	}
+	
+	// Process all templates to ensure proper quoting
+	for i := range templates.Middlewares {
+		processConfigForDB(&templates.Middlewares[i].Config)
 	}
 	
 	// Convert to YAML

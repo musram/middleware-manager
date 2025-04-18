@@ -1,12 +1,14 @@
 package services
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -183,7 +185,33 @@ func marshalConfigToYAML(config TraefikConfig) ([]byte, error) {
     processStringValues(configMap)
     
     // Marshal to YAML
-    return yaml.Marshal(configMap)
+    var buf bytes.Buffer
+    enc := yaml.NewEncoder(&buf)
+    enc.SetIndent(2) // Set indentation level
+    
+    if err := enc.Encode(configMap); err != nil {
+        return nil, err
+    }
+    
+    // Post-process YAML string to ensure quotes for specific fields
+    yamlStr := buf.String()
+    
+    // Add quotes to regex and replacement fields
+    // First mark the lines we need to quote
+    yamlStr = regexp.MustCompile(`(?m)^(\s*)(regex|replacement):\s+([^"].+)$`).
+        ReplaceAllString(yamlStr, `$1$2: "__QUOTE__$3"`)
+    
+    // Then convert the markers to quotes
+    yamlStr = strings.ReplaceAll(yamlStr, "__QUOTE__", "\"")
+    
+    // Add closing quotes to those lines
+    yamlStr = regexp.MustCompile(`(?m)^(\s*)(regex|replacement):\s+"(.+)$`).
+        ReplaceAllString(yamlStr, `$1$2: "$3"`)
+    
+    // Fix duration strings if needed
+    yamlStr = fixDurationStrings(yamlStr)
+    
+    return []byte(yamlStr), nil
 }
 
 // processStringValues handles special string formatting for YAML output
@@ -194,8 +222,10 @@ func processStringValues(data interface{}) {
         "initialInterval": true, "gracePeriod": true,
     }
     
-    regexKeys := map[string]bool{
+    // Keys that need to be quoted in YAML output
+    quotedKeys := map[string]bool{
         "regex": true, "replacement": true, "path": true, "prefix": true,
+        "expression": true, "retryExpression": true,
     }
     
     switch v := data.(type) {
@@ -208,9 +238,9 @@ func processStringValues(data interface{}) {
                     if strings.HasPrefix(innerVal, "\"") && strings.HasSuffix(innerVal, "\"") {
                         v[key] = strings.Trim(innerVal, "\"")
                     }
-                } else if regexKeys[key] {
-                    // Ensure regex patterns have proper formatting
-                    // We don't add quotes here since YAML will add them as needed
+                } else if quotedKeys[key] {
+                    // For regex, etc., strip any extra quotes but they'll get properly quoted
+                    // in marshalConfigToYAML using our custom post-processing
                     if strings.HasPrefix(innerVal, "\"") && strings.HasSuffix(innerVal, "\"") {
                         v[key] = strings.Trim(innerVal, "\"")
                     }
@@ -231,6 +261,15 @@ func processStringValues(data interface{}) {
             }
         }
     }
+}
+
+// fixDurationStrings removes any extra quotes from duration strings in the YAML
+func fixDurationStrings(yaml string) string {
+    // Pattern to match quoted duration strings
+    durationPattern := regexp.MustCompile(`(?m)(checkPeriod|fallbackDuration|recoveryDuration|initialInterval|gracePeriod): "([0-9]+[smhdw]s?)"`)
+    
+    // Replace with unquoted duration
+    return durationPattern.ReplaceAllString(yaml, "$1: $2")
 }
 
 // hasConfigurationChanged checks if the configuration has changed

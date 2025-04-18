@@ -2074,10 +2074,12 @@ const configTemplates = {
   headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000,\n  "customResponseHeaders": {\n    "X-Custom-Header": "value",\n    "Server": ""\n  }\n}',
   stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ],\n  "forceSlash": true\n}',
   addPrefix: '{\n  "prefix": "/api"\n}',
+  // Notice how regex and replacement are explicitly quoted
   redirectRegex: '{\n  "regex": "^http://localhost/(.*)",\n  "replacement": "https://example.com/${1}",\n  "permanent": true\n}',
   redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
   chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
   replacePath: '{\n  "path": "/newpath"\n}',
+  // Note the explicit quotes for regex and replacement
   replacePathRegex: '{\n  "regex": "^/api/(.*)",\n  "replacement": "/bar/$1"\n}',
   stripPrefixRegex: '{\n  "regex": [\n    "^/api/v\\\\d+/"\n  ]\n}',
   plugin: '{\n  "plugin-name": {\n    "option1": "value1",\n    "option2": "value2"\n  }\n}',
@@ -2102,55 +2104,76 @@ const sanitizeConfigBeforeSubmit = (configObj) => {
     'initialInterval': true,
     'gracePeriod': true
   };
-  
-  // Keys that should have specific string formatting
-  const regexKeys = {
-    'regex': true,
-    'replacement': true,
-    'path': true,
-    'prefix': true
-  };
-  
-  // Helper function to process values recursively
-  const processValue = (value, key) => {
-    if (typeof value === 'string') {
-      // For duration keys, ensure they don't have extra quotes
-      if (durationKeys[key]) {
-        // Check if it's a quoted duration string like "\"10s\""
-        if (value.startsWith('"') && value.endsWith('"')) {
-          return value.substring(1, value.length - 1);
-        }
-      }
-      
-      // For regex and other string values, ensure proper formatting
-      if (regexKeys[key]) {
-        // Remove any unnecessary quotes but preserve the string content
-        if (value.startsWith('"') && value.endsWith('"')) {
-          return value.substring(1, value.length - 1);
-        }
-      }
-      
-      return value;
-    } else if (Array.isArray(value)) {
-      return value.map(item => {
-        if (typeof item === 'string' && item.startsWith('"') && item.endsWith('"')) {
-          return item.substring(1, item.length - 1);
-        }
-        return processValue(item);
-      });
-    } else if (typeof value === 'object' && value !== null) {
-      const result = {};
-      for (const [k, v] of Object.entries(value)) {
-        result[k] = processValue(v, k);
-      }
-      return result;
-    }
-    return value;
-  };
 
-  // Process the entire config object
-  return processValue(configObj);
-};
+    // Keys that should always be quoted in the output
+    const needsQuotes = {
+      'regex': true,
+      'replacement': true,
+      'path': true,
+      'prefix': true,
+      'expression': true,
+      'retryExpression': true
+    };
+    
+    // Helper function to process values recursively
+    const processValue = (value, key) => {
+      if (typeof value === 'string') {
+        // For duration keys, ensure they don't have extra quotes
+        if (durationKeys[key]) {
+          // If it looks like a quoted duration, remove quotes
+          if (value.startsWith('"') && value.endsWith('"')) {
+            return value.substring(1, value.length - 1);
+          }
+          return value;
+        }
+        
+        // For regex and other string values that need quotes in the output
+        if (needsQuotes[key]) {
+          // If it's not already quoted, add quotes
+          if (!value.startsWith('"') || !value.endsWith('"')) {
+            return `"${value}"`;
+          }
+          // Otherwise, keep as is - it's already properly quoted
+          return value;
+        }
+        
+        // For other string values
+        return value;
+      } else if (Array.isArray(value)) {
+        return value.map((item, index) => processValue(item, `${key}_item${index}`));
+      } else if (typeof value === 'object' && value !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(value)) {
+          result[k] = processValue(v, k);
+        }
+        return result;
+      }
+      return value;
+    };
+  
+    // Process the entire config object
+    const processed = {};
+    for (const [key, value] of Object.entries(configObj)) {
+      processed[key] = processValue(value, key);
+    }
+    
+    return processed;
+  };
+  
+  // Add this helper function to properly handle form submission
+  const handleTextareaChange = (e) => {
+    const newText = e.target.value;
+    setConfigText(newText);
+    
+    // Optionally provide real-time validation/formatting feedback
+    try {
+      const parsed = JSON.parse(newText);
+      const formattedRegex = JSON.stringify(sanitizeConfigBeforeSubmit(parsed), null, 2);
+      // You could show a preview or validation indicator based on this
+    } catch (err) {
+      // Invalid JSON, no need to do anything
+    }
+  };
     
 
   // Fetch middleware details if editing
