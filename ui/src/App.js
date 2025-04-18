@@ -2063,7 +2063,6 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     { value: 'retry', label: 'Retry' }
   ];
 
-  // Template configs for different middleware types
   const configTemplates = {
     basicAuth: '{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}',
     digestAuth: '{\n  "users": [\n    "test:traefik:a2688e031edb4be6a3797f3882655c05"\n  ]\n}',
@@ -2074,7 +2073,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     headers: '{\n  "browserXssFilter": true,\n  "contentTypeNosniff": true,\n  "customFrameOptionsValue": "SAMEORIGIN",\n  "forceSTSHeader": true,\n  "stsIncludeSubdomains": true,\n  "stsSeconds": 63072000,\n  "customResponseHeaders": {\n    "X-Custom-Header": "value",\n    "Server": ""\n  }\n}',
     stripPrefix: '{\n  "prefixes": [\n    "/api"\n  ],\n  "forceSlash": true\n}',
     addPrefix: '{\n  "prefix": "/api"\n}',
-    redirectRegex: '{\n  "regex": "^http://(.*)$",\n  "replacement": "https://${1}",\n  "permanent": true\n}',
+    redirectRegex: '{\n  "regex": "^http://localhost/(.*)",\n  "replacement": "https://example.com/${1}",\n  "permanent": true\n}',
     redirectScheme: '{\n  "scheme": "https",\n  "permanent": true,\n  "port": "443"\n}',
     chain: '{\n  "middlewares": [\n    "basic-auth@file",\n    "rate-limit@file"\n  ]\n}',
     replacePath: '{\n  "path": "/newpath"\n}',
@@ -2091,6 +2090,8 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     passTLSClientCert: '{\n  "pem": true\n}',
     retry: '{\n  "attempts": 3,\n  "initialInterval": "100ms"\n}'
   };
+  
+    
 
   // Fetch middleware details if editing
   useEffect(() => {

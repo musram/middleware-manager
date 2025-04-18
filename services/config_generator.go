@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -128,8 +129,8 @@ func (cg *ConfigGenerator) generateConfig() error {
 		return fmt.Errorf("failed to process TCP resources: %w", err)
 	}
 
-	// Convert to YAML
-	yamlData, err := yaml.Marshal(config)
+	// Convert to YAML using our custom marshaler
+	yamlData, err := marshalConfigToYAML(config)
 	if err != nil {
 		return fmt.Errorf("failed to convert config to YAML: %w", err)
 	}
@@ -146,6 +147,91 @@ func (cg *ConfigGenerator) generateConfig() error {
 	}
 
 	return nil
+}
+
+// marshalConfigToYAML converts the config to properly formatted YAML
+func marshalConfigToYAML(config TraefikConfig) ([]byte, error) {
+    // Create a temporary map for modification
+    configMap := make(map[string]interface{})
+    
+    // Convert HTTP middlewares
+    if len(config.HTTP.Middlewares) > 0 {
+        middlewares := make(map[string]interface{})
+        for id, middleware := range config.HTTP.Middlewares {
+            middlewares[id] = middleware
+        }
+        configMap["http"] = map[string]interface{}{
+            "middlewares": middlewares,
+        }
+    }
+    
+    // Add routers if present
+    if len(config.HTTP.Routers) > 0 {
+        if configMap["http"] == nil {
+            configMap["http"] = map[string]interface{}{}
+        }
+        configMap["http"].(map[string]interface{})["routers"] = config.HTTP.Routers
+    }
+    
+    // Add TCP routers if present
+    if len(config.TCP.Routers) > 0 {
+        configMap["tcp"] = map[string]interface{}{
+            "routers": config.TCP.Routers,
+        }
+    }
+    
+    // Process special string values in the map
+    processStringValues(configMap)
+    
+    // Marshal to YAML
+    return yaml.Marshal(configMap)
+}
+
+// processStringValues handles special string formatting for YAML output
+func processStringValues(data interface{}) {
+    // Special keys that need specific handling
+    durationKeys := map[string]bool{
+        "checkPeriod": true, "fallbackDuration": true, "recoveryDuration": true,
+        "initialInterval": true, "gracePeriod": true,
+    }
+    
+    regexKeys := map[string]bool{
+        "regex": true, "replacement": true, "path": true, "prefix": true,
+    }
+    
+    switch v := data.(type) {
+    case map[string]interface{}:
+        for key, value := range v {
+            switch innerVal := value.(type) {
+            case string:
+                if durationKeys[key] {
+                    // Strip any extra quotes from duration strings
+                    if strings.HasPrefix(innerVal, "\"") && strings.HasSuffix(innerVal, "\"") {
+                        v[key] = strings.Trim(innerVal, "\"")
+                    }
+                } else if regexKeys[key] {
+                    // Ensure regex patterns have proper formatting
+                    // We don't add quotes here since YAML will add them as needed
+                    if strings.HasPrefix(innerVal, "\"") && strings.HasSuffix(innerVal, "\"") {
+                        v[key] = strings.Trim(innerVal, "\"")
+                    }
+                }
+            case map[string]interface{}, []interface{}:
+                processStringValues(innerVal)
+            }
+        }
+    case []interface{}:
+        for i, item := range v {
+            if mapItem, ok := item.(map[string]interface{}); ok {
+                processStringValues(mapItem)
+            } else if strItem, ok := item.(string); ok {
+                // Check for quoted strings in arrays
+                if strings.HasPrefix(strItem, "\"") && strings.HasSuffix(strItem, "\"") {
+                    v[i] = strings.Trim(strItem, "\"")
+                }
+            }
+        }
+    }
 }
 
 // hasConfigurationChanged checks if the configuration has changed
@@ -214,9 +300,6 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 			continue
 		}
 
-		// Process time durations and string values to ensure proper formatting
-		sanitizeConfigValues(middlewareConfig)
-
 		// Special handling for chain middlewares to ensure proper provider prefixes
 		if typ == "chain" && middlewareConfig["middlewares"] != nil {
 			if middlewares, ok := middlewareConfig["middlewares"].([]interface{}); ok {
@@ -245,49 +328,7 @@ func (cg *ConfigGenerator) processMiddlewares(config *TraefikConfig) error {
 
 	return nil
 }
-func sanitizeConfigValues(config map[string]interface{}) {
-	// List of keys that should be treated as duration values
-	durationKeys := map[string]bool{
-		"checkPeriod": true,
-		"fallbackDuration": true,
-		"recoveryDuration": true,
-		"initialInterval": true,
-		"retryTimeout": true,
-		"gracePeriod": true,
-	}
 
-	for key, value := range config {
-		switch v := value.(type) {
-		case string:
-			// Check if this is a duration value that needs fixing
-			if durationKeys[key] {
-				// If it looks like a quoted string (starts and ends with quote)
-				if len(v) > 2 && strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"") {
-					// Remove the extra quotes
-					config[key] = v[1 : len(v)-1]
-				}
-			} else if strings.HasPrefix(v, "\"") && strings.HasSuffix(v, "\"") {
-				// For other string values, also remove unnecessary quotes if present
-				config[key] = v[1 : len(v)-1]
-			}
-		case map[string]interface{}:
-			// Recursively process nested maps
-			sanitizeConfigValues(v)
-		case []interface{}:
-			// Process array values
-			for i, item := range v {
-				if subMap, ok := item.(map[string]interface{}); ok {
-					sanitizeConfigValues(subMap)
-				} else if str, ok := item.(string); ok {
-					// Check if string has unnecessary quotes
-					if len(str) > 2 && strings.HasPrefix(str, "\"") && strings.HasSuffix(str, "\"") {
-						v[i] = str[1 : len(str)-1]
-					}
-				}
-			}
-		}
-	}
-}
 // MiddlewareWithPriority represents a middleware with its priority value
 type MiddlewareWithPriority struct {
     ID       string
