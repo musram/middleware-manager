@@ -194,7 +194,7 @@ To use Traefik plugins like CrowdSec, GeoBlock, or CloudflareWarp:
    experimental:
      plugins:
        crowdsec:
-         moduleName: github.com/crowdsecurity/traefik-plugin-crowdsec
+         moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
          version: v1.4.2
        geoblock:
          moduleName: github.com/PascalMinder/geoblock
