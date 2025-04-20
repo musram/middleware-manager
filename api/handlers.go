@@ -39,6 +39,46 @@ func (s *Server) getMiddlewares(c *gin.Context) {
 	c.JSON(http.StatusOK, middlewares)
 }
 
+// ensureEmptyStringsPreserved ensures empty strings are properly preserved in middleware configs
+func ensureEmptyStringsPreserved(config map[string]interface{}) map[string]interface{} {
+	if config == nil {
+		return nil
+	}
+
+	// Process custom headers which commonly use empty strings
+	if customResponseHeaders, ok := config["customResponseHeaders"].(map[string]interface{}); ok {
+		for key, value := range customResponseHeaders {
+			// Ensure nil or null values are converted to empty strings where appropriate
+			if value == nil {
+				customResponseHeaders[key] = ""
+			}
+		}
+	}
+	
+	if customRequestHeaders, ok := config["customRequestHeaders"].(map[string]interface{}); ok {
+		for key, value := range customRequestHeaders {
+			if value == nil {
+				customRequestHeaders[key] = ""
+			}
+		}
+	}
+	
+	// Common header fields that might have empty strings
+	headerFields := []string{
+		"Server", "X-Powered-By", "customFrameOptionsValue", 
+		"contentSecurityPolicy", "referrerPolicy", "permissionsPolicy",
+	}
+	
+	for _, field := range headerFields {
+		if value, exists := config[field]; exists && value == nil {
+			config[field] = ""
+		}
+	}
+	
+	// Return the processed config
+	return config
+}
+
 // createMiddleware creates a new middleware configuration
 func (s *Server) createMiddleware(c *gin.Context) {
 	var middleware struct {
@@ -65,6 +105,9 @@ func (s *Server) createMiddleware(c *gin.Context) {
 		ResponseWithError(c, http.StatusInternalServerError, "Failed to generate ID")
 		return
 	}
+
+	// Ensure empty strings are properly preserved in config
+	middleware.Config = ensureEmptyStringsPreserved(middleware.Config)
 
 	// Convert config to JSON string
 	configJSON, err := json.Marshal(middleware.Config)
@@ -269,6 +312,9 @@ func (s *Server) updateMiddleware(c *gin.Context) {
 		return
 	}
 
+	// Ensure empty strings are properly preserved in config
+	middleware.Config = ensureEmptyStringsPreserved(middleware.Config)
+
 	// Convert config to JSON string
 	configJSON, err := json.Marshal(middleware.Config)
 	if err != nil {
@@ -342,6 +388,7 @@ func (s *Server) updateMiddleware(c *gin.Context) {
 		"config": middleware.Config,
 	})
 }
+
 // sanitizeMiddlewareConfig ensures proper formatting of duration values and strings
 func sanitizeMiddlewareConfig(config map[string]interface{}) {
 	// List of keys that should be treated as duration values
@@ -397,6 +444,7 @@ func sanitizeConfigRecursive(data interface{}, durationKeys map[string]bool) {
 		}
 	}
 }
+
 // deleteMiddleware deletes a middleware configuration
 func (s *Server) deleteMiddleware(c *gin.Context) {
 	id := c.Param("id")
@@ -903,6 +951,7 @@ func (s *Server) removeMiddleware(c *gin.Context) {
     log.Printf("Successfully removed middleware %s from resource %s", middlewareID, resourceID)
     c.JSON(http.StatusOK, gin.H{"message": "Middleware removed from resource successfully"})
 }
+
 // updateHTTPConfig updates the HTTP router entrypoints configuration
 func (s *Server) updateHTTPConfig(c *gin.Context) {
     id := c.Param("id")
@@ -1300,6 +1349,7 @@ func (s *Server) updateHeadersConfig(c *gin.Context) {
         "custom_headers": input.CustomHeaders,
     })
 }
+
 // generateID generates a random 16-character hex string
 func generateID() (string, error) {
 	bytes := make([]byte, 8)
