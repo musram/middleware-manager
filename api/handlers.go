@@ -1362,18 +1362,34 @@ func generateID() (string, error) {
 // isValidMiddlewareType checks if a middleware type is valid
 func isValidMiddlewareType(typ string) bool {
 	validTypes := map[string]bool{
-		"basicAuth":       true,
-		"forwardAuth":     true,
-		"ipWhiteList":     true,
-		"rateLimit":       true,
-		"headers":         true,
-		"stripPrefix":     true,
-		"addPrefix":       true,
-		"redirectRegex":   true,
-		"redirectScheme":  true,
-		"chain":           true,
-		"replacepathregex": true,
-		"plugin":          true,
+        // Currently supported types
+        "basicAuth":         true,
+        "forwardAuth":       true,
+        "ipWhiteList":       true,
+        "rateLimit":         true,
+        "headers":           true,
+        "stripPrefix":       true,
+        "addPrefix":         true,
+        "redirectRegex":     true,
+        "redirectScheme":    true,
+        "chain":             true,
+        "replacepathregex":  true,
+        "replacePathRegex":  true, // Adding correct camelCase version
+        "plugin":            true,
+        // Additional middleware types from templates.yaml
+        "digestAuth":        true,
+        "ipAllowList":       true,
+        "stripPrefixRegex":  true,
+        "replacePath":       true,
+        "compress":          true,
+        "circuitBreaker":    true,
+        "contentType":       true,
+        "errors":            true,
+        "grpcWeb":           true,
+        "inFlightReq":       true,
+        "passTLSClientCert": true,
+        "retry":             true,
+        "buffering":         true,
 	}
 	
 	return validTypes[typ]
