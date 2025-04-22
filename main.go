@@ -84,7 +84,7 @@ func main() {
 		CORSOrigin: cfg.CORSOrigin,
 	}
 	
-	server := api.NewServer(db, serverConfig)
+	server := api.NewServer(db.DB, serverConfig)
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Printf("Server error: %v", err)
