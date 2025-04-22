@@ -14,7 +14,7 @@ const ResourceContext = createContext();
  * @returns {JSX.Element}
  */
 export const ResourceProvider = ({ children }) => {
-  const { resources, fetchResources } = useResources();
+  const [resources, setResources] = useState([]);
   const [selectedResource, setSelectedResource] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
