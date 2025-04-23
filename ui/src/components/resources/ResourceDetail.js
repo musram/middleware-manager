@@ -53,29 +53,44 @@ const ResourceDetail = ({ id, navigateTo }) => {
   }, [id, fetchResource, fetchMiddlewares]);
   
   // Update local state when resource data is loaded
-  useEffect(() => {
-    if (selectedResource) {
-      setEntrypoints(selectedResource.entrypoints || 'websecure');
-      setTLSDomains(selectedResource.tls_domains || '');
-      setTCPEnabled(selectedResource.tcp_enabled || false);
-      setTCPEntrypoints(selectedResource.tcp_entrypoints || 'tcp');
-      setTCPSNIRule(selectedResource.tcp_sni_rule || '');
-      setRouterPriority(selectedResource.router_priority || 100);
-      
-      // Parse custom headers
-      if (selectedResource.custom_headers) {
-        try {
-          const headers = JSON.parse(selectedResource.custom_headers);
-          setCustomHeaders(headers);
-        } catch (e) {
-          console.error("Error parsing custom headers:", e);
-          setCustomHeaders({});
-        }
-      } else {
+ // Update local state when resource data is loaded
+ useEffect(() => {
+  if (selectedResource) {
+    setEntrypoints(selectedResource.entrypoints || 'websecure');
+    setTLSDomains(selectedResource.tls_domains || '');
+    setTCPEnabled(selectedResource.tcp_enabled === true);
+    setTCPEntrypoints(selectedResource.tcp_entrypoints || 'tcp');
+    setTCPSNIRule(selectedResource.tcp_sni_rule || '');
+    setRouterPriority(selectedResource.router_priority || 100);
+    
+    // Parse custom headers
+    if (selectedResource.custom_headers) {
+      try {
+        // Handle both string and object formats
+        const headers = typeof selectedResource.custom_headers === 'string' 
+          ? JSON.parse(selectedResource.custom_headers) 
+          : selectedResource.custom_headers;
+        
+        setCustomHeaders(headers || {});
+      } catch (e) {
+        console.error("Error parsing custom headers:", e);
         setCustomHeaders({});
       }
+    } else {
+      setCustomHeaders({});
     }
-  }, [selectedResource]);
+    
+    console.log("Updated resource configuration state:", {
+      entrypoints: selectedResource.entrypoints,
+      tlsDomains: selectedResource.tls_domains,
+      tcpEnabled: selectedResource.tcp_enabled,
+      tcpEntrypoints: selectedResource.tcp_entrypoints,
+      tcpSNIRule: selectedResource.tcp_sni_rule,
+      customHeaders: selectedResource.custom_headers,
+      routerPriority: selectedResource.router_priority
+    });
+  }
+}, [selectedResource]);
   
   // Handle loading state
   const loading = resourceLoading || middlewaresLoading;
