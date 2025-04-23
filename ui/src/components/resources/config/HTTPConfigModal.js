@@ -1,22 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * HTTP Configuration Modal for managing resource entrypoints
  * @param {Object} props
  * @param {Object} props.resource - Resource data
+ * @param {string} props.entrypoints - Current entrypoints string
+ * @param {Function} props.setEntrypoints - Function to update entrypoints
  * @param {Function} props.onSave - Save handler function
  * @param {Function} props.onClose - Close modal handler
  */
-const HTTPConfigModal = ({ resource, onSave, onClose }) => {
-  const [entrypoints, setEntrypoints] = useState(resource.entrypoints || 'websecure');
+const HTTPConfigModal = ({ resource, entrypoints, setEntrypoints, onSave, onClose }) => {
+  const [localEntrypoints, setLocalEntrypoints] = useState(entrypoints || 'websecure');
   const [saving, setSaving] = useState(false);
+  
+  // Initialize from props when they change
+  useEffect(() => {
+    if (entrypoints) {
+      setLocalEntrypoints(entrypoints);
+    }
+  }, [entrypoints]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
       setSaving(true);
-      await onSave({ entrypoints });
+      // Update parent state first
+      setEntrypoints(localEntrypoints);
+      // Then save
+      await onSave({ entrypoints: localEntrypoints });
       onClose();
     } catch (err) {
       alert('Failed to update HTTP configuration');
@@ -48,8 +60,8 @@ const HTTPConfigModal = ({ resource, onSave, onClose }) => {
               </label>
               <input
                 type="text"
-                value={entrypoints}
-                onChange={(e) => setEntrypoints(e.target.value)}
+                value={localEntrypoints}
+                onChange={(e) => setLocalEntrypoints(e.target.value)}
                 className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="websecure,metrics,api"
                 required

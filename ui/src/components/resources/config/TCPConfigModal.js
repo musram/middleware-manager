@@ -1,26 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * TCP Configuration Modal for TCP SNI routing
+ * @param {Object} props
+ * @param {Object} props.resource - Resource data
+ * @param {boolean} props.tcpEnabled - Whether TCP SNI routing is enabled
+ * @param {Function} props.setTCPEnabled - Function to update TCP enabled status
+ * @param {string} props.tcpEntrypoints - TCP entrypoints string
+ * @param {Function} props.setTCPEntrypoints - Function to update TCP entrypoints
+ * @param {string} props.tcpSNIRule - TCP SNI rule string
+ * @param {Function} props.setTCPSNIRule - Function to update TCP SNI rule
+ * @param {string} props.resourceHost - Host for the resource
+ * @param {Function} props.onSave - Save handler function
+ * @param {Function} props.onClose - Close modal handler
  */
-const TCPConfigModal = ({ resource, onSave, onClose }) => {
-  const [tcpEnabled, setTCPEnabled] = useState(resource.tcp_enabled || false);
-  const [tcpEntrypoints, setTCPEntrypoints] = useState(resource.tcp_entrypoints || 'tcp');
-  const [tcpSNIRule, setTCPSNIRule] = useState(resource.tcp_sni_rule || '');
+const TCPConfigModal = ({ 
+  resource, 
+  tcpEnabled, 
+  setTCPEnabled, 
+  tcpEntrypoints, 
+  setTCPEntrypoints, 
+  tcpSNIRule, 
+  setTCPSNIRule, 
+  resourceHost, 
+  onSave, 
+  onClose 
+}) => {
+  const [localTcpEnabled, setLocalTcpEnabled] = useState(tcpEnabled === true);
+  const [localTcpEntrypoints, setLocalTcpEntrypoints] = useState(tcpEntrypoints || 'tcp');
+  const [localTcpSNIRule, setLocalTcpSNIRule] = useState(tcpSNIRule || '');
+  const [saving, setSaving] = useState(false);
+  
+  // Host fallback if resourceHost is not provided
+  const host = resourceHost || (resource && resource.host) || 'example.com';
+  
+  // Initialize from props when they change
+  useEffect(() => {
+    setLocalTcpEnabled(tcpEnabled === true);
+    setLocalTcpEntrypoints(tcpEntrypoints || 'tcp');
+    setLocalTcpSNIRule(tcpSNIRule || '');
+  }, [tcpEnabled, tcpEntrypoints, tcpSNIRule]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
+      setSaving(true);
+      
+      // Update parent state first
+      setTCPEnabled(localTcpEnabled);
+      setTCPEntrypoints(localTcpEntrypoints);
+      setTCPSNIRule(localTcpSNIRule);
+      
+      // Then save
       await onSave({
-        tcp_enabled: tcpEnabled,
-        tcp_entrypoints: tcpEntrypoints,
-        tcp_sni_rule: tcpSNIRule
+        tcp_enabled: localTcpEnabled,
+        tcp_entrypoints: localTcpEntrypoints,
+        tcp_sni_rule: localTcpSNIRule
       });
+      
       onClose();
     } catch (err) {
       alert('Failed to update TCP configuration');
       console.error('TCP config update error:', err);
+    } finally {
+      setSaving(false);
     }
   };
   
@@ -32,6 +76,7 @@ const TCPConfigModal = ({ resource, onSave, onClose }) => {
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
+            disabled={saving}
           >
             ×
           </button>
@@ -42,9 +87,10 @@ const TCPConfigModal = ({ resource, onSave, onClose }) => {
               <label className="block text-gray-700 text-sm font-bold mb-2 flex items-center">
                 <input
                   type="checkbox"
-                  checked={tcpEnabled}
-                  onChange={(e) => setTCPEnabled(e.target.checked)}
+                  checked={localTcpEnabled}
+                  onChange={(e) => setLocalTcpEnabled(e.target.checked)}
                   className="mr-2"
+                  disabled={saving}
                 />
                 Enable TCP SNI Routing
               </label>
@@ -53,7 +99,7 @@ const TCPConfigModal = ({ resource, onSave, onClose }) => {
               </p>
             </div>
             
-            {tcpEnabled && (
+            {localTcpEnabled && (
               <>
                 <div className="mb-4">
                   <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -61,11 +107,12 @@ const TCPConfigModal = ({ resource, onSave, onClose }) => {
                   </label>
                   <input
                     type="text"
-                    value={tcpEntrypoints}
-                    onChange={(e) => setTCPEntrypoints(e.target.value)}
+                    value={localTcpEntrypoints}
+                    onChange={(e) => setLocalTcpEntrypoints(e.target.value)}
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="tcp"
                     required
+                    disabled={saving}
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Standard TCP entrypoint: tcp. Default: tcp
@@ -77,21 +124,22 @@ const TCPConfigModal = ({ resource, onSave, onClose }) => {
                   </label>
                   <input
                     type="text"
-                    value={tcpSNIRule}
-                    onChange={(e) => setTCPSNIRule(e.target.value)}
+                    value={localTcpSNIRule}
+                    onChange={(e) => setLocalTcpSNIRule(e.target.value)}
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={`HostSNI(\`${resource.host}\`)`}
+                    placeholder={`HostSNI(\`${host}\`)`}
+                    disabled={saving}
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     SNI rule using HostSNI or HostSNIRegexp matchers
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Examples:</p>
                   <ul className="text-xs text-gray-500 mt-1 list-disc pl-5">
-                    <li>Match specific domain: <code>{`HostSNI(\`${resource.host}\`)`}</code></li>
+                    <li>Match specific domain: <code>{`HostSNI(\`${host}\`)`}</code></li>
                     <li>Match with wildcard: <code>{`HostSNIRegexp(\`^.+\\.example\\.com$\`)`}</code></li>
                   </ul>
                   <p className="text-xs text-gray-500 mt-1">
-                    If empty, defaults to <code>{`HostSNI(\`${resource.host}\`)`}</code>
+                    If empty, defaults to <code>{`HostSNI(\`${host}\`)`}</code>
                   </p>
                 </div>
               </>
@@ -102,14 +150,16 @@ const TCPConfigModal = ({ resource, onSave, onClose }) => {
                 type="button"
                 onClick={onClose}
                 className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                disabled={saving}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                disabled={saving}
               >
-                Save TCP Configuration
+                {saving ? 'Saving...' : 'Save TCP Configuration'}
               </button>
             </div>
           </form>

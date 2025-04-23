@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useResources } from '../../contexts/ResourceContext';
 import { useMiddlewares } from '../../contexts/MiddlewareContext';
@@ -46,51 +47,77 @@ const ResourceDetail = ({ id, navigateTo }) => {
   const [headerKey, setHeaderKey] = useState('');
   const [headerValue, setHeaderValue] = useState('');
   
-  // Load resource and middlewares data
+  // Add debugging for resource loading
   useEffect(() => {
+    console.log("ResourceDetail mounted with ID:", id);
     fetchResource(id);
     fetchMiddlewares();
   }, [id, fetchResource, fetchMiddlewares]);
   
-  // Update local state when resource data is loaded
- // Update local state when resource data is loaded
- useEffect(() => {
-  if (selectedResource) {
-    setEntrypoints(selectedResource.entrypoints || 'websecure');
-    setTLSDomains(selectedResource.tls_domains || '');
-    setTCPEnabled(selectedResource.tcp_enabled === true);
-    setTCPEntrypoints(selectedResource.tcp_entrypoints || 'tcp');
-    setTCPSNIRule(selectedResource.tcp_sni_rule || '');
-    setRouterPriority(selectedResource.router_priority || 100);
-    
-    // Parse custom headers
-    if (selectedResource.custom_headers) {
+  // Add debugging for resource data
+  useEffect(() => {
+    console.log("selectedResource updated:", selectedResource);
+    if (selectedResource) {
       try {
-        // Handle both string and object formats
-        const headers = typeof selectedResource.custom_headers === 'string' 
-          ? JSON.parse(selectedResource.custom_headers) 
-          : selectedResource.custom_headers;
+        // Parse entrypoints
+        const entrypointsValue = selectedResource.entrypoints || 'websecure';
+        console.log("Setting entrypoints to:", entrypointsValue);
+        setEntrypoints(entrypointsValue);
         
-        setCustomHeaders(headers || {});
-      } catch (e) {
-        console.error("Error parsing custom headers:", e);
-        setCustomHeaders({});
+        // Parse TLS domains
+        const tlsDomainsValue = selectedResource.tls_domains || '';
+        console.log("Setting TLS domains to:", tlsDomainsValue);
+        setTLSDomains(tlsDomainsValue);
+        
+        // Parse TCP enabled as boolean
+        const tcpEnabledValue = selectedResource.tcp_enabled === true;
+        console.log("Setting TCP enabled to:", tcpEnabledValue, "from value:", selectedResource.tcp_enabled);
+        setTCPEnabled(tcpEnabledValue);
+        
+        // Parse TCP entrypoints
+        const tcpEntrypointsValue = selectedResource.tcp_entrypoints || 'tcp';
+        console.log("Setting TCP entrypoints to:", tcpEntrypointsValue);
+        setTCPEntrypoints(tcpEntrypointsValue);
+        
+        // Parse TCP SNI rule
+        const tcpSNIRuleValue = selectedResource.tcp_sni_rule || '';
+        console.log("Setting TCP SNI rule to:", tcpSNIRuleValue);
+        setTCPSNIRule(tcpSNIRuleValue);
+        
+        // Parse router priority
+        const routerPriorityValue = selectedResource.router_priority || 100;
+        console.log("Setting router priority to:", routerPriorityValue);
+        setRouterPriority(routerPriorityValue);
+        
+        // Parse custom headers
+        try {
+          let headers = {};
+          
+          if (selectedResource.custom_headers) {
+            if (typeof selectedResource.custom_headers === 'string') {
+              // Try to parse JSON string
+              if (selectedResource.custom_headers.trim() !== '') {
+                headers = JSON.parse(selectedResource.custom_headers);
+              }
+            } else {
+              // Use as object directly
+              headers = selectedResource.custom_headers;
+            }
+          }
+          
+          console.log("Setting custom headers to:", headers);
+          setCustomHeaders(headers || {});
+        } catch (e) {
+          console.error("Error parsing custom headers:", e);
+          setCustomHeaders({});
+        }
+      } catch (error) {
+        console.error("Error updating local state from resource:", error);
       }
-    } else {
-      setCustomHeaders({});
     }
-    
-    console.log("Updated resource configuration state:", {
-      entrypoints: selectedResource.entrypoints,
-      tlsDomains: selectedResource.tls_domains,
-      tcpEnabled: selectedResource.tcp_enabled,
-      tcpEntrypoints: selectedResource.tcp_entrypoints,
-      tcpSNIRule: selectedResource.tcp_sni_rule,
-      customHeaders: selectedResource.custom_headers,
-      routerPriority: selectedResource.router_priority
-    });
-  }
-}, [selectedResource]);
+  }, [selectedResource]);
+  
+  // The rest of the component remains unchanged
   
   // Handle loading state
   const loading = resourceLoading || middlewaresLoading;
