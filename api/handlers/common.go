@@ -34,25 +34,38 @@ func generateID() (string, error) {
 }
 
 // isValidMiddlewareType checks if a middleware type is valid
+// isValidMiddlewareType checks if a middleware type is valid
 func isValidMiddlewareType(typ string) bool {
-	validTypes := map[string]bool{
-		"basicAuth":       true,
-		"forwardAuth":     true,
-		"ipWhiteList":     true,
-		"rateLimit":       true,
-		"headers":         true,
-		"stripPrefix":     true,
-		"addPrefix":       true,
-		"redirectRegex":   true,
-		"redirectScheme":  true,
-		"chain":           true,
-		"replacepathregex": true,
-		"plugin":          true,
-	}
-	
-	return validTypes[typ]
+    validTypes := map[string]bool{
+        "basicAuth":         true,
+        "digestAuth":        true,
+        "forwardAuth":       true,
+        "ipWhiteList":       true,
+        "ipAllowList":       true,
+        "rateLimit":         true,
+        "headers":           true,
+        "stripPrefix":       true,
+        "stripPrefixRegex":  true,
+        "addPrefix":         true,
+        "redirectRegex":     true,
+        "redirectScheme":    true,
+        "replacePath":       true,
+        "replacePathRegex":  true,
+        "chain":             true,
+        "plugin":            true,
+        "buffering":         true,
+        "circuitBreaker":    true,
+        "compress":          true,
+        "contentType":       true,
+        "errors":            true,
+        "grpcWeb":           true,
+        "inFlightReq":       true,
+        "passTLSClientCert": true,
+        "retry":             true,
+    }
+    
+    return validTypes[typ]
 }
-
 // sanitizeMiddlewareConfig ensures proper formatting of duration values and strings
 func sanitizeMiddlewareConfig(config map[string]interface{}) {
 	// List of keys that should be treated as duration values
