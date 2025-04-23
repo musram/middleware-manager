@@ -16,7 +16,7 @@ import MiddlewareForm from './components/middlewares/MiddlewareForm';
  * based on the navigation state
  */
 const MainContent = () => {
-  const { page, resourceId, middlewareId, isEditing, navigateTo } = useApp();
+  const { page, resourceId, middlewareId, isEditing, navigateTo, isDarkMode, setIsDarkMode } = useApp();
 
   // Render the active page based on state
   const renderPage = () => {
@@ -43,10 +43,12 @@ const MainContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className={`min-h-screen ${isDarkMode ? 'dark-mode' : ''} bg-gray-100`}>
       <Header 
         currentPage={page} 
-        navigateTo={navigateTo} 
+        navigateTo={navigateTo}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
       />
       <main className="container mx-auto px-6 py-6">
         {renderPage()}
