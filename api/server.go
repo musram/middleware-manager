@@ -138,6 +138,14 @@ func (s *Server) setupRoutes(uiPath string) {
 			resources.PUT("/:id/config/headers", s.configHandler.UpdateHeadersConfig) // Custom Host headers
 			resources.PUT("/:id/config/priority", s.configHandler.UpdateRouterPriority) // Router priority
 		}
+        // Data source routes
+        datasource := api.Group("/datasource")
+        {
+            datasource.GET("", s.dataSourceHandler.GetDataSources)
+            datasource.GET("/active", s.dataSourceHandler.GetActiveDataSource)
+            datasource.PUT("/active", s.dataSourceHandler.SetActiveDataSource)
+            datasource.PUT("/:name", s.dataSourceHandler.UpdateDataSource)
+        }		
 	}
 
 	// Serve the React app

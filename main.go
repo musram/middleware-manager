@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -18,16 +19,17 @@ import (
 
 // Configuration represents the application configuration
 type Configuration struct {
-	PangolinAPIURL  string
-	TraefikConfDir  string
-	DBPath          string
-	Port            string
-	UIPath          string
-	CheckInterval   time.Duration
+	PangolinAPIURL   string
+	TraefikConfDir   string
+	DBPath           string
+	Port             string
+	UIPath           string
+	ConfigDir        string
+	CheckInterval    time.Duration
 	GenerateInterval time.Duration
-	Debug           bool
-	AllowCORS       bool
-	CORSOrigin      string
+	Debug            bool
+	AllowCORS        bool
+	CORSOrigin       string
 }
 
 func main() {
@@ -49,7 +51,7 @@ func main() {
 	defer db.Close()
 	
 	// Ensure config directory exists
-	configDir := getEnv("CONFIG_DIR", "/app/config")
+	configDir := cfg.ConfigDir
 	if err := config.EnsureConfigDirectory(configDir); err != nil {
 		log.Printf("Warning: Failed to create config directory: %v", err)
 	}
@@ -64,11 +66,20 @@ func main() {
 		log.Printf("Warning: Failed to load default templates: %v", err)
 	}
 
+	// Initialize config manager
+	configManager, err := services.NewConfigManager(filepath.Join(configDir, "config.json"))
+	if err != nil {
+		log.Fatalf("Failed to initialize config manager: %v", err)
+	}
+
 	// Create stop channel for graceful shutdown
 	stopChan := make(chan struct{})
 	
-	// Start resource watcher
-	resourceWatcher := services.NewResourceWatcher(db, cfg.PangolinAPIURL)
+	// Start resource watcher with config manager
+	resourceWatcher, err := services.NewResourceWatcher(db, configManager)
+	if err != nil {
+		log.Fatalf("Failed to create resource watcher: %v", err)
+	}
 	go resourceWatcher.Start(cfg.CheckInterval)
 
 	// Start configuration generator
@@ -84,7 +95,7 @@ func main() {
 		CORSOrigin: cfg.CORSOrigin,
 	}
 	
-	server := api.NewServer(db.DB, serverConfig)
+	server := api.NewServer(db.DB, serverConfig, configManager)
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Printf("Server error: %v", err)
@@ -141,16 +152,17 @@ func loadConfiguration(debug bool) Configuration {
 	}
 	
 	return Configuration{
-		PangolinAPIURL:  getEnv("PANGOLIN_API_URL", "http://pangolin:3001/api/v1"),
-		TraefikConfDir:  getEnv("TRAEFIK_CONF_DIR", "/conf"),
-		DBPath:          getEnv("DB_PATH", "/data/middleware.db"),
-		Port:            getEnv("PORT", "3456"),
-		UIPath:          getEnv("UI_PATH", "/app/ui/build"),
-		CheckInterval:   checkInterval,
+		PangolinAPIURL:   getEnv("PANGOLIN_API_URL", "http://pangolin:3001/api/v1"),
+		TraefikConfDir:   getEnv("TRAEFIK_CONF_DIR", "/conf"),
+		DBPath:           getEnv("DB_PATH", "/data/middleware.db"),
+		Port:             getEnv("PORT", "3456"),
+		UIPath:           getEnv("UI_PATH", "/app/ui/build"),
+		ConfigDir:        getEnv("CONFIG_DIR", "/app/config"),
+		CheckInterval:    checkInterval,
 		GenerateInterval: generateInterval,
-		Debug:           debug,
-		AllowCORS:       allowCORS,
-		CORSOrigin:      getEnv("CORS_ORIGIN", ""),
+		Debug:            debug,
+		AllowCORS:        allowCORS,
+		CORSOrigin:       getEnv("CORS_ORIGIN", ""),
 	}
 }
 
