@@ -17,6 +17,9 @@ COPY ui/public/ ./public/
 
 # Copy *specific* source files and directories from host's ui/src into container's /app/src
 COPY ui/src/styles ./src/styles
+COPY ui/src/components ./src/components
+COPY ui/src/contexts ./src/contexts
+COPY ui/src/services ./src/services
 COPY ui/src/App.js ./src/App.js
 COPY ui/src/index.js ./src/index.js
 

@@ -158,6 +158,29 @@ func runPostMigrationUpdates(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to check if entrypoints column exists: %w", err)
 	}
+
+	// Check for source_type column
+	var hasSourceTypeColumn bool
+	err = db.QueryRow(`
+    SELECT COUNT(*) > 0 
+    FROM pragma_table_info('resources') 
+    WHERE name = 'source_type'
+`).Scan(&hasSourceTypeColumn)
+
+	if err != nil {
+    return fmt.Errorf("failed to check if source_type column exists: %w", err)
+	}
+
+   // If the column doesn't exist, add it
+	if !hasSourceTypeColumn {
+    log.Println("Adding source_type column to resources table")
+    
+    if _, err := db.Exec("ALTER TABLE resources ADD COLUMN source_type TEXT DEFAULT ''"); err != nil {
+        return fmt.Errorf("failed to add source_type column: %w", err)
+    }
+    
+    log.Println("Successfully added source_type column")
+	}
 	
 	// If the column doesn't exist, add the routing columns too
 	if !hasEntrypointsColumn {

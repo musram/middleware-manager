@@ -1,3 +1,4 @@
+
 package models
 
 import (
@@ -31,3 +32,5 @@ type ResourceMiddleware struct {
 	Priority     int       `json:"priority"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+// Resource struct removed to resolve redeclaration error.
+// Please ensure the Resource struct is only defined in one file (likely resource.go).

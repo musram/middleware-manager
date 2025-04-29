@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -12,14 +13,20 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
-	"github.com/hhftechnology/middleware-manager/database"
+	"github.com/hhftechnology/middleware-manager/api/handlers"
+	"github.com/hhftechnology/middleware-manager/services"
 )
 
 // Server represents the API server
 type Server struct {
-	db     *database.DB
-	router *gin.Engine
-	srv    *http.Server
+	db                *sql.DB
+	router            *gin.Engine
+	srv               *http.Server
+	middlewareHandler *handlers.MiddlewareHandler
+	resourceHandler   *handlers.ResourceHandler
+	configHandler     *handlers.ConfigHandler
+	dataSourceHandler *handlers.DataSourceHandler
+	configManager     *services.ConfigManager
 }
 
 // ServerConfig contains configuration options for the server
@@ -32,7 +39,7 @@ type ServerConfig struct {
 }
 
 // NewServer creates a new API server
-func NewServer(db *database.DB, config ServerConfig) *Server {
+func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigManager) *Server {
 	// Set gin mode based on debug flag
 	if !config.Debug {
 		gin.SetMode(gin.ReleaseMode)
@@ -69,10 +76,21 @@ func NewServer(db *database.DB, config ServerConfig) *Server {
 		router.Use(cors.New(corsConfig))
 	}
 
+	// Create request handlers
+	middlewareHandler := handlers.NewMiddlewareHandler(db)
+	resourceHandler := handlers.NewResourceHandler(db)
+	configHandler := handlers.NewConfigHandler(db)
+	dataSourceHandler := handlers.NewDataSourceHandler(configManager)
+
 	// Setup server
 	server := &Server{
-		db:     db,
-		router: router,
+		db:                db,
+		router:            router,
+		middlewareHandler: middlewareHandler,
+		resourceHandler:   resourceHandler,
+		configHandler:     configHandler,
+		dataSourceHandler: dataSourceHandler,
+		configManager:     configManager,
 		srv: &http.Server{
 			Addr:              ":" + config.Port,
 			Handler:           router,
@@ -102,29 +120,39 @@ func (s *Server) setupRoutes(uiPath string) {
 		// Middleware routes
 		middlewares := api.Group("/middlewares")
 		{
-			middlewares.GET("", s.getMiddlewares)
-			middlewares.POST("", s.createMiddleware)
-			middlewares.GET("/:id", s.getMiddleware)
-			middlewares.PUT("/:id", s.updateMiddleware)
-			middlewares.DELETE("/:id", s.deleteMiddleware)
+			middlewares.GET("", s.middlewareHandler.GetMiddlewares)
+			middlewares.POST("", s.middlewareHandler.CreateMiddleware)
+			middlewares.GET("/:id", s.middlewareHandler.GetMiddleware)
+			middlewares.PUT("/:id", s.middlewareHandler.UpdateMiddleware)
+			middlewares.DELETE("/:id", s.middlewareHandler.DeleteMiddleware)
 		}
 
 		// Resource routes
 		resources := api.Group("/resources")
 		{
-			resources.GET("", s.getResources)
-			resources.GET("/:id", s.getResource)
-			resources.DELETE("/:id", s.deleteResource)
-			resources.POST("/:id/middlewares", s.assignMiddleware)
-			resources.POST("/:id/middlewares/bulk", s.assignMultipleMiddlewares)
-			resources.DELETE("/:id/middlewares/:middlewareId", s.removeMiddleware)
+			resources.GET("", s.resourceHandler.GetResources)
+			resources.GET("/:id", s.resourceHandler.GetResource)
+			resources.DELETE("/:id", s.resourceHandler.DeleteResource)
+			resources.POST("/:id/middlewares", s.resourceHandler.AssignMiddleware)
+			resources.POST("/:id/middlewares/bulk", s.resourceHandler.AssignMultipleMiddlewares)
+			resources.DELETE("/:id/middlewares/:middlewareId", s.resourceHandler.RemoveMiddleware)
 			
 			// Router configuration routes
-			resources.PUT("/:id/config/http", s.updateHTTPConfig)    // HTTP entrypoints
-			resources.PUT("/:id/config/tls", s.updateTLSConfig)      // TLS certificate domains
-			resources.PUT("/:id/config/tcp", s.updateTCPConfig)      // TCP SNI routing
-            resources.PUT("/:id/config/headers", s.updateHeadersConfig) // Custom Host headers
-			resources.PUT("/:id/config/priority", s.updateRouterPriority) // Router priority
+			resources.PUT("/:id/config/http", s.configHandler.UpdateHTTPConfig)
+			resources.PUT("/:id/config/tls", s.configHandler.UpdateTLSConfig)
+			resources.PUT("/:id/config/tcp", s.configHandler.UpdateTCPConfig)
+			resources.PUT("/:id/config/headers", s.configHandler.UpdateHeadersConfig)
+			resources.PUT("/:id/config/priority", s.configHandler.UpdateRouterPriority)
+		}
+
+		// Data source routes
+		datasource := api.Group("/datasource")
+		{
+			datasource.GET("", s.dataSourceHandler.GetDataSources)
+			datasource.GET("/active", s.dataSourceHandler.GetActiveDataSource)
+			datasource.PUT("/active", s.dataSourceHandler.SetActiveDataSource)
+			datasource.PUT("/:name", s.dataSourceHandler.UpdateDataSource)
+			datasource.POST("/:name/test", s.dataSourceHandler.TestDataSourceConnection)
 		}
 	}
 

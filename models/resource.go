@@ -27,11 +27,14 @@ type Resource struct {
 	// Custom headers configuration
 	CustomHeaders  string    `json:"custom_headers"`
 	
+	// Router priority configuration
+	RouterPriority int       `json:"router_priority"`
+	
+	// Source type for tracking data origin
+	SourceType     string    `json:"source_type"`
+	
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
-	
-	// Middlewares is a list of associated middlewares, populated when needed
-	Middlewares []ResourceMiddleware `json:"middlewares,omitempty"`
 }
 
 // PangolinResource represents the format of a resource from Pangolin API

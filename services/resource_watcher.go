@@ -1,308 +1,365 @@
 package services
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"strings"
-	"time"
+    "context"
+    "database/sql"
+    "encoding/json"
+    "fmt"
+    "io"
+    "io/ioutil"
+    "log"
+    "net/http"
+    "strings"
+    "time"
 
-	"github.com/hhftechnology/middleware-manager/database"
-	"github.com/hhftechnology/middleware-manager/models"
+    "github.com/hhftechnology/middleware-manager/database"
+    "github.com/hhftechnology/middleware-manager/models"
 )
 
-// ResourceWatcher watches for resources in Pangolin
+// ResourceWatcher watches for resources using configured data source
 type ResourceWatcher struct {
-	db            *database.DB
-	pangolinAPI   string
-	stopChan      chan struct{}
-	isRunning     bool
-	httpClient    *http.Client
+    db              *database.DB
+    fetcher         ResourceFetcher
+    configManager   *ConfigManager
+    stopChan        chan struct{}
+    isRunning       bool
+    httpClient      *http.Client
 }
 
 // NewResourceWatcher creates a new resource watcher
-func NewResourceWatcher(db *database.DB, pangolinAPI string) *ResourceWatcher {
-	// Create HTTP client with timeout
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second, // Set reasonable timeout
-	}
-	
-	return &ResourceWatcher{
-		db:          db,
-		pangolinAPI: pangolinAPI,
-		stopChan:    make(chan struct{}),
-		isRunning:   false,
-		httpClient:  httpClient,
-	}
+func NewResourceWatcher(db *database.DB, configManager *ConfigManager) (*ResourceWatcher, error) {
+    // Get the active data source config
+    dsConfig, err := configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get active data source config: %w", err)
+    }
+    
+    // Create the fetcher
+    fetcher, err := NewResourceFetcher(dsConfig)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create resource fetcher: %w", err)
+    }
+    
+    // Create HTTP client with timeout
+    httpClient := &http.Client{
+        Timeout: 10 * time.Second, // Set reasonable timeout
+    }
+    
+    return &ResourceWatcher{
+        db:             db,
+        fetcher:        fetcher,
+        configManager:  configManager,
+        stopChan:       make(chan struct{}),
+        isRunning:      false,
+        httpClient:     httpClient,
+    }, nil
 }
 
 // Start begins watching for resources
 func (rw *ResourceWatcher) Start(interval time.Duration) {
-	if rw.isRunning {
-		return
-	}
-	
-	rw.isRunning = true
-	log.Printf("Resource watcher started, checking every %v", interval)
+    if rw.isRunning {
+        return
+    }
+    
+    rw.isRunning = true
+    log.Printf("Resource watcher started, checking every %v", interval)
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
 
-	// Do an initial check
-	if err := rw.checkResources(); err != nil {
-		log.Printf("Initial resource check failed: %v", err)
-	}
+    // Do an initial check
+    if err := rw.checkResources(); err != nil {
+        log.Printf("Initial resource check failed: %v", err)
+    }
 
-	for {
-		select {
-		case <-ticker.C:
-			if err := rw.checkResources(); err != nil {
-				log.Printf("Resource check failed: %v", err)
-			}
-		case <-rw.stopChan:
-			log.Println("Resource watcher stopped")
-			return
-		}
-	}
+    for {
+        select {
+        case <-ticker.C:
+            // Check if data source config has changed
+            if err := rw.refreshFetcher(); err != nil {
+                log.Printf("Failed to refresh resource fetcher: %v", err)
+            }
+            
+            if err := rw.checkResources(); err != nil {
+                log.Printf("Resource check failed: %v", err)
+            }
+        case <-rw.stopChan:
+            log.Println("Resource watcher stopped")
+            return
+        }
+    }
+}
+
+// refreshFetcher updates the fetcher if the data source config has changed
+func (rw *ResourceWatcher) refreshFetcher() error {
+    dsConfig, err := rw.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        return fmt.Errorf("failed to get data source config: %w", err)
+    }
+    
+    // Create a new fetcher with the updated config
+    fetcher, err := NewResourceFetcher(dsConfig)
+    if err != nil {
+        return fmt.Errorf("failed to create resource fetcher: %w", err)
+    }
+    
+    // Update the fetcher
+    rw.fetcher = fetcher
+    return nil
 }
 
 // Stop stops the resource watcher
 func (rw *ResourceWatcher) Stop() {
-	if !rw.isRunning {
-		return
-	}
-	
-	close(rw.stopChan)
-	rw.isRunning = false
+    if !rw.isRunning {
+        return
+    }
+    
+    close(rw.stopChan)
+    rw.isRunning = false
 }
 
-// checkResources fetches resources from Pangolin and updates the database
+// checkResources fetches resources from the configured data source and updates the database
 func (rw *ResourceWatcher) checkResources() error {
-	log.Println("Checking for resources in Pangolin...")
-	
-	// Create a context with timeout for the operation
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	
-	// Fetch Traefik configuration from Pangolin
-	config, err := rw.fetchTraefikConfig(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to fetch Traefik config: %w", err)
-	}
+    log.Println("Checking for resources using configured data source...")
+    
+    // Create a context with timeout for the operation
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    
+    // Fetch resources using the configured fetcher
+    resources, err := rw.fetcher.FetchResources(ctx)
+    if err != nil {
+        return fmt.Errorf("failed to fetch resources: %w", err)
+    }
 
-	// Get all existing resources from the database
-	var existingResources []string
-	rows, err := rw.db.Query("SELECT id FROM resources WHERE status = 'active'")
-	if err != nil {
-		return fmt.Errorf("failed to query existing resources: %w", err)
-	}
-	
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			log.Printf("Error scanning resource ID: %v", err)
-			continue
-		}
-		existingResources = append(existingResources, id)
-	}
-	rows.Close()
-	
-	// Keep track of resources we find in Pangolin
-	foundResources := make(map[string]bool)
+    // Get all existing resources from the database
+    var existingResources []string
+    rows, err := rw.db.Query("SELECT id FROM resources WHERE status = 'active'")
+    if err != nil {
+        return fmt.Errorf("failed to query existing resources: %w", err)
+    }
+    
+    for rows.Next() {
+        var id string
+        if err := rows.Scan(&id); err != nil {
+            log.Printf("Error scanning resource ID: %v", err)
+            continue
+        }
+        existingResources = append(existingResources, id)
+    }
+    rows.Close()
+    
+    // Keep track of resources we find
+    foundResources := make(map[string]bool)
 
-	// Check if there are any routers configured in Pangolin
-	if config.HTTP.Routers == nil || len(config.HTTP.Routers) == 0 {
-		log.Println("No routers found in Pangolin configuration")
-		// Mark all existing resources as disabled since there are no active resources
-		for _, resourceID := range existingResources {
-			log.Printf("No active routers in Pangolin, marking resource %s as disabled", resourceID)
-			_, err := rw.db.Exec(
-				"UPDATE resources SET status = 'disabled', updated_at = ? WHERE id = ?",
-				time.Now(), resourceID,
-			)
-			if err != nil {
-				log.Printf("Error marking resource as disabled: %v", err)
-			}
-		}
-		return nil
-	}
+    // Check if there are any resources
+    if len(resources.Resources) == 0 {
+        log.Println("No resources found in data source")
+        // Mark all existing resources as disabled since there are no active resources
+        for _, resourceID := range existingResources {
+            log.Printf("No active resources, marking resource %s as disabled", resourceID)
+            _, err := rw.db.Exec(
+                "UPDATE resources SET status = 'disabled', updated_at = ? WHERE id = ?",
+                time.Now(), resourceID,
+            )
+            if err != nil {
+                log.Printf("Error marking resource as disabled: %v", err)
+            }
+        }
+        return nil
+    }
 
-	// Process routers to find resources
-	for routerID, router := range config.HTTP.Routers {
-		// Skip non-SSL routers (usually HTTP redirects)
-		 if router.TLS.CertResolver == "" {
-			 continue
-		}
+    // Process resources
+    for _, resource := range resources.Resources {
+        // Skip invalid resources
+        if resource.Host == "" || resource.ServiceID == "" {
+            continue
+        }
 
-		// Extract host from rule (e.g., "Host(`example.com`)")
-		host := extractHostFromRule(router.Rule)
-		if host == "" {
-			continue
-		}
-
-		// Skip Pangolin's own routers
-		if isSystemRouter(routerID) {
-			continue
-		}
-
-		// Get or create the resource
-		serviceID := router.Service
-		
-		if err := rw.updateOrCreateResource(routerID, host, serviceID); err != nil {
-			log.Printf("Error processing resource %s: %v", routerID, err)
-			// Continue processing other resources even if one fails
-			continue
-		}
-		
-		// Mark this resource as found
-		foundResources[routerID] = true
-	}
-	
-	// Mark resources as disabled if they no longer exist in Pangolin
-	for _, resourceID := range existingResources {
-		if !foundResources[resourceID] {
-			log.Printf("Resource %s no longer exists in Pangolin, marking as disabled", resourceID)
-			_, err := rw.db.Exec(
-				"UPDATE resources SET status = 'disabled', updated_at = ? WHERE id = ?",
-				time.Now(), resourceID,
-			)
-			if err != nil {
-				log.Printf("Error marking resource as disabled: %v", err)
-			}
-		}
-	}
-	
-	return nil
+        // Process resource
+        if err := rw.updateOrCreateResource(resource); err != nil {
+            log.Printf("Error processing resource %s: %v", resource.ID, err)
+            // Continue processing other resources even if one fails
+            continue
+        }
+        
+        // Mark this resource as found
+        foundResources[resource.ID] = true
+    }
+    
+    // Mark resources as disabled if they no longer exist in the data source
+    for _, resourceID := range existingResources {
+        if !foundResources[resourceID] {
+            log.Printf("Resource %s no longer exists, marking as disabled", resourceID)
+            _, err := rw.db.Exec(
+                "UPDATE resources SET status = 'disabled', updated_at = ? WHERE id = ?",
+                time.Now(), resourceID,
+            )
+            if err != nil {
+                log.Printf("Error marking resource as disabled: %v", err)
+            }
+        }
+    }
+    
+    return nil
 }
 
 // updateOrCreateResource updates an existing resource or creates a new one
-func (rw *ResourceWatcher) updateOrCreateResource(resourceID, host, serviceID string) error {
-	// Check if resource already exists
-	var exists int
-	var status string
-	var entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule string
-	var tcpEnabled int
-	
-	err := rw.db.QueryRow(`
-		SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule 
-		FROM resources WHERE id = ?
-	`, resourceID).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule)
-	
-	if err == nil {
-		// Resource exists, update essential fields but preserve custom configuration
-		_, err = rw.db.Exec(
-			"UPDATE resources SET host = ?, service_id = ?, status = 'active', updated_at = ? WHERE id = ?",
-			host, serviceID, time.Now(), resourceID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to update resource %s: %w", resourceID, err)
-		}
-		
-		if status == "disabled" {
-			log.Printf("Resource %s was disabled but is now active again", resourceID)
-		}
-		
-		return nil
-	}
+func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) error {
+    // Check if resource already exists
+    var exists int
+    var status string
+    var entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
+    var tcpEnabled int
+    var routerPriority sql.NullInt64
+    
+    err := rw.db.QueryRow(`
+        SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
+               custom_headers, router_priority
+        FROM resources WHERE id = ?
+    `, resource.ID).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
+                        &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
+    
+    if err == nil {
+        // Resource exists, update essential fields but preserve custom configuration
+        _, err = rw.db.Exec(
+            "UPDATE resources SET host = ?, service_id = ?, status = 'active', source_type = ?, updated_at = ? WHERE id = ?",
+            resource.Host, resource.ServiceID, resource.SourceType, time.Now(), resource.ID,
+        )
+        if err != nil {
+            return fmt.Errorf("failed to update resource %s: %w", resource.ID, err)
+        }
+        
+        if status == "disabled" {
+            log.Printf("Resource %s was disabled but is now active again", resource.ID)
+        }
+        
+        return nil
+    }
 
-	// Create new resource with default configuration
-	_, err = rw.db.Exec(`
-		INSERT INTO resources (
-			id, host, service_id, org_id, site_id, status, 
-			entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule
-		) VALUES (?, ?, ?, ?, ?, 'active', 'websecure', '', 0, 'tcp', '')
-	`, resourceID, host, serviceID, "unknown", "unknown")
-	
-	if err != nil {
-		return fmt.Errorf("failed to create resource %s: %w", resourceID, err)
-	}
+    // Handle default values for new resources
+    if resource.Entrypoints == "" {
+        resource.Entrypoints = "websecure"
+    }
+    
+    if resource.OrgID == "" {
+        resource.OrgID = "unknown"
+    }
+    
+    if resource.SiteID == "" {
+        resource.SiteID = "unknown"
+    }
+    
+    tcpEnabledValue := 0
+    if resource.TCPEnabled {
+        tcpEnabledValue = 1
+    }
+    
+    // Use default router priority if not set
+    if resource.RouterPriority == 0 {
+        resource.RouterPriority = 100 // Default priority
+    }
+    
+    // Create new resource with default configuration
+    _, err = rw.db.Exec(`
+        INSERT INTO resources (
+            id, host, service_id, org_id, site_id, status, source_type,
+            entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule,
+            custom_headers, router_priority, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, resource.ID, resource.Host, resource.ServiceID, resource.OrgID, resource.SiteID,
+       resource.SourceType, resource.Entrypoints, resource.TLSDomains, tcpEnabledValue,
+       resource.TCPEntrypoints, resource.TCPSNIRule, resource.CustomHeaders, 
+       resource.RouterPriority, time.Now(), time.Now())
+    
+    if err != nil {
+        return fmt.Errorf("failed to create resource %s: %w", resource.ID, err)
+    }
 
-	log.Printf("Added new resource: %s (%s)", host, resourceID)
-	return nil
+    log.Printf("Added new resource: %s (%s)", resource.Host, resource.ID)
+    return nil
 }
 
-// fetchTraefikConfig fetches the Traefik configuration from Pangolin
+// fetchTraefikConfig fetches the Traefik configuration from the data source
+// This method is kept for backward compatibility with the original implementation
 func (rw *ResourceWatcher) fetchTraefikConfig(ctx context.Context) (*models.PangolinTraefikConfig, error) {
-	// Build the URL
-	url := fmt.Sprintf("%s/traefik-config", rw.pangolinAPI)
-	
-	// Create a request with context
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	
-	// Make the request
-	resp, err := rw.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
+    // Get the active data source config
+    dsConfig, err := rw.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get data source config: %w", err)
+    }
+    
+    // Build the URL based on data source type
+    var url string
+    if dsConfig.Type == models.PangolinAPI {
+        url = fmt.Sprintf("%s/traefik-config", dsConfig.URL)
+    } else {
+        return nil, fmt.Errorf("unsupported data source type for this operation: %s", dsConfig.Type)
+    }
+    
+    // Create a request with context
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create request: %w", err)
+    }
+    
+    // Add basic auth if configured
+    if dsConfig.BasicAuth.Username != "" {
+        req.SetBasicAuth(dsConfig.BasicAuth.Username, dsConfig.BasicAuth.Password)
+    }
+    
+    // Make the request
+    resp, err := rw.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("HTTP request failed: %w", err)
+    }
+    defer resp.Body.Close()
 
-	// Check status code
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
-	}
+    // Check status code
+    if resp.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("HTTP request returned status %d", resp.StatusCode)
+    }
 
-	// Read response body with a limit to prevent memory issues
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10MB limit
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
+    // Read response body with a limit to prevent memory issues
+    body, err := ioutil.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10MB limit
+    if err != nil {
+        return nil, fmt.Errorf("failed to read response body: %w", err)
+    }
 
-	// Parse JSON
-	var config models.PangolinTraefikConfig
-	if err := json.Unmarshal(body, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
+    // Parse JSON
+    var config models.PangolinTraefikConfig
+    if err := json.Unmarshal(body, &config); err != nil {
+        return nil, fmt.Errorf("failed to parse JSON: %w", err)
+    }
 
-	// Initialize empty maps if they're nil to prevent nil pointer dereferences
-	if config.HTTP.Routers == nil {
-		config.HTTP.Routers = make(map[string]models.PangolinRouter)
-	}
-	if config.HTTP.Services == nil {
-		config.HTTP.Services = make(map[string]models.PangolinService)
-	}
+    // Initialize empty maps if they're nil to prevent nil pointer dereferences
+    if config.HTTP.Routers == nil {
+        config.HTTP.Routers = make(map[string]models.PangolinRouter)
+    }
+    if config.HTTP.Services == nil {
+        config.HTTP.Services = make(map[string]models.PangolinService)
+    }
 
-	return &config, nil
+    return &config, nil
 }
 
-// isSystemRouter checks if a router is a system router (to be skipped)
-func isSystemRouter(routerID string) bool {
-	systemPrefixes := []string{
-		"api-router",
-		"next-router",
-		"ws-router",
-	}
-	
-	for _, prefix := range systemPrefixes {
-		if strings.Contains(routerID, prefix) {
-			return true
-		}
-	}
-	
-	return false
-}
-
-// extractHostFromRule extracts the host from a Traefik rule
-// Example: "Host(`example.com`) && PathPrefix(`/api`)" -> "example.com"
-func extractHostFromRule(rule string) string {
-	if !strings.Contains(rule, "Host(`") {
-		return ""
-	}
-
-	parts := strings.Split(rule, "Host(`")
-	if len(parts) < 2 {
-		return ""
-	}
-
-	host := strings.Split(parts[1], "`)")
-	if len(host) < 1 {
-		return ""
-	}
-
-	return host[0]
+// isSystemRouterForResourceWatcher checks if a router is a system router (to be skipped)
+// This is renamed to prevent collision with the function in pangolin_fetcher.go
+func isSystemRouterForResourceWatcher(routerID string) bool {
+    systemPrefixes := []string{
+        "api-router",
+        "next-router",
+        "ws-router",
+        "dashboard",
+        "api@internal",
+        "acme-http",
+    }
+    
+    for _, prefix := range systemPrefixes {
+        if strings.Contains(routerID, prefix) {
+            return true
+        }
+    }
+    
+    return false
 }
