@@ -84,7 +84,7 @@ func (f *PangolinFetcher) FetchResources(ctx context.Context) (*models.ResourceC
         }
         
         // Skip system routers
-        if isSystemRouter(id) {
+        if isPangolinSystemRouter(id) {
             continue
         }
         
@@ -105,8 +105,8 @@ func (f *PangolinFetcher) FetchResources(ctx context.Context) (*models.ResourceC
     return resources, nil
 }
 
-// isSystemRouter checks if a router is a system router (to be skipped)
-func isSystemRouter(routerID string) bool {
+// isPangolinSystemRouter checks if a router is a Pangolin system router (to be skipped)
+func isPangolinSystemRouter(routerID string) bool {
     systemPrefixes := []string{
         "api-router",
         "next-router",
@@ -120,4 +120,10 @@ func isSystemRouter(routerID string) bool {
     }
     
     return false
+}
+
+// Helper function to extract TLS domains into a comma-separated string
+// Note: This function is updated to use the model package's function
+func extractTLSDomains(domains []models.TraefikTLSDomain) string {
+    return models.JoinTLSDomains(domains)
 }

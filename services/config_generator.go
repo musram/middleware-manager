@@ -349,10 +349,19 @@ func preserveStringsInYamlNode(node *yaml.Node) {
 		// For scalar nodes (including strings), ensure empty strings are properly quoted
 		if node.Value == "" {
 			node.Style = yaml.DoubleQuotedStyle
+		} else if len(node.Value) > 5 && isNumeric(node.Value) {
+			// Force large numbers to be strings to avoid scientific notation
+			node.Tag = "!!str"
 		}
 	}
+	
+	
 }
-
+// isNumeric checks if a string is numeric
+func isNumeric(s string) bool {
+	_, err := strconv.ParseInt(s, 10, 64)
+	return err == nil
+}
 // containsSpecialField checks if a field name is one that needs special handling
 // for correct string value preservation
 func containsSpecialField(fieldName string) bool {

@@ -17,6 +17,8 @@ export const AppProvider = ({ children }) => {
   const [middlewareId, setMiddlewareId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeDataSource, setActiveDataSource] = useState('pangolin');
 
   // Initialize dark mode on mount
   useEffect(() => {
@@ -34,6 +36,28 @@ export const AppProvider = ({ children }) => {
       setIsDarkMode(false);
     }
   }, []);
+
+  // Fetch active data source on mount
+  useEffect(() => {
+    fetchActiveDataSource();
+  }, []);
+
+  /**
+   * Fetch the active data source from the API
+   */
+  const fetchActiveDataSource = async () => {
+    try {
+      const response = await fetch('/api/datasource/active');
+      if (response.ok) {
+        const data = await response.json();
+        setActiveDataSource(data.name || 'pangolin');
+      }
+    } catch (error) {
+      console.error('Failed to fetch active data source:', error);
+      // Default to pangolin if there's an error
+      setActiveDataSource('pangolin');
+    }
+  };
 
   /**
    * Navigate to a different page
@@ -67,8 +91,13 @@ export const AppProvider = ({ children }) => {
     middlewareId,
     isEditing,
     isDarkMode,
+    showSettings,
+    activeDataSource,
     setIsDarkMode,
-    navigateTo
+    setShowSettings,
+    setActiveDataSource,
+    navigateTo,
+    fetchActiveDataSource
   };
   
   return (

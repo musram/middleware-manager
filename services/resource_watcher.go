@@ -343,8 +343,9 @@ func (rw *ResourceWatcher) fetchTraefikConfig(ctx context.Context) (*models.Pang
     return &config, nil
 }
 
-// isSystemRouter checks if a router is a system router (to be skipped)
-func isSystemRouter(routerID string) bool {
+// isSystemRouterForResourceWatcher checks if a router is a system router (to be skipped)
+// This is renamed to prevent collision with the function in pangolin_fetcher.go
+func isSystemRouterForResourceWatcher(routerID string) bool {
     systemPrefixes := []string{
         "api-router",
         "next-router",

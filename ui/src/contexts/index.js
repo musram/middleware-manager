@@ -6,3 +6,4 @@
 export { AppProvider, useApp } from './AppContext';
 export { ResourceProvider, useResources } from './ResourceContext';
 export { MiddlewareProvider, useMiddlewares } from './MiddlewareContext';
+export { DataSourceProvider, useDataSource } from './DataSourceContext';

@@ -1,12 +1,17 @@
 package services
 
 import (
+    "context"
     "encoding/json"
     "fmt"
     "io/ioutil"
+    "log"
+    "net/http"
     "os"
     "path/filepath"
+    "strings"
     "sync"
+    "time"
     
     "github.com/hhftechnology/middleware-manager/models"
 )
@@ -48,7 +53,7 @@ func (cm *ConfigManager) loadConfig() error {
                 },
                 "traefik": {
                     Type: models.TraefikAPI,
-                    URL:  "http://traefik:8080",
+                    URL:  "http://host.docker.internal:8080",
                 },
             },
         }
@@ -69,6 +74,66 @@ func (cm *ConfigManager) loadConfig() error {
     }
     
     return nil
+}
+
+// EnsureDefaultDataSources ensures default data sources are configured
+func (cm *ConfigManager) EnsureDefaultDataSources(pangolinURL, traefikURL string) error {
+    cm.mu.Lock()
+    defer cm.mu.Unlock()
+    
+    // Ensure data sources map exists
+    if cm.config.DataSources == nil {
+        cm.config.DataSources = make(map[string]models.DataSourceConfig)
+    }
+    
+    // Add default Pangolin data source if not present
+    if _, exists := cm.config.DataSources["pangolin"]; !exists {
+        cm.config.DataSources["pangolin"] = models.DataSourceConfig{
+            Type: models.PangolinAPI,
+            URL:  pangolinURL,
+        }
+    }
+    
+    // Add default Traefik data source if not present
+    if _, exists := cm.config.DataSources["traefik"]; !exists {
+        cm.config.DataSources["traefik"] = models.DataSourceConfig{
+            Type: models.TraefikAPI,
+            URL:  traefikURL,
+        }
+    } else if traefikURL != "" {
+        // Update Traefik URL if provided (could be auto-discovered)
+        tConfig := cm.config.DataSources["traefik"]
+        if tConfig.URL != traefikURL {
+            log.Printf("Updating Traefik URL from %s to %s", tConfig.URL, traefikURL)
+            tConfig.URL = traefikURL
+            cm.config.DataSources["traefik"] = tConfig
+        }
+    }
+    
+    // Ensure there's an active data source
+    if cm.config.ActiveDataSource == "" {
+        cm.config.ActiveDataSource = "pangolin"
+    }
+    
+    // Try to determine if Traefik is available
+    if cm.config.ActiveDataSource == "pangolin" {
+        client := &http.Client{Timeout: 2 * time.Second}
+        traefikConfig := cm.config.DataSources["traefik"]
+        
+        // Try the Traefik URL
+        resp, err := client.Get(traefikConfig.URL + "/api/version")
+        if err == nil && resp.StatusCode == http.StatusOK {
+            resp.Body.Close()
+            // Traefik is available, but not active - log a message
+            log.Printf("Note: Traefik API appears to be available at %s but is not the active source", traefikConfig.URL)
+        }
+        if resp != nil {
+            resp.Body.Close()
+        }
+    }
+    
+    // Save the updated configuration
+    return cm.saveConfig()
 }
 
 // saveConfig saves configuration to file
@@ -124,7 +189,20 @@ func (cm *ConfigManager) SetActiveDataSource(name string) error {
         return fmt.Errorf("data source not found: %s", name)
     }
     
+    // Skip if already active
+    if cm.config.ActiveDataSource == name {
+        return nil
+    }
+    
+    // Store the previous active source for logging
+    oldSource := cm.config.ActiveDataSource
+    
+    // Update active source
     cm.config.ActiveDataSource = name
+    
+    // Log the change
+    log.Printf("Changed active data source from %s to %s", oldSource, name)
+    
     return cm.saveConfig()
 }
 
@@ -147,6 +225,77 @@ func (cm *ConfigManager) UpdateDataSource(name string, config models.DataSourceC
     cm.mu.Lock()
     defer cm.mu.Unlock()
     
-    cm.config.DataSources[name] = config
+    // Create a copy to avoid reference issues
+    newConfig := config
+    
+    // Ensure URL doesn't end with a slash
+    if newConfig.URL != "" && strings.HasSuffix(newConfig.URL, "/") {
+        newConfig.URL = strings.TrimSuffix(newConfig.URL, "/")
+    }
+    
+    // Test the connection before saving
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    if err := cm.testDataSourceConnection(ctx, newConfig); err != nil {
+        log.Printf("Warning: Data source connection test failed: %v", err)
+        // Continue anyway but log the warning
+    }
+    
+    // Update the config
+    cm.config.DataSources[name] = newConfig
+    
+    // If this is the active data source, log a special message
+    if cm.config.ActiveDataSource == name {
+        log.Printf("Updated active data source '%s'", name)
+    }
+    
     return cm.saveConfig()
+}
+
+// testDataSourceConnection tests the connection to a data source
+func (cm *ConfigManager) testDataSourceConnection(ctx context.Context, config models.DataSourceConfig) error {
+    client := &http.Client{
+        Timeout: 5 * time.Second,
+    }
+    
+    var url string
+    switch config.Type {
+    case models.PangolinAPI:
+        url = config.URL + "/status"
+    case models.TraefikAPI:
+        url = config.URL + "/api/version"
+    default:
+        return fmt.Errorf("unsupported data source type: %s", config.Type)
+    }
+    
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+    
+    // Add basic auth if configured
+    if config.BasicAuth.Username != "" {
+        req.SetBasicAuth(config.BasicAuth.Username, config.BasicAuth.Password)
+    }
+    
+    resp, err := client.Do(req)
+    if err != nil {
+        return fmt.Errorf("connection test failed: %w", err)
+    }
+    defer resp.Body.Close()
+    
+    if resp.StatusCode >= 400 {
+        return fmt.Errorf("connection test failed with status code: %d", resp.StatusCode)
+    }
+    
+    return nil
+}
+
+// TestDataSourceConnection is a public method to test a connection
+func (cm *ConfigManager) TestDataSourceConnection(config models.DataSourceConfig) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    return cm.testDataSourceConnection(ctx, config)
 }

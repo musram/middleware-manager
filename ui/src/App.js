@@ -2,24 +2,48 @@ import React from 'react';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { ResourceProvider } from './contexts/ResourceContext';
 import { MiddlewareProvider } from './contexts/MiddlewareContext';
+import { DataSourceProvider } from './contexts/DataSourceContext';
 import { Header } from './components/common';
 
-// Import page components (these would be created as separate files)
+// Import page components
 import Dashboard from './components/dashboard/Dashboard';
 import ResourcesList from './components/resources/ResourcesList';
 import ResourceDetail from './components/resources/ResourceDetail';
 import MiddlewaresList from './components/middlewares/MiddlewaresList';
 import MiddlewareForm from './components/middlewares/MiddlewareForm';
+import DataSourceSettings from './components/settings/DataSourceSettings';
 
 /**
  * Main application component that renders the current page
  * based on the navigation state
  */
 const MainContent = () => {
-  const { page, resourceId, middlewareId, isEditing, navigateTo, isDarkMode, setIsDarkMode } = useApp();
+  const { 
+    page, 
+    resourceId, 
+    middlewareId, 
+    isEditing, 
+    navigateTo, 
+    isDarkMode, 
+    setIsDarkMode,
+    showSettings,
+    setShowSettings
+  } = useApp();
 
   // Render the active page based on state
   const renderPage = () => {
+    // If settings panel should be displayed, show it as an overlay
+    if (showSettings) {
+      return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="w-full max-w-3xl max-h-screen">
+          <DataSourceSettings onClose={() => setShowSettings(false)} />
+        </div>
+      </div>
+      );
+    }
+    
+    // Otherwise, render the current page
     switch (page) {
       case 'dashboard':
         return <Dashboard navigateTo={navigateTo} />;
@@ -49,6 +73,7 @@ const MainContent = () => {
         navigateTo={navigateTo}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
+        openSettings={() => setShowSettings(true)}
       />
       <main className="container mx-auto px-6 py-6">
         {renderPage()}
@@ -63,11 +88,13 @@ const MainContent = () => {
 const App = () => {
   return (
     <AppProvider>
-      <ResourceProvider>
-        <MiddlewareProvider>
-          <MainContent />
-        </MiddlewareProvider>
-      </ResourceProvider>
+      <DataSourceProvider>
+        <ResourceProvider>
+          <MiddlewareProvider>
+            <MainContent />
+          </MiddlewareProvider>
+        </ResourceProvider>
+      </DataSourceProvider>
     </AppProvider>
   );
 };

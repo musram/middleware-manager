@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS resources (
     -- Router priority configuration
     router_priority INTEGER DEFAULT 100,
     
+    -- Source type for tracking data origin
+    source_type TEXT DEFAULT '',
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

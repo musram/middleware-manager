@@ -96,3 +96,4 @@ func GetLastInsertID(result sql.Result) (int64, error) {
   }
   return id, nil
 }
+

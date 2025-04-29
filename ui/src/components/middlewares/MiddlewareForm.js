@@ -22,6 +22,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
   });
   const [configText, setConfigText] = useState('{\n  "users": [\n    "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"\n  ]\n}');
   const [formError, setFormError] = useState(null);
+  const [orderedMiddlewares, setOrderedMiddlewares] = useState([]);
   
   // Available middleware types
   const middlewareTypes = [
@@ -74,6 +75,13 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
       });
       
       setConfigText(configJson);
+      
+      // Extract and set ordered middlewares for chain type
+      if (selectedMiddleware.type === 'chain' && 
+          selectedMiddleware.config && 
+          selectedMiddleware.config.middlewares) {
+        setOrderedMiddlewares(selectedMiddleware.config.middlewares);
+      }
     }
   }, [isEditing, selectedMiddleware]);
 
@@ -85,17 +93,46 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
     // Get template for this middleware type
     const template = getConfigTemplate(newType);
     setConfigText(template);
+    
+    // Reset ordered middlewares when switching to/from chain type
+    if (newType === 'chain') {
+      setOrderedMiddlewares([]);
+    }
   };
 
   // Handle middleware selection for chain type
   const handleMiddlewareSelection = (e) => {
     const options = e.target.options;
-    const selected = Array.from(options)
+    const selectedValues = Array.from(options)
       .filter(option => option.selected)
       .map(option => option.value);
     
-    // Update the config text to reflect the selected middlewares
-    const configObj = { middlewares: selected };
+    // Keep track of previously selected middlewares
+    const previouslySelected = orderedMiddlewares;
+    
+    // Create a new ordered array that preserves existing order
+    // and adds new selections at the end (or removes unselected ones)
+    const newOrderedMiddlewares = [];
+    
+    // First add all previously selected items that are still selected
+    for (const id of previouslySelected) {
+      if (selectedValues.includes(id)) {
+        newOrderedMiddlewares.push(id);
+      }
+    }
+    
+    // Then add any newly selected items in their original DOM order
+    for (const id of selectedValues) {
+      if (!newOrderedMiddlewares.includes(id)) {
+        newOrderedMiddlewares.push(id);
+      }
+    }
+    
+    // Update the ordered state
+    setOrderedMiddlewares(newOrderedMiddlewares);
+    
+    // Update the config text with the ordered array
+    const configObj = { middlewares: newOrderedMiddlewares };
     setConfigText(JSON.stringify(configObj, null, 2));
   };
 
@@ -227,6 +264,7 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
                     onChange={handleMiddlewareSelection}
                     className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     size={Math.min(8, middlewares.length)}
+                    value={orderedMiddlewares}
                   >
                     {middlewares
                       .filter(m => m.id !== id) // Filter out current middleware if editing
@@ -239,6 +277,23 @@ const MiddlewareForm = ({ id, isEditing, navigateTo }) => {
                   <p className="text-xs text-gray-500 mt-1">
                     Hold Ctrl (or Cmd) to select multiple middlewares. Middlewares will be applied in the order selected.
                   </p>
+                  
+                  {orderedMiddlewares.length > 0 && (
+                    <div className="mt-4 p-3 bg-gray-50 border rounded">
+                      <h4 className="text-sm font-bold mb-2">Current Middleware Order:</h4>
+                      <ol className="list-decimal pl-5">
+                        {orderedMiddlewares.map((mwId, index) => {
+                          const mw = middlewares.find(m => m.id === mwId);
+                          return (
+                            <li key={mwId} className="text-sm py-1">
+                              {mw ? `${mw.name} (${mw.type})` : mwId}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                      <p className="text-xs text-gray-500 mt-2">Middlewares will be applied in this order.</p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded text-blue-700">
