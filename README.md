@@ -1,9 +1,9 @@
 <div align="center">
-    <h1 align="center"><a href="https://forum.hhf.technology/t/enhancing-your-pangolin-deployment-with-middleware-manager">Pangolin Middleware Manager</a></h1>
+    <h1 align="center"><a href="https://forum.hhf.technology/t/enhancing-your-pangolin-deployment-with-middleware-manager">Pangolin/Traefik Middleware Manager</a></h1>
 
 </div>
 
-<h3 align="center">Middleware/Router Manager for your Pangolin Stack</h3>
+<h3 align="center">Middleware/Router Manager for your Pangolin Stack/ Traefik Stack</h3>
 <div align="center">
 
 
