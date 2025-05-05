@@ -238,3 +238,202 @@
     .modal-footer { flex-direction: column; gap: 0.5rem; }
     .modal-footer .btn { width: 100%; }
   }
+
+/* DARK MODE TEXT VISIBILITY FIXES */
+html.dark-mode p,
+html.dark-mode h1,
+html.dark-mode h2,
+html.dark-mode h3,
+html.dark-mode h4,
+html.dark-mode h5,
+html.dark-mode h6,
+html.dark-mode span,
+html.dark-mode div,
+html.dark-mode label,
+html.dark-mode button,
+html.dark-mode a,
+html.dark-mode li,
+html.dark-mode td,
+html.dark-mode th {
+  color: var(--color-text-base);
+}
+
+html.dark-mode .card {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-base);
+}
+
+html.dark-mode .table tbody tr {
+  color: var(--color-text-base);
+}
+
+/* Header dark mode fixes */
+html.dark-mode nav {
+  background-color: var(--color-bg-primary);
+  border-color: var(--color-border-primary);
+}
+
+html.dark-mode .text-gray-800 {
+  color: var(--color-text-base);
+}
+
+html.dark-mode .text-gray-500, 
+html.dark-mode .text-gray-400, 
+html.dark-mode .text-gray-300 {
+  color: var(--color-text-muted);
+}
+
+html.dark-mode .bg-gray-100 {
+  background-color: var(--color-bg-tertiary);
+}
+
+html.dark-mode .bg-blue-100 {
+  background-color: var(--color-accent-primary);
+}
+
+html.dark-mode .text-blue-800 {
+  color: var(--color-accent-text);
+}
+
+html.dark-mode .hover\:bg-gray-50:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+html.dark-mode .hover\:text-gray-900:hover {
+  color: var(--color-text-base);
+}
+
+/* Mobile menu dark mode fixes */
+html.dark-mode #mobile-menu {
+  border-color: var(--color-border-primary);
+  background-color: var(--color-bg-primary);
+}
+
+/* ResourcesList dark mode fixes */
+html.dark-mode .bg-white {
+  background-color: var(--color-bg-primary);
+}
+
+html.dark-mode .bg-gray-50 {
+  background-color: var(--color-bg-secondary);
+}
+
+html.dark-mode .bg-gray-200 {
+  background-color: var(--color-button-secondary-bg);
+}
+
+html.dark-mode .hover\:bg-gray-300:hover {
+  background-color: var(--color-button-secondary-hover);
+}
+
+html.dark-mode .divide-gray-200 {
+  border-color: var(--color-border-primary);
+}
+
+html.dark-mode .divide-y > * {
+  border-color: var(--color-border-primary);
+}
+
+html.dark-mode input, 
+html.dark-mode select, 
+html.dark-mode textarea {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-primary);
+  color: var(--color-text-base);
+}
+
+html.dark-mode input::placeholder {
+  color: var(--color-text-muted);
+}
+
+html.dark-mode .shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Table specific dark mode fixes */
+html.dark-mode table {
+  color: var(--color-text-base);
+}
+
+html.dark-mode th {
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-secondary);
+}
+
+html.dark-mode tbody tr:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+html.dark-mode .text-red-600 {
+  color: #f87171; /* A lighter red that's visible on dark backgrounds */
+}
+
+html.dark-mode .hover\:text-red-900:hover {
+  color: #fca5a5; /* An even lighter red for hover states */
+}
+
+html.dark-mode .text-blue-600 {
+  color: #60a5fa; /* A lighter blue that's visible on dark backgrounds */
+}
+
+html.dark-mode .hover\:text-blue-900:hover {
+  color: #93c5fd; /* An even lighter blue for hover states */
+}
+
+/* Status badge dark mode fixes */
+html.dark-mode .bg-green-100 {
+  background-color: #064e3b; /* darker green-800 */
+}
+
+html.dark-mode .text-green-800 {
+  color: #6ee7b7; /* lighter green-300 */
+}
+
+html.dark-mode .bg-yellow-100 {
+  background-color: #7c2d12; /* darker orange-800 */
+}
+
+html.dark-mode .text-yellow-800 {
+  color: #fdba74; /* lighter orange-300 */
+}
+
+html.dark-mode .bg-red-100 {
+  background-color: #991b1b; /* darker red-800 */
+}
+
+html.dark-mode .text-red-800 {
+  color: #fca5a5; /* lighter red-300 */
+}
+
+html.dark-mode .bg-gray-100 {
+  background-color: #374151; /* gray-700 */
+}
+
+html.dark-mode .text-gray-800 {
+  color: #e5e7eb; /* gray-200 */
+}
+
+/* Troubleshooting info dark mode fixes */
+html.dark-mode .bg-blue-50 {
+  background-color: #1e3a8a; /* dark blue-900 */
+}
+
+html.dark-mode .border-blue-400 {
+  border-color: #60a5fa; /* blue-400 */
+}
+
+html.dark-mode .text-blue-700 {
+  color: #93c5fd; /* blue-300 */
+}
+
+html.dark-mode .bg-blue-100 {
+  background-color: #1e40af; /* blue-800 */
+}
+
+html.dark-mode code {
+  color: #e5e7eb; /* gray-200 */
+}
+
+html.dark-mode .list-disc li {
+  color: #93c5fd; /* blue-300 */
+}
