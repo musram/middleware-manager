@@ -1,149 +1,121 @@
+// ui/src/components/resources/config/HeadersConfigModal.js
 import React, { useState, useEffect } from 'react';
 
 /**
  * HeadersConfigModal - A modal for configuring custom headers for a resource
- * 
+ *
  * @param {Object} props
- * @param {Object} props.resource - The resource being configured
- * @param {Object} props.customHeaders - Current custom headers
- * @param {Function} props.setCustomHeaders - Function to update custom headers
- * @param {string} props.headerKey - Current header key in the form
- * @param {Function} props.setHeaderKey - Function to update header key
- * @param {string} props.headerValue - Current header value in the form
- * @param {Function} props.setHeaderValue - Function to update header value
- * @param {Function} props.addHeader - Function to add a header
- * @param {Function} props.removeHeader - Function to remove a header
- * @param {Function} props.onSave - Function to save the changes
+ * @param {Object} props.customHeaders - Current custom headers object
+ * @param {Function} props.setCustomHeaders - Function to update headers in parent state (optional)
+ * @param {Function} props.onSave - Function to save the changes (receives { custom_headers: object })
  * @param {Function} props.onClose - Function to close the modal
+ * @param {boolean} props.isDisabled - Whether the resource is disabled
  */
-const HeadersConfigModal = ({ 
-  resource, 
-  customHeaders = {}, 
-  setCustomHeaders, 
-  headerKey,
-  setHeaderKey,
-  headerValue,
-  setHeaderValue,
-  addHeader,
-  removeHeader,
-  onSave, 
-  onClose 
+const HeadersConfigModal = ({
+  customHeaders: initialCustomHeaders = {},
+  setCustomHeaders: setParentCustomHeaders, // Optional parent setter
+  onSave,
+  onClose,
+  isDisabled // Receive disabled state
 }) => {
-  const [localCustomHeaders, setLocalCustomHeaders] = useState({});
-  const [localHeaderKey, setLocalHeaderKey] = useState('');
-  const [localHeaderValue, setLocalHeaderValue] = useState('');
+  // Ensure initial state is always an object
+  const [localCustomHeaders, setLocalCustomHeaders] = useState(initialCustomHeaders || {});
+  const [headerKey, setHeaderKey] = useState('');
+  const [headerValue, setHeaderValue] = useState('');
   const [saving, setSaving] = useState(false);
-  
-  // Initialize local state from props
-  useEffect(() => {
-    // Ensure we have an object even if customHeaders is null/undefined
-    const headers = customHeaders || {};
-    setLocalCustomHeaders(headers);
-    
-    // Initialize form fields if passed
-    if (headerKey !== undefined) setLocalHeaderKey(headerKey);
-    if (headerValue !== undefined) setLocalHeaderValue(headerValue);
-    
-    console.log("HeadersConfigModal initialized with:", headers);
-  }, [customHeaders, headerKey, headerValue]);
 
-  // Local function to add a header
-  const handleAddHeader = () => {
-    if (!localHeaderKey.trim()) {
-      alert('Header key cannot be empty');
+  // Sync local state if initial prop changes
+  useEffect(() => {
+    setLocalCustomHeaders(initialCustomHeaders || {});
+  }, [initialCustomHeaders]);
+
+  const handleAddHeader = (e) => {
+    e.preventDefault(); // Prevent potential form submission if wrapped in form later
+    if (!headerKey.trim()) {
+      alert('Header name cannot be empty.');
       return;
     }
-    
-    const updatedHeaders = {
-      ...localCustomHeaders,
-      [localHeaderKey]: localHeaderValue
-    };
-    
-    setLocalCustomHeaders(updatedHeaders);
-    
-    // If parent component provided these functions, call them
-    if (setCustomHeaders) setCustomHeaders(updatedHeaders);
-    if (addHeader) addHeader();
-    
+    const keyToAdd = headerKey.trim();
+    const newHeaders = { ...localCustomHeaders, [keyToAdd]: headerValue };
+    setLocalCustomHeaders(newHeaders);
+    if (setParentCustomHeaders) {
+      setParentCustomHeaders(newHeaders); // Update parent if function provided
+    }
     // Reset form
-    setLocalHeaderKey('');
-    setLocalHeaderValue('');
-    
-    // Update parent component state if no addHeader function was provided
-    if (!addHeader && setHeaderKey) setHeaderKey('');
-    if (!addHeader && setHeaderValue) setHeaderValue('');
+    setHeaderKey('');
+    setHeaderValue('');
   };
 
-  // Local function to remove a header
-  const handleRemoveHeader = (key) => {
-    const updatedHeaders = {...localCustomHeaders};
-    delete updatedHeaders[key];
-    
-    setLocalCustomHeaders(updatedHeaders);
-    
-    // If parent component provided these functions, call them
-    if (setCustomHeaders) setCustomHeaders(updatedHeaders);
-    if (removeHeader) removeHeader(key);
+  const handleRemoveHeader = (keyToRemove) => {
+    const { [keyToRemove]: _, ...remainingHeaders } = localCustomHeaders; // Exclude the key
+    setLocalCustomHeaders(remainingHeaders);
+    if (setParentCustomHeaders) {
+      setParentCustomHeaders(remainingHeaders); // Update parent if function provided
+    }
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+     if (isDisabled) return; // Prevent saving if disabled
+
+    setSaving(true);
     try {
-      setSaving(true);
-      
-      // Make sure parent component state is updated
-      if (setCustomHeaders) setCustomHeaders(localCustomHeaders);
-      
-      // Call the save function
       await onSave({ custom_headers: localCustomHeaders });
-      
-      // Close the modal on success
-      onClose();
+      onClose(); // Close only on successful save
     } catch (err) {
       alert('Failed to update custom headers');
       console.error('Update headers error:', err);
+      // Keep modal open on error
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-        <div className="flex justify-between items-center px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold">Custom Headers Configuration</h3>
+    <div className="modal-overlay">
+      <div className="modal-content max-w-xl"> {/* Increased max-width */}
+        <div className="modal-header">
+          <h3 className="modal-title">Custom Request Headers Configuration</h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="modal-close-button"
             disabled={saving}
+            aria-label="Close"
           >
-            ×
+            &times;
           </button>
         </div>
-        <div className="px-6 py-4">
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body space-y-6"> {/* Increased spacing */}
+            {isDisabled && (
+                <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 dark:bg-red-900 dark:text-red-200 border border-red-300 dark:border-red-600 rounded-md">
+                    Configuration cannot be changed while the resource is disabled.
+                </div>
+             )}
+            <div>
+              <label className="form-label">
                 Custom Request Headers
               </label>
-              
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Add or modify headers sent to the backend service. Common use: setting the <code className="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">Host</code> header.
+              </p>
+
               {/* Current headers list */}
               {Object.keys(localCustomHeaders).length > 0 ? (
-                <div className="mb-4 border rounded p-3">
-                  <h4 className="text-sm font-semibold mb-2">Current Headers</h4>
+                <div className="mb-4 border dark:border-gray-600 rounded p-3 max-h-48 overflow-y-auto">
+                  <h4 className="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Current Headers:</h4>
                   <ul className="space-y-2">
                     {Object.entries(localCustomHeaders).map(([key, value]) => (
-                      <li key={key} className="flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{key}:</span> {value}
+                      <li key={key} className="flex justify-between items-center text-sm border-b border-dashed dark:border-gray-700 pb-1 last:border-b-0">
+                        <div className="font-mono text-gray-800 dark:text-gray-200 break-all">
+                          <span className="font-medium">{key}:</span> {value || <span className="italic text-gray-400">(empty)</span>}
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveHeader(key)}
-                          className="text-red-600 hover:text-red-800"
-                          disabled={saving}
+                          className="ml-4 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs"
+                          disabled={saving || isDisabled}
+                          aria-label={`Remove header ${key}`}
                         >
                           Remove
                         </button>
@@ -152,81 +124,62 @@ const HeadersConfigModal = ({
                   </ul>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 mb-4">No custom headers configured.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 italic">No custom headers configured.</p>
               )}
-              
-              {/* Add new header */}
-              <div className="border rounded p-3">
-                <h4 className="text-sm font-semibold mb-2">Add New Header</h4>
-                <div className="grid grid-cols-5 gap-2 mb-2">
-                  <div className="col-span-2">
-                    <input
-                      type="text"
-                      value={setHeaderKey ? headerKey : localHeaderKey}
-                      onChange={(e) => {
-                        if (setHeaderKey) setHeaderKey(e.target.value);
-                        setLocalHeaderKey(e.target.value);
-                      }}
-                      placeholder="Header name"
-                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={saving}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <input
-                      type="text"
-                      value={setHeaderValue ? headerValue : localHeaderValue}
-                      onChange={(e) => {
-                        if (setHeaderValue) setHeaderValue(e.target.value);
-                        setLocalHeaderValue(e.target.value);
-                      }}
-                      placeholder="Header value"
-                      className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={saving}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <button
-                      type="button"
-                      onClick={addHeader || handleAddHeader}
-                      className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      disabled={saving || !(setHeaderKey ? headerKey : localHeaderKey).trim()}
-                    >
-                      Add
-                    </button>
-                  </div>
+
+              {/* Add new header form */}
+              <div className="border dark:border-gray-600 rounded p-3 bg-gray-50 dark:bg-gray-800">
+                <h4 className="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Add / Update Header</h4>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={headerKey}
+                    onChange={(e) => setHeaderKey(e.target.value)}
+                    placeholder="Header Name (e.g., Host)"
+                    className="form-input flex-1"
+                    disabled={saving || isDisabled}
+                    aria-label="Header Name"
+                  />
+                  <input
+                    type="text"
+                    value={headerValue}
+                    onChange={(e) => setHeaderValue(e.target.value)}
+                    placeholder="Header Value"
+                    className="form-input flex-1"
+                    disabled={saving || isDisabled}
+                    aria-label="Header Value"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddHeader}
+                    className="btn btn-secondary px-3 py-2 text-sm" // Smaller padding
+                    disabled={saving || !headerKey.trim() || isDisabled}
+                    aria-label="Add or Update Header"
+                  >
+                    Set
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Common examples: Host, X-Forwarded-Host
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  <strong>Host</strong>: To modify the hostname sent to the backend service
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  <strong>X-Forwarded-Host</strong>: To pass the original hostname to the backend
-                </p>
               </div>
             </div>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                disabled={saving}
-              >
-                {saving ? 'Saving...' : 'Save Headers'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+          <div className="modal-footer">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 border-yellow-600 dark:border-yellow-500" // Specific styling for Headers
+              disabled={saving || isDisabled}
+            >
+              {saving ? 'Saving...' : 'Save Headers'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

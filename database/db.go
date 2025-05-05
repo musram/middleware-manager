@@ -12,10 +12,29 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 )
+// import "github.com/hhftechnology/middleware-manager/config"
 
 // DB is a wrapper around sql.DB
 type DB struct {
 	*sql.DB
+}
+
+// TraefikConfig represents the structure of the Traefik configuration
+type TraefikConfig struct {
+	HTTP struct {
+		Middlewares map[string]interface{} `yaml:"middlewares,omitempty"`
+		Routers     map[string]interface{} `yaml:"routers,omitempty"`
+		Services    map[string]interface{} `yaml:"services,omitempty"`
+	} `yaml:"http"`
+	
+	TCP struct {
+		Routers     map[string]interface{} `yaml:"routers,omitempty"`
+		Services    map[string]interface{} `yaml:"services,omitempty"`
+	} `yaml:"tcp,omitempty"`
+	
+	UDP struct {
+		Services map[string]interface{} `yaml:"services,omitempty"`
+	} `yaml:"udp,omitempty"`
 }
 
 // InitDB initializes the database connection
@@ -51,12 +70,21 @@ func InitDB(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 	
+	// Create a DB wrapper
+	dbWrapper := &DB{db}
+	
+	// Run service migrations
+	if err := runServiceMigrations(dbWrapper); err != nil {
+		log.Printf("Warning: Error running service migrations: %v", err)
+		// Continue despite errors to avoid breaking existing functionality
+	}
+	
 	// Run post-migration updates
 	if err := runPostMigrationUpdates(db); err != nil {
 		log.Printf("Warning: Error running post-migration updates: %v", err)
 	}
 
-	return &DB{db}, nil
+	return dbWrapper, nil
 }
 
 // runMigrations executes the database migrations
@@ -97,6 +125,67 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	log.Println("Migrations completed successfully")
+	return nil
+}
+
+// runServiceMigrations runs the service-specific migrations
+func runServiceMigrations(db *DB) error {
+	// Check if services table exists
+	var hasServicesTable bool
+	err := db.QueryRow(`
+		SELECT COUNT(*) > 0 
+		FROM sqlite_master 
+		WHERE type='table' AND name='services'
+	`).Scan(&hasServicesTable)
+	
+	if err != nil {
+		return fmt.Errorf("failed to check if services table exists: %w", err)
+	}
+	
+	// If the table doesn't exist, create it
+	if !hasServicesTable {
+		log.Println("Services table doesn't exist, running service migrations")
+		
+		// Find the migrations file
+		migrationsFile := findServiceMigrationsFile()
+		if migrationsFile == "" {
+			return fmt.Errorf("service migrations file not found")
+		}
+		
+		// Read migrations file
+		migrations, err := ioutil.ReadFile(migrationsFile)
+		if err != nil {
+			return fmt.Errorf("failed to read service migrations file: %w", err)
+		}
+		
+		// Execute migrations in a transaction
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		
+		var txErr error
+		defer func() {
+			if txErr != nil {
+				tx.Rollback()
+			}
+		}()
+		
+		// Execute migrations
+		if _, txErr = tx.Exec(string(migrations)); txErr != nil {
+			return fmt.Errorf("failed to execute service migrations: %w", txErr)
+		}
+		
+		// Commit the transaction
+		if txErr = tx.Commit(); txErr != nil {
+			return fmt.Errorf("failed to commit transaction: %w", txErr)
+		}
+		
+		log.Println("Service migrations completed successfully")
+	} else {
+		log.Println("Services table already exists, skipping service migrations")
+	}
+	
 	return nil
 }
 
@@ -233,6 +322,24 @@ func findMigrationsFile() string {
 	return ""
 }
 
+// findServiceMigrationsFile tries to find the service migrations file in different locations
+func findServiceMigrationsFile() string {
+	possiblePaths := []string{
+		"database/migrations_service.sql",
+		"migrations_service.sql",
+		"/app/database/migrations_service.sql",
+		"/app/migrations_service.sql",
+	}
+
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
+}
+
 // GetMiddlewares fetches all middleware definitions
 func (db *DB) GetMiddlewares() ([]map[string]interface{}, error) {
 	rows, err := db.Query("SELECT id, name, type, config FROM middlewares")
@@ -283,7 +390,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 	rows, err := db.Query(`
 		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status, 
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers,
+		       r.custom_headers, r.router_priority,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -299,11 +406,18 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 	for rows.Next() {
 		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
 		var tcpEnabled int
+		var routerPriority sql.NullInt64
 		var middlewares sql.NullString
 		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, 
 				   &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-				   &customHeaders, &middlewares); err != nil {
+				   &customHeaders, &routerPriority, &middlewares); err != nil {
 			return nil, fmt.Errorf("row scan failed: %w", err)
+		}
+
+		// Set default priority if null
+		priority := 100 // Default value
+		if routerPriority.Valid {
+			priority = int(routerPriority.Int64)
 		}
 		
 		resource := map[string]interface{}{
@@ -319,6 +433,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 			"tcp_entrypoints": tcpEntrypoints,
 			"tcp_sni_rule":    tcpSNIRule,
 			"custom_headers":  customHeaders,
+			"router_priority": priority,
 		}
 		
 		if middlewares.Valid {
@@ -341,12 +456,13 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
 	var tcpEnabled int
+	var routerPriority sql.NullInt64
 	var middlewares sql.NullString
 
 	err := db.QueryRow(`
 		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers,
+		       r.custom_headers, r.router_priority,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -355,12 +471,18 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		GROUP BY r.id
 	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
 		    &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-		    &customHeaders, &middlewares)
+		    &customHeaders, &routerPriority, &middlewares)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("resource not found: %s", id)
 	} else if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	// Set default priority if null
+	priority := 100 // Default value
+	if routerPriority.Valid {
+		priority = int(routerPriority.Int64)
 	}
 
 	resource := map[string]interface{}{
@@ -376,6 +498,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		"tcp_entrypoints": tcpEntrypoints,
 		"tcp_sni_rule":    tcpSNIRule,
 		"custom_headers":  customHeaders,
+		"router_priority": priority,
 	}
 
 	if middlewares.Valid {
@@ -418,4 +541,116 @@ func (db *DB) GetMiddleware(id string) (map[string]interface{}, error) {
 		"type":   typ,
 		"config": configMap,
 	}, nil
+}
+
+// GetServices fetches all service definitions
+func (db *DB) GetServices() ([]map[string]interface{}, error) {
+	rows, err := db.Query("SELECT id, name, type, config FROM services")
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var services []map[string]interface{}
+	for rows.Next() {
+		var id, name, typ, configStr string
+		if err := rows.Scan(&id, &name, &typ, &configStr); err != nil {
+			return nil, fmt.Errorf("row scan failed: %w", err)
+		}
+
+		// Parse the config JSON
+		var configMap map[string]interface{}
+		if err := json.Unmarshal([]byte(configStr), &configMap); err != nil {
+			// If we can't parse the JSON, just return it as a string
+			service := map[string]interface{}{
+				"id":     id,
+				"name":   name,
+				"type":   typ,
+				"config": configStr,
+			}
+			services = append(services, service)
+			continue
+		}
+
+		service := map[string]interface{}{
+			"id":     id,
+			"name":   name,
+			"type":   typ,
+			"config": configMap,
+		}
+		services = append(services, service)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return services, nil
+}
+
+// GetService fetches a specific service by ID
+func (db *DB) GetService(id string) (map[string]interface{}, error) {
+	var name, typ, configStr string
+
+	err := db.QueryRow(
+		"SELECT name, type, config FROM services WHERE id = ?", id,
+	).Scan(&name, &typ, &configStr)
+
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	var configMap map[string]interface{}
+	if err := json.Unmarshal([]byte(configStr), &configMap); err != nil {
+		// If we can't parse the JSON, just return the string
+		return map[string]interface{}{
+			"id":     id,
+			"name":   name,
+			"type":   typ,
+			"config": configStr,
+		}, nil
+	}
+
+	return map[string]interface{}{
+		"id":     id,
+		"name":   name,
+		"type":   typ,
+		"config": configMap,
+	}, nil
+}
+
+// GetResourceService fetches the service associated with a resource
+func (db *DB) GetResourceService(resourceID string) (map[string]interface{}, error) {
+	var serviceID string
+	err := db.QueryRow(
+		"SELECT service_id FROM resource_services WHERE resource_id = ?", resourceID,
+	).Scan(&serviceID)
+
+	if err != nil {
+		return nil, fmt.Errorf("service relationship query failed: %w", err)
+	}
+
+	return db.GetService(serviceID)
+}
+
+// AddResourceService associates a service with a resource
+func (db *DB) AddResourceService(resourceID, serviceID string) error {
+	return db.WithTransaction(func(tx *sql.Tx) error {
+		// First, clear any existing service for this resource
+		_, err := tx.Exec("DELETE FROM resource_services WHERE resource_id = ?", resourceID)
+		if err != nil {
+			return fmt.Errorf("failed to clear existing service: %w", err)
+		}
+
+		// Then add the new service
+		_, err = tx.Exec(
+			"INSERT INTO resource_services (resource_id, service_id) VALUES (?, ?)",
+			resourceID, serviceID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to add service: %w", err)
+		}
+
+		return nil
+	})
 }

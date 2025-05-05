@@ -6,4 +6,6 @@
 export { AppProvider, useApp } from './AppContext';
 export { ResourceProvider, useResources } from './ResourceContext';
 export { MiddlewareProvider, useMiddlewares } from './MiddlewareContext';
+// Export ServiceContext along with the provider and hook
+export { ServiceContext, ServiceProvider, useServices } from './ServiceContext'; // <-- Modified line
 export { DataSourceProvider, useDataSource } from './DataSourceContext';

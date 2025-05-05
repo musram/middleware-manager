@@ -29,6 +29,7 @@ type Configuration struct {
 	ConfigDir        string
 	CheckInterval    time.Duration
 	GenerateInterval time.Duration
+	ServiceInterval   time.Duration  // New field for service check interval
 	Debug            bool
 	AllowCORS        bool
 	CORSOrigin       string
@@ -158,9 +159,19 @@ func main() {
 		log.Println("Received stop signal from server")
 	}
 
+		// Start service watcher with config manager
+	serviceWatcher, err := services.NewServiceWatcher(db, configManager)
+		if err != nil {
+			log.Printf("Warning: Failed to create service watcher: %v", err)
+		} else {
+			// Use the same interval as the resource watcher, or a different one if preferred
+			go serviceWatcher.Start(cfg.CheckInterval)
+		}
+
 	// Graceful shutdown
 	log.Println("Shutting down...")
 	resourceWatcher.Stop()
+	serviceWatcher.Stop() // Add this line
 	configGenerator.Stop()
 	server.Stop()
 	log.Println("Middleware Manager stopped")
