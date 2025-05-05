@@ -514,6 +514,7 @@ go build -o middleware-manager
 
 ```bash
 cd ui
+cp src/package.json .
 npm install
 npm start
 ```
