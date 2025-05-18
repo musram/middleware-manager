@@ -1,817 +1,439 @@
+/* ui/src/styles/main.css */
+
 /* =====================
-   BASE STYLES
+   BASE STYLES & RESET
    ===================== */
-   * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+   body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    line-height: 1.5;
-  }
-  
-  /* Typography basics */
-  h1, h2, h3, h4, h5, h6 {
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    line-height: 1.25;
-  }
-  
-  p {
-    margin-bottom: 1rem;
-  }
-  
-  /* Links */
-  a {
-    text-decoration: none;
-  }
-  
-  a:hover {
-    text-decoration: underline;
-  }
-  
-  /* Table basics */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  
-  th, td {
-    padding: 0.75rem;
-    text-align: left;
-    vertical-align: top;
-  }
-  
-  th {
-    font-weight: 600;
-  }
-  
-  /* Form controls */
-  input, select, textarea {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
-  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd { margin: 0; }
+  html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; }
   
   /* =====================
      THEME VARIABLES
      ===================== */
   :root {
-    --background-color: #f5f7f9;
-    --card-background: #ffffff;
-    --text-color: #333333;
-    --text-secondary: #6b7280;
-    --border-color: #e2e8f0;
-    --accent-color: #1677ff;
-    --hover-color: #0055cc;
-    --success-bg: #ecfdf5;
-    --success-text: #047857;
-    --warning-bg: #ffedd5;
-    --warning-text: #c2410c;
-    --error-bg: #fee2e2;
-    --error-text: #b91c1c;
-    --button-bg: #e5e7eb;
-    --button-hover: #d1d5db;
-    --button-primary-bg: #1677ff;
-    --button-primary-hover: #0055cc;
-    --table-header-bg: #f9fafb;
-    --shadow-color: rgba(0, 0, 0, 0.1);
-    --text-on-primary: #ffffff;
+    /* Light Mode */
+    --color-text-base: #1f2937; /* gray-800 */
+    --color-text-muted: #6b7280; /* gray-500 */
+    --color-text-inverted: #ffffff; /* white */
+    --color-bg-primary: #ffffff; /* white */
+    --color-bg-secondary: #f9fafb; /* gray-50 */
+    --color-bg-tertiary: #f3f4f6; /* gray-100 */
+    --color-border-primary: #e5e7eb; /* gray-200 */
+    --color-border-secondary: #d1d5db; /* gray-300 */
+    --color-accent-primary: #2563eb; /* blue-600 */
+    --color-accent-hover: #1d4ed8; /* blue-700 */
+    --color-accent-text: #ffffff; /* white */
+    --color-button-secondary-bg: #e5e7eb; /* gray-200 */
+    --color-button-secondary-hover: #d1d5db; /* gray-300 */
+    --color-button-secondary-text: #1f2937; /* gray-800 */
+    --color-success-bg: #ecfdf5; /* green-50 */
+    --color-success-text: #059669; /* green-600 */
+    --color-warning-bg: #fffbeb; /* yellow-50 */
+    --color-warning-text: #d97706; /* yellow-600 */
+    --color-error-bg: #fef2f2; /* red-50 */
+    --color-error-text: #dc2626; /* red-600 */
+    --color-info-bg: #eff6ff; /* blue-50 */
+    --color-info-text: #2563eb; /* blue-600 */
+    --color-purple-bg: #f5f3ff; /* purple-50 */
+    --color-purple-text: #7c3aed; /* purple-600 */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-color-rgb: 0, 0, 0;
   }
   
-  /* Dark mode theme */
-  .dark-mode {
-    --background-color: #000000;
-    --card-background: #121212;
-    --text-color: #ffffff;
-    --text-secondary: #9ca3af;
-    --border-color: #333333;
-    --accent-color: #ff6b00; /* Orange */
-    --hover-color: #ff8c33; /* Lighter orange */
-    --success-bg: #052e16;
-    --success-text: #34d399;
-    --warning-bg: #451a03;
-    --warning-text: #fdba74;
-    --error-bg: #450a0a;
-    --error-text: #fca5a5;
-    --button-bg: #333333;
-    --button-hover: #4b5563;
-    --button-primary-bg: #ff6b00; /* Orange */
-    --button-primary-hover: #ff8c33; /* Lighter orange */
-    --table-header-bg: #1f1f1f;
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --text-on-primary: #ffffff;
+  html.dark-mode { /* Target html element */
+    /* Dark Mode */
+    --color-text-base: #e5e7eb; /* gray-200 - Lighter text */
+    --color-text-muted: #9ca3af; /* gray-400 */
+    --color-text-inverted: #111827; /* gray-900 */
+    --color-bg-primary: #1f2937; /* gray-800 - Card backgrounds */
+    --color-bg-secondary: #111827; /* gray-900 - Body background */
+    --color-bg-tertiary: #374151; /* gray-700 - Hover, inputs */
+    --color-border-primary: #4b5563; /* gray-600 */
+    --color-border-secondary: #6b7280; /* gray-500 */
+    --color-accent-primary: #fb923c; /* orange-400 */
+    --color-accent-hover: #f97316; /* orange-500 */
+    --color-accent-text: #111827; /* gray-900 - Text on orange */
+    --color-button-secondary-bg: #374151; /* gray-700 */
+    --color-button-secondary-hover: #4b5563; /* gray-600 */
+    --color-button-secondary-text: #e5e7eb; /* gray-200 */
+    --color-success-bg: #064e3b; /* darker green-800 */
+    --color-success-text: #6ee7b7; /* lighter green-300 */
+    --color-warning-bg: #7c2d12; /* darker orange-800 */
+    --color-warning-text: #fdba74; /* lighter orange-300 */
+    --color-error-bg: #991b1b; /* darker red-800 */
+    --color-error-text: #fca5a5; /* lighter red-300 */
+    --color-info-bg: #1e3a8a; /* darker blue-800 */
+    --color-info-text: #93c5fd; /* lighter blue-300 */
+    --color-purple-bg: #3b0764; /* darker purple */
+    --color-purple-text: #c4b5fd; /* lighter purple */
+    --shadow-color-rgb: 255, 255, 255; /* Lighter shadow for dark */
+    --shadow-sm: 0 1px 2px 0 rgba(var(--shadow-color-rgb), 0.1);
+    --shadow-md: 0 4px 6px -1px rgba(var(--shadow-color-rgb), 0.15), 0 2px 4px -2px rgba(var(--shadow-color-rgb), 0.15);
+    --shadow-lg: 0 10px 15px -3px rgba(var(--shadow-color-rgb), 0.15), 0 4px 6px -4px rgba(var(--shadow-color-rgb), 0.15);
   }
   
   /* =====================
      THEME APPLICATION
      ===================== */
   body {
-    background-color: var(--background-color);
-    color: var(--text-color);
-    transition: background-color 0.3s, color 0.3s;
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-base);
+    transition: background-color 0.2s ease-out, color 0.2s ease-out;
   }
   
-  .bg-white {
-    background-color: var(--card-background) !important;
-  }
-  
-  .bg-gray-50, .bg-gray-100 {
-    background-color: var(--table-header-bg) !important;
-  }
-  
-  .text-gray-500, .text-gray-600, .text-gray-700 {
-    color: var(--text-secondary) !important;
-  }
-  
-  .border, .border-gray-200 {
-    border-color: var(--border-color) !important;
-  }
-  
-  .divide-gray-200 > * + * {
-    border-color: var(--border-color) !important;
-  }
-  
-  .shadow {
-    box-shadow: 0 1px 3px 0 var(--shadow-color) !important;
-  }
-  
-  a {
-    color: var(--accent-color);
-  }
-  
-  /* =====================
-     BUTTON STYLING
-     ===================== */
-  button, .btn {
-    cursor: pointer;
-    border: none;
-    font-size: 14px;
-    border-radius: 0.25rem;
-    transition: background-color 0.2s, color 0.2s, transform 0.1s;
-    position: relative;
-    display: inline-block;
-    padding: 0.375rem 0.75rem;
-    font-weight: 500;
-    text-decoration: none !important;
-    overflow: hidden;
-  }
-  
-  button:disabled, .btn:disabled {
-    opacity: 0.65;
-    pointer-events: none;
-  }
-  
-  /* Primary buttons */
-  .bg-blue-600, .bg-blue-700 {
-    background-color: var(--button-primary-bg) !important;
-    color: var(--text-on-primary) !important;
-  }
-  
-  .hover\:bg-blue-700:hover {
-    background-color: var(--button-primary-hover) !important;
-  }
-  
-  /* Secondary buttons */
-  .bg-gray-200, .bg-gray-300 {
-    background-color: var(--button-bg) !important;
-    color: var(--text-color) !important;
-  }
-  
-  .hover\:bg-gray-300:hover {
-    background-color: var(--button-hover) !important;
-  }
-  
-  /* Button effects */
-  button:hover, 
-  .bg-blue-600:hover,
-  .bg-blue-700:hover,
-  .text-blue-600:hover,
-  .text-blue-900:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    text-decoration: none !important;
-  }
-  
-  button:active, 
-  .bg-blue-600:active,
-  .bg-blue-700:active,
-  .text-blue-600:active,
-  .text-blue-900:active {
-    transform: translateY(1px);
-    box-shadow: none;
-  }
-  
-  /* =====================
-     TABLE ACTION BUTTONS
-     ===================== */
-  /* Action buttons in tables */
-  td button, 
-  td a[class*="text-blue"],
-  td a.text-blue-600, 
-  td a.text-blue-900,
-  td button.bg-blue-600 {
-    background-color: var(--button-primary-bg) !important;
-    color: var(--text-on-primary) !important;
-    text-align: center;
-    min-width: 5rem;
-    display: inline-block;
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.25rem;
-    text-decoration: none !important;
-    font-weight: 500;
-  }
-  
-  /* Additional button targeting */
-td button:first-child, 
-td a:first-child {
-  background-color: var(--button-primary-bg);
-  color: var(--text-on-primary) !important;
-  text-align: center;
-  min-width: 5rem;
-  display: inline-block;
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.25rem;
-  text-decoration: none !important;
-  font-weight: 500;
-}
-
-/* Ensure button text is always visible */
-td button span, 
-td a span,
-td button, 
-td a,
-td button:first-child span, 
-td a:first-child span,
-td button:first-child, 
-td a:first-child {
-  color: var(--text-on-primary) !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  z-index: 2;
-  position: relative;
-}
-  
-  /* Link-style buttons */
-  .text-blue-600, .text-blue-900 {
-    color: var(--accent-color) !important;
-  }
-  
-  .hover\:text-blue-900:hover {
-    color: var(--hover-color) !important;
-  }
-  
-  /* Button hover states */
-  td a[class*="text-blue"]:hover,
-  td button:hover,
-  td a:hover,
-  .hover\:text-blue-900:hover {
-    background-color: var(--button-primary-hover) !important;
-    color: var(--text-on-primary) !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    text-decoration: none !important;
-  }
-  
-  /* Center actions column */
-  td:last-child {
-    text-align: center;
-  }
-  
-  th:last-child {
-    text-align: center;
-  }
-  
-  /* =====================
-     DESTRUCTIVE ACTIONS
-     ===================== */
-  /* Delete/Remove buttons */
-  td a.text-red-600, 
-  td a.text-red-900,
-  td a[class*="text-red"],
-  .text-red-600, 
-  .text-red-700, 
-  .text-red-800, 
-  .text-red-900 {
-    background-color: var(--button-primary-bg) !important;
-    color: var(--text-on-primary) !important;
-    text-align: center;
-    min-width: 5rem;
-  }
-  
-/* Fix for empty buttons */
-td a:empty:before {
-  content: "Remove";
-  color: var(--text-on-primary) !important;
-}
-
-td button:empty:before {
-  content: "View";
-  display: inline-block;
-  color: var(--text-on-primary) !important;
-  visibility: visible;
-  opacity: 1;
-}
-  
-  /* =====================
-     STATUS INDICATORS
-     ===================== */
-  /* Status badges */
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.25rem 0.75rem;
-  }
-  
-  .status-badge.protected {
-    background-color: var(--success-bg);
-    color: var(--success-text);
-  }
-  
-  .status-badge.not-protected {
-    background-color: var(--warning-bg);
-    color: var(--warning-text);
-  }
-  
-  .bg-green-100 {
-    background-color: rgba(52, 211, 153, 0.2) !important;
-    border: 1px solid var(--success-text);
-  }
-  
-  .text-green-800 {
-    color: var(--success-text) !important;
-  }
-  
-  .bg-yellow-100, .bg-yellow-50 {
-    background-color: rgba(253, 186, 116, 0.2) !important;
-    border: 1px solid var(--warning-text);
-  }
-  
-  .text-yellow-800, .text-yellow-700 {
-    color: var(--warning-text) !important;
-  }
-  
-  .bg-red-100, .bg-red-50 {
-    background-color: var(--error-bg) !important;
-  }
-  
-  .text-red-700, .text-red-800, .text-red-600 {
-    color: var(--error-text) !important;
-  }
-  
-  .border-red-300, .border-red-400 {
-    border-color: var(--error-text) !important;
-  }
-  
-  .border-yellow-400 {
-    border-color: var(--warning-text) !important;
-  }
-  
-  .border-blue-400 {
-    border-color: var(--accent-color) !important;
-  }
-  
-  /* Make status badges more distinct */
-  span.px-2.py-1.inline-flex.text-xs.leading-5.font-semibold.rounded-full {
-    padding: 0.25rem 0.75rem;
-  }
-  
-  /* =====================
-     DARK MODE TOGGLE
-     ===================== */
-  .dark-mode-toggle {
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--button-bg);
-    color: var(--text-color);
-    transition: background-color 0.3s;
-    width: 2rem;
-    height: 2rem;
-  }
-  
-  .dark-mode-toggle:hover {
-    background-color: var(--button-hover);
-  }
-  
-  .dark-mode-icon, .light-mode-icon {
-    width: 1.25rem;
-    height: 1.25rem;
-    transition: transform 0.3s;
-  }
-  
-  .dark-mode-icon {
-    transform: rotate(0deg);
-  }
-  
-  .light-mode-icon {
-    transform: rotate(360deg);
-  }
-  
-  /* =====================
-     MODAL STYLING
-     ===================== */
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-  }
-  
-  .bg-gray-600.bg-opacity-50 {
-    background-color: rgba(0, 0, 0, 0.7) !important;
-  }
-  
-  /* =====================
-     LOADING ANIMATIONS
-     ===================== */
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  
-  .loading-spinner {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid var(--accent-color);
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto;
-  }
-  
-  /* =====================
-     CONTAINER & LAYOUT
-     ===================== */
+  /* Global container */
   .container {
     width: 100%;
-    padding-right: 1rem;
-    padding-left: 1rem;
-    margin-right: auto;
     margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem; /* px-4 */
+    padding-right: 1rem; /* px-4 */
+  }
+  @media (min-width: 640px) { .container { max-width: 640px; } }
+  @media (min-width: 768px) { .container { max-width: 768px; } }
+  @media (min-width: 1024px) { .container { max-width: 1024px; padding-left: 1.5rem; padding-right: 1.5rem; } } /* lg:px-6 */
+  @media (min-width: 1280px) { .container { max-width: 1280px; padding-left: 2rem; padding-right: 2rem; } } /* xl:px-8 */
+  
+  /* Card Styling */
+  .card {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-base);
+    border-radius: 0.5rem; /* rounded-lg */
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-border-primary);
   }
   
   /* =====================
-     RESPONSIVE STYLES
+     COMPONENT STYLING
      ===================== */
-  /* Responsive breakpoints */
-  @media (min-width: 640px) {
-    .container {
-      max-width: 640px;
-    }
+  
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500;
+    text-align: center; transition: all 0.2s ease-in-out; cursor: pointer;
+    border: 1px solid transparent; line-height: 1.25; /* Added */
+  }
+  .btn:focus { outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-primary) 40%, transparent);}
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  
+  .btn-primary { background-color: var(--color-accent-primary); color: var(--color-accent-text); border-color: var(--color-accent-primary); }
+  .btn-primary:hover:not(:disabled) { background-color: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+  html.dark-mode .btn-primary { color: var(--color-accent-text); } /* Ensure text contrast on dark accent */
+  
+  .btn-secondary { background-color: var(--color-button-secondary-bg); color: var(--color-button-secondary-text); border-color: var(--color-border-secondary); }
+  .btn-secondary:hover:not(:disabled) { background-color: var(--color-button-secondary-hover); }
+  
+  .btn-danger { background-color: var(--color-error-bg); color: var(--color-error-text); border-color: var(--color-error-text); }
+  .btn-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-error-text) 90%, black); color: var(--color-text-inverted); }
+  html.dark-mode .btn-danger { background-color: var(--color-error-text); color: var(--color-error-bg); border-color: var(--color-error-text); }
+  html.dark-mode .btn-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-error-text) 85%, white); }
+  
+  .btn-link { color: var(--color-accent-primary); background: none; border: none; padding: 0; text-decoration: none; font-weight: 500; }
+  .btn-link:hover:not(:disabled) { text-decoration: underline; color: var(--color-accent-hover); }
+  html.dark-mode .btn-link { color: var(--color-accent-primary); } /* Use dark mode accent */
+  html.dark-mode .btn-link:hover:not(:disabled) { color: var(--color-accent-hover); }
+  .btn-link.text-red-600 { color: var(--color-error-text); } /* Specific danger link */
+  html.dark-mode .btn-link.text-red-600 { color: var(--color-error-text); }
+  .btn-link.text-red-600:hover { color: color-mix(in srgb, var(--color-error-text) 80%, black); }
+  html.dark-mode .btn-link.text-red-600:hover { color: color-mix(in srgb, var(--color-error-text) 80%, white); }
+  
+  
+  /* Forms */
+  .form-input, .form-select, .form-textarea {
+    display: block; width: 100%; padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem; border: 1px solid var(--color-border-secondary);
+    background-color: var(--color-bg-primary); color: var(--color-text-base);
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline: 2px solid transparent; outline-offset: 2px;
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-primary) 40%, transparent);
+  }
+  .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--color-text-muted); font-size: 0.875rem; /* text-sm */ }
+  .form-textarea { min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.875rem; }
+  .form-checkbox { border-radius: 0.25rem; color: var(--color-accent-primary); border-color: var(--color-border-secondary); }
+  .form-checkbox:focus { border-color: var(--color-accent-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-primary) 40%, transparent); }
+  html.dark-mode .form-input, html.dark-mode .form-select, html.dark-mode .form-textarea { background-color: var(--color-bg-tertiary); border-color: var(--color-border-primary); color: var(--color-text-base); }
+  html.dark-mode .form-input::placeholder, html.dark-mode .form-textarea::placeholder { color: var(--color-text-muted); }
+  html.dark-mode .form-checkbox { background-color: var(--color-bg-tertiary); border-color: var(--color-border-primary); }
+  html.dark-mode .form-checkbox:checked { background-color: var(--color-accent-primary); border-color: var(--color-accent-primary);}
+  
+  
+  /* Tables */
+  .table { width: 100%; border-collapse: collapse; }
+  .table th, .table td { padding: 0.75rem 1rem; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--color-border-primary); }
+  .table thead th { background-color: var(--color-bg-secondary); color: var(--color-text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-bottom-width: 2px; }
+  .table tbody tr:hover { background-color: var(--color-bg-tertiary); }
+  .table td:last-child { text-align: right; }
+  html.dark-mode .table thead th { background-color: var(--color-bg-primary); } /* Darker header */
+  html.dark-mode .table tbody tr:hover { background-color: var(--color-bg-tertiary); }
+  
+  
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; line-height: 1; border: 1px solid transparent; }
+  .badge-success { background-color: var(--color-success-bg); color: var(--color-success-text); border-color: color-mix(in srgb, var(--color-success-text) 30%, transparent); }
+  .badge-warning { background-color: var(--color-warning-bg); color: var(--color-warning-text); border-color: color-mix(in srgb, var(--color-warning-text) 30%, transparent); }
+  .badge-error { background-color: var(--color-error-bg); color: var(--color-error-text); border-color: color-mix(in srgb, var(--color-error-text) 30%, transparent); }
+  .badge-info { background-color: var(--color-info-bg); color: var(--color-info-text); border-color: color-mix(in srgb, var(--color-info-text) 30%, transparent); }
+  .badge-purple { background-color: var(--color-purple-bg); color: var(--color-purple-text); border-color: color-mix(in srgb, var(--color-purple-text) 30%, transparent); }
+  .badge-neutral { background-color: var(--color-bg-tertiary); color: var(--color-text-muted); border-color: var(--color-border-secondary); }
+  html.dark-mode .badge-neutral { background-color: var(--color-bg-secondary); border-color: var(--color-border-primary); }
+  html.dark-mode .badge { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); } /* Add subtle border in dark mode */
+  
+  
+  /* Modals */
+  .modal-overlay { position: fixed; inset: 0; background-color: rgba(var(--shadow-color-rgb), 0.6); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow-y: auto; }
+  html.dark-mode .modal-overlay { background-color: rgba(0, 0, 0, 0.8); }
+  .modal-content { background-color: var(--color-bg-primary); color: var(--color-text-base); border-radius: 0.5rem; box-shadow: var(--shadow-lg); width: 100%; max-width: 32rem; max-height: calc(100vh - 4rem); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--color-border-primary); }
+  .modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-border-primary); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  .modal-title { font-size: 1.125rem; font-weight: 600; color: var(--color-text-base); }
+  .modal-close-button { color: var(--color-text-muted); background: none; border: none; font-size: 1.75rem; line-height: 1; cursor: pointer; padding: 0; }
+  .modal-close-button:hover { color: var(--color-text-base); }
+  .modal-body { padding: 1.5rem; overflow-y: auto; flex-grow: 1; }
+  .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--color-border-primary); display: flex; justify-content: flex-end; gap: 0.75rem; background-color: var(--color-bg-secondary); border-bottom-left-radius: 0.5rem; border-bottom-right-radius: 0.5rem; flex-shrink: 0; }
+  /* Size variants */
+  .modal-content.max-w-lg { max-width: 32rem; }
+  .modal-content.max-w-xl { max-width: 36rem; }
+  .modal-content.max-w-2xl { max-width: 42rem; }
+  
+  /* Dark Mode Toggle */
+  .dark-mode-toggle { display: flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 9999px; background-color: var(--color-bg-tertiary); color: var(--color-text-muted); cursor: pointer; transition: all 0.2s ease-in-out; border: none; }
+  .dark-mode-toggle:hover { background-color: var(--color-border-primary); color: var(--color-text-base); }
+  .dark-mode-toggle:focus { outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-primary) 40%, transparent); }
+  .dark-mode-toggle svg { width: 1.25rem; height: 1.25rem; }
+  
+  
+  /* Code blocks/inline code */
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text-base);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.85em; /* Slightly smaller */
+    border: 1px solid var(--color-border-primary);
+  }
+  html.dark-mode code {
+      background-color: var(--color-bg-secondary);
+      border-color: var(--color-border-primary);
+      color: var(--color-text-base);
   }
   
-  @media (min-width: 768px) {
-    .container {
-      max-width: 768px;
-    }
-  }
-  
-  @media (min-width: 1024px) {
-    .container {
-      max-width: 1024px;
-    }
-  }
-  
-  @media (min-width: 1280px) {
-    .container {
-      max-width: 1280px;
-    }
-  }
-  
-  /* Responsive navigation */
-  nav .container {
-    padding: 0.5rem 1rem;
-  }
-  
-  @media (max-width: 768px) {
-    nav .flex.justify-between {
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    
-    nav .space-x-4 {
-      display: flex;
-      width: 100%;
-      justify-content: space-between;
-    }
-    
-    nav .space-x-4 button {
-      font-size: 0.875rem;
-      padding: 0.5rem 0.75rem;
-    }
-  
-    /* Card grids */
-    .grid.grid-cols-1.md\:grid-cols-3,
-    .grid.grid-cols-1.md\:grid-cols-2 {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-  
-    /* Action buttons */
-    .text-blue-600.hover\:text-blue-900,
-    .text-red-600.hover\:text-red-900 {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      border-radius: 0.25rem;
-      margin: 0.125rem;
-    }
-    
-    /* Form layout */
-    .mb-6.flex.justify-between {
-      flex-direction: column;
-      gap: 0.75rem;
-      align-items: stretch;
-    }
-    
-    .mb-6.flex.justify-between .relative.w-64 {
-      width: 100%;
-    }
-    
-    .mb-6.flex.justify-between .space-x-3 {
-      display: flex;
-      justify-content: space-between;
-    }
-  }
-  
-  /* Table responsiveness */
-  @media (max-width: 1024px) {
-    .overflow-x-auto {
-      -webkit-overflow-scrolling: touch;
-    }
-    
-    table {
-      min-width: 640px;
-    }
-  }
-  
-  /* Small screen forms */
+  /* Responsive adjustments */
   @media (max-width: 640px) {
-    form input, 
-    form select, 
-    form textarea {
-      font-size: 16px; /* Prevents iOS zoom on focus */
-    }
-    
-    .flex.justify-end.space-x-3 {
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    
-    .flex.justify-end.space-x-3 button {
-      width: 100%;
-    }
-    
-    .mb-6.flex.items-center {
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-  
-    /* Dashboard sections */
-    main.container {
-      padding-top: 1rem;
-      padding-bottom: 2rem;
-    }
-    
-    .mb-8 {
-      margin-bottom: 1.5rem;
-    }
-    
-    h1.text-2xl {
-      margin-bottom: 1rem;
-    }
-    
-    .bg-white.p-6 {
-      padding: 1rem;
-    }
-    
-    /* Badges */
-    span.px-2.py-1.inline-flex.text-xs {
-      padding: 0.25rem 0.5rem;
-      font-size: 0.75rem;
-    }
-    
-    /* Modal */
-    .fixed.inset-0.flex.items-center.justify-center .max-w-md {
-      width: calc(100% - 2rem);
-      margin: 0 1rem;
-    }
-    
-    .fixed.inset-0.flex.items-center.justify-center .px-6 {
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
-    
-    .fixed.inset-0.bg-gray-600.bg-opacity-50.flex.items-center.justify-center {
-      align-items: flex-start;
-      padding-top: 2rem;
-      padding-bottom: 2rem;
-      overflow-y: auto;
-    }
-  }
-  
-  /* Middleware form */
-  @media (max-width: 768px) {
-    textarea.w-full.px-3.py-2.border.font-mono.h-64 {
-      height: 180px;
-    }
+    .modal-content { max-width: calc(100% - 2rem); margin: 1rem; max-height: calc(100vh - 2rem); }
+    .modal-header, .modal-body, .modal-footer { padding: 1rem; }
+    .modal-title { font-size: 1rem; }
+    .form-input, .form-select, .form-textarea { font-size: 16px; /* Prevent iOS zoom */ }
+    .modal-footer { flex-direction: column; gap: 0.5rem; }
+    .modal-footer .btn { width: 100%; }
   }
 
-  /* Add this new section at the end of your CSS file */
-/* =====================
-   DARK MODE TEXT VISIBILITY FIXES
-   ===================== */
-.dark-mode button,
-.dark-mode .btn,
-.dark-mode a[role="button"],
-.dark-mode [class*="btn"],
-.dark-mode td a,
-.dark-mode td button {
-  color: var(--text-on-primary) !important;
-  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+/* DARK MODE TEXT VISIBILITY FIXES */
+html.dark-mode p,
+html.dark-mode h1,
+html.dark-mode h2,
+html.dark-mode h3,
+html.dark-mode h4,
+html.dark-mode h5,
+html.dark-mode h6,
+html.dark-mode span,
+html.dark-mode div,
+html.dark-mode label,
+html.dark-mode button,
+html.dark-mode a,
+html.dark-mode li,
+html.dark-mode td,
+html.dark-mode th {
+  color: var(--color-text-base);
 }
 
-/* First button in each row - often "Visit" */
-.dark-mode a:first-child,
-.dark-mode button:first-child,
-.dark-mode .dark-mode td > *:first-child {
-  color: var(--text-on-primary) !important;
-  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
-  visibility: visible !important;
-  opacity: 1 !important;
+html.dark-mode .card {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-base);
 }
 
-/* Fix specifically for Visit button */
-.dark-mode a:empty:before,
-.dark-mode button:empty:before {
-  content: "Visit";
-  display: inline;
-  color: var(--text-on-primary) !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+html.dark-mode .table tbody tr {
+  color: var(--color-text-base);
 }
 
-/* Fix for other buttons in various contexts */
-.dark-mode td a:nth-child(2):empty:before,
-.dark-mode td button:nth-child(2):empty:before {
-  content: "Remove";
-  color: var(--text-on-primary) !important;
+/* Header dark mode fixes */
+html.dark-mode nav {
+  background-color: var(--color-bg-primary);
+  border-color: var(--color-border-primary);
 }
 
-/* Fix modal buttons */
-.dark-mode .modal-overlay button,
-.dark-mode .fixed button,
-.dark-mode [role="dialog"] button {
-  color: var(--text-on-primary) !important;
-  text-shadow: 0 0 1px rgba(0, 0, 0, 0.7);
+html.dark-mode .text-gray-800 {
+  color: var(--color-text-base);
 }
 
-/* =====================
-   DARK MODE TEXT VISIBILITY FIXES
-   ===================== */
-   .dark-mode {
-    /* Add stronger text contrast settings */
-    --text-color: #ffffff !important;
-    --text-secondary: #e2e8f0 !important;
-    --text-on-primary: #ffffff !important;
-  }
-  
-  /* Force all text elements to use proper color in dark mode */
-  .dark-mode p,
-  .dark-mode h1,
-  .dark-mode h2,
-  .dark-mode h3,
-  .dark-mode h4,
-  .dark-mode h5,
-  .dark-mode h6,
-  .dark-mode span,
-  .dark-mode div,
-  .dark-mode label,
-  .dark-mode button,
-  .dark-mode a,
-  .dark-mode li,
-  .dark-mode td,
-  .dark-mode th,
-  .dark-mode input,
-  .dark-mode select,
-  .dark-mode textarea {
-    color: var(--text-color) !important;
-  }
-  
-  /* Ensure input text is visible against input backgrounds */
-  .dark-mode input,
-  .dark-mode select,
-  .dark-mode textarea {
-    background-color: #333 !important;
-    color: #fff !important;
-  }
-  
-  /* Fix for dropdowns and modal content */
-  .dark-mode .dropdown-content,
-  .dark-mode [role="listbox"],
-  .dark-mode [role="menu"],
-  .dark-mode [role="dialog"] {
-    color: var(--text-color) !important;
-    background-color: var(--card-background) !important;
-  }
-  
-  /* Ensure text in status indicators remains visible */
-  .dark-mode .status-badge.protected,
-  .dark-mode .bg-green-100 {
-    color: #34d399 !important; /* Brighter green for dark mode */
-  }
-  
-  .dark-mode .status-badge.not-protected,
-  .dark-mode .bg-yellow-100,
-  .dark-mode .bg-yellow-50 {
-    color: #fdba74 !important; /* Brighter orange for dark mode */
-  }
-  
-  /* Fix for modal scrolling on mobile */
-  @media (max-width: 640px) {
-    .fixed.inset-0.bg-gray-600.bg-opacity-50.flex.items-center.justify-center {
-      align-items: flex-start;
-      padding-top: 2rem;
-      padding-bottom: 2rem;
-      overflow-y: auto;
-    }
-  }
-  /* Fix for loading spinner */
- /* Alternative approach with more general selectors */
-
-/* =====================
-   DARK MODE LABEL VISIBILITY FIX
-   ===================== */
-.dark-mode {
-  /* Override specific element colors for dark mode */
-  --badge-bg-blue: #90cdf4;
-  --badge-text-blue: #1e3a8a;
-  --badge-bg-green: #0d9488;
-  --badge-text-green: #ffffff;
-  --badge-bg-yellow: #d97706;
-  --badge-text-yellow: #ffffff;
-  --badge-bg-red: #f87171;
-  --badge-text-red: #ffffff;
+html.dark-mode .text-gray-500, 
+html.dark-mode .text-gray-400, 
+html.dark-mode .text-gray-300 {
+  color: var(--color-text-muted);
 }
 
-/* General badge styles for dark mode */
-.dark-mode [class*="rounded-full"],
-.dark-mode .status-badge {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+html.dark-mode .bg-gray-100 {
+  background-color: var(--color-bg-tertiary);
 }
 
-/* Blue badges (middleware types) */
-.dark-mode .bg-blue-100,
-.dark-mode [class*="bg-blue-"] {
-  background-color: var(--badge-bg-blue) !important;
-  color: var(--badge-text-blue) !important;
-  text-shadow: none;
+html.dark-mode .bg-blue-100 {
+  background-color: var(--color-accent-primary);
 }
 
-/* Green badges (protected status) */
-.dark-mode .bg-green-100,
-.dark-mode [class*="bg-green-"] {
-  background-color: var(--badge-bg-green) !important;
-  color: var(--badge-text-green) !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+html.dark-mode .text-blue-800 {
+  color: var(--color-accent-text);
 }
 
-/* Yellow badges (not protected status) */
-.dark-mode .bg-yellow-100,
-.dark-mode .bg-yellow-50,
-.dark-mode [class*="bg-yellow-"] {
-  background-color: var(--badge-bg-yellow) !important;
-  color: var(--badge-text-yellow) !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+html.dark-mode .hover\:bg-gray-50:hover {
+  background-color: var(--color-bg-tertiary);
 }
 
-/* Red badges (errors, disabled) */
-.dark-mode .bg-red-100,
-.dark-mode .bg-red-50,
-.dark-mode [class*="bg-red-"] {
-  background-color: var(--badge-bg-red) !important;
-  color: var(--badge-text-red) !important;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+html.dark-mode .hover\:text-gray-900:hover {
+  color: var(--color-text-base);
 }
 
-/* Force text visibility for all badge elements */
-.dark-mode span[class*="rounded-full"],
-.dark-mode .status-badge {
-  opacity: 1 !important;
-  visibility: visible !important;
-  font-weight: 600 !important;
-} 
+/* Mobile menu dark mode fixes */
+html.dark-mode #mobile-menu {
+  border-color: var(--color-border-primary);
+  background-color: var(--color-bg-primary);
+}
+
+/* ResourcesList dark mode fixes */
+html.dark-mode .bg-white {
+  background-color: var(--color-bg-primary);
+}
+
+html.dark-mode .bg-gray-50 {
+  background-color: var(--color-bg-secondary);
+}
+
+html.dark-mode .bg-gray-200 {
+  background-color: var(--color-button-secondary-bg);
+}
+
+html.dark-mode .hover\:bg-gray-300:hover {
+  background-color: var(--color-button-secondary-hover);
+}
+
+html.dark-mode .divide-gray-200 {
+  border-color: var(--color-border-primary);
+}
+
+html.dark-mode .divide-y > * {
+  border-color: var(--color-border-primary);
+}
+
+html.dark-mode input, 
+html.dark-mode select, 
+html.dark-mode textarea {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-primary);
+  color: var(--color-text-base);
+}
+
+html.dark-mode input::placeholder {
+  color: var(--color-text-muted);
+}
+
+html.dark-mode .shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* Table specific dark mode fixes */
+html.dark-mode table {
+  color: var(--color-text-base);
+}
+
+html.dark-mode th {
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-secondary);
+}
+
+html.dark-mode tbody tr:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+html.dark-mode .text-red-600 {
+  color: #f87171; /* A lighter red that's visible on dark backgrounds */
+}
+
+html.dark-mode .hover\:text-red-900:hover {
+  color: #fca5a5; /* An even lighter red for hover states */
+}
+
+html.dark-mode .text-blue-600 {
+  color: #60a5fa; /* A lighter blue that's visible on dark backgrounds */
+}
+
+html.dark-mode .hover\:text-blue-900:hover {
+  color: #93c5fd; /* An even lighter blue for hover states */
+}
+
+/* Status badge dark mode fixes */
+html.dark-mode .bg-green-100 {
+  background-color: #064e3b; /* darker green-800 */
+}
+
+html.dark-mode .text-green-800 {
+  color: #6ee7b7; /* lighter green-300 */
+}
+
+html.dark-mode .bg-yellow-100 {
+  background-color: #7c2d12; /* darker orange-800 */
+}
+
+html.dark-mode .text-yellow-800 {
+  color: #fdba74; /* lighter orange-300 */
+}
+
+html.dark-mode .bg-red-100 {
+  background-color: #991b1b; /* darker red-800 */
+}
+
+html.dark-mode .text-red-800 {
+  color: #fca5a5; /* lighter red-300 */
+}
+
+html.dark-mode .bg-gray-100 {
+  background-color: #374151; /* gray-700 */
+}
+
+html.dark-mode .text-gray-800 {
+  color: #e5e7eb; /* gray-200 */
+}
+
+/* Troubleshooting info dark mode fixes */
+html.dark-mode .bg-blue-50 {
+  background-color: #1e3a8a; /* dark blue-900 */
+}
+
+html.dark-mode .border-blue-400 {
+  border-color: #60a5fa; /* blue-400 */
+}
+
+html.dark-mode .text-blue-700 {
+  color: #93c5fd; /* blue-300 */
+}
+
+html.dark-mode .bg-blue-100 {
+  background-color: #1e40af; /* blue-800 */
+}
+
+html.dark-mode code {
+  color: #e5e7eb; /* gray-200 */
+}
+
+html.dark-mode .list-disc li {
+  color: #93c5fd; /* blue-300 */
+}

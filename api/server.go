@@ -26,6 +26,7 @@ type Server struct {
 	resourceHandler   *handlers.ResourceHandler
 	configHandler     *handlers.ConfigHandler
 	dataSourceHandler *handlers.DataSourceHandler
+	serviceHandler    *handlers.ServiceHandler
 	configManager     *services.ConfigManager
 }
 
@@ -81,8 +82,9 @@ func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigMa
 	resourceHandler := handlers.NewResourceHandler(db)
 	configHandler := handlers.NewConfigHandler(db)
 	dataSourceHandler := handlers.NewDataSourceHandler(configManager)
+	serviceHandler := handlers.NewServiceHandler(db)
 
-	// Setup server
+	// Setup server with all handlers
 	server := &Server{
 		db:                db,
 		router:            router,
@@ -90,6 +92,7 @@ func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigMa
 		resourceHandler:   resourceHandler,
 		configHandler:     configHandler,
 		dataSourceHandler: dataSourceHandler,
+		serviceHandler:    serviceHandler,
 		configManager:     configManager,
 		srv: &http.Server{
 			Addr:              ":" + config.Port,
@@ -127,15 +130,32 @@ func (s *Server) setupRoutes(uiPath string) {
 			middlewares.DELETE("/:id", s.middlewareHandler.DeleteMiddleware)
 		}
 
+		// Service routes
+		services := api.Group("/services")
+		{
+			services.GET("", s.serviceHandler.GetServices)
+			services.POST("", s.serviceHandler.CreateService)
+			services.GET("/:id", s.serviceHandler.GetService)
+			services.PUT("/:id", s.serviceHandler.UpdateService)
+			services.DELETE("/:id", s.serviceHandler.DeleteService)
+		}
+
 		// Resource routes
 		resources := api.Group("/resources")
 		{
 			resources.GET("", s.resourceHandler.GetResources)
 			resources.GET("/:id", s.resourceHandler.GetResource)
 			resources.DELETE("/:id", s.resourceHandler.DeleteResource)
+			
+			// Middleware assignments
 			resources.POST("/:id/middlewares", s.resourceHandler.AssignMiddleware)
 			resources.POST("/:id/middlewares/bulk", s.resourceHandler.AssignMultipleMiddlewares)
 			resources.DELETE("/:id/middlewares/:middlewareId", s.resourceHandler.RemoveMiddleware)
+			
+			// Service assignments
+			resources.GET("/:id/service", s.serviceHandler.GetResourceService)
+			resources.POST("/:id/service", s.serviceHandler.AssignServiceToResource)
+			resources.DELETE("/:id/service", s.serviceHandler.RemoveServiceFromResource)
 			
 			// Router configuration routes
 			resources.PUT("/:id/config/http", s.configHandler.UpdateHTTPConfig)

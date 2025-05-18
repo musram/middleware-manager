@@ -1,8 +1,10 @@
+// ui/src/App.js
 import React from 'react';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { ResourceProvider } from './contexts/ResourceContext';
 import { MiddlewareProvider } from './contexts/MiddlewareContext';
 import { DataSourceProvider } from './contexts/DataSourceContext';
+import { ServiceProvider } from './contexts/ServiceContext';
 import { Header } from './components/common';
 
 // Import page components
@@ -11,6 +13,8 @@ import ResourcesList from './components/resources/ResourcesList';
 import ResourceDetail from './components/resources/ResourceDetail';
 import MiddlewaresList from './components/middlewares/MiddlewaresList';
 import MiddlewareForm from './components/middlewares/MiddlewareForm';
+import ServicesList from './components/services/ServicesList';
+import ServiceForm from './components/services/ServiceForm';
 import DataSourceSettings from './components/settings/DataSourceSettings';
 
 /**
@@ -18,31 +22,35 @@ import DataSourceSettings from './components/settings/DataSourceSettings';
  * based on the navigation state
  */
 const MainContent = () => {
-  const { 
-    page, 
-    resourceId, 
-    middlewareId, 
-    isEditing, 
-    navigateTo, 
-    isDarkMode, 
-    setIsDarkMode,
+  const {
+    page,
+    resourceId,
+    middlewareId,
+    serviceId,
+    isEditing,
+    navigateTo,
+    isDarkMode, // Still needed for Header toggle state
+    setIsDarkMode, // Still needed for Header toggle state
     showSettings,
     setShowSettings
   } = useApp();
 
   // Render the active page based on state
   const renderPage = () => {
-    // If settings panel should be displayed, show it as an overlay
+    // Render settings panel overlay if active
     if (showSettings) {
       return (
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className="w-full max-w-3xl max-h-screen">
+      // Using Tailwind classes for the overlay directly
+      <div className="fixed inset-0 bg-black bg-opacity-60 dark:bg-opacity-80 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        {/* Removed max-h-screen, relying on modal's internal scroll */}
+        <div className="w-full max-w-3xl">
+          {/* DataSourceSettings now acts as the modal content */}
           <DataSourceSettings onClose={() => setShowSettings(false)} />
         </div>
       </div>
       );
     }
-    
+
     // Otherwise, render the current page
     switch (page) {
       case 'dashboard':
@@ -61,23 +69,36 @@ const MainContent = () => {
             navigateTo={navigateTo}
           />
         );
+        case 'services':
+        return <ServicesList navigateTo={navigateTo} />;
+      case 'service-form':
+        return (
+          <ServiceForm
+            // id={serviceId} // ID and isEditing are now read from context in ServiceForm
+            navigateTo={navigateTo}
+          />
+        );
       default:
         return <Dashboard navigateTo={navigateTo} />;
     }
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark-mode' : ''} bg-gray-100`}>
-      <Header 
-        currentPage={page} 
+    // Body background is now controlled by CSS variables via the <html> class
+    // This div provides min-height and potential future layout structure
+    <div className="min-h-screen flex flex-col">
+      <Header
+        currentPage={page}
         navigateTo={navigateTo}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         openSettings={() => setShowSettings(true)}
       />
-      <main className="container mx-auto px-6 py-6">
+      {/* Main content area */}
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow">
         {renderPage()}
       </main>
+      {/* Footer can be added here */}
     </div>
   );
 };
@@ -91,7 +112,9 @@ const App = () => {
       <DataSourceProvider>
         <ResourceProvider>
           <MiddlewareProvider>
-            <MainContent />
+            <ServiceProvider>
+              <MainContent />
+            </ServiceProvider>
           </MiddlewareProvider>
         </ResourceProvider>
       </DataSourceProvider>

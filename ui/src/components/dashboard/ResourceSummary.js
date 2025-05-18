@@ -1,10 +1,11 @@
+// ui/src/components/dashboard/ResourceSummary.js
 import React from 'react';
 import { useResources } from '../../contexts/ResourceContext';
 import { MiddlewareUtils } from '../../services/api';
 
 /**
  * ResourceSummary component for displaying a resource row in the dashboard
- * 
+ *
  * @param {Object} props
  * @param {Object} props.resource - Resource data
  * @param {Function} props.onView - Function to handle viewing the resource
@@ -13,7 +14,7 @@ import { MiddlewareUtils } from '../../services/api';
  */
 const ResourceSummary = ({ resource, onView, onDelete }) => {
   const { deleteResource } = useResources();
-  
+
   // Parse middlewares from the resource
   const middlewaresList = MiddlewareUtils.parseMiddlewares(resource.middlewares);
   const isProtected = middlewaresList.length > 0;
@@ -29,56 +30,50 @@ const ResourceSummary = ({ resource, onView, onDelete }) => {
       )
     ) {
       const success = await deleteResource(resource.id);
-      if (success) {
-        // Notify parent component about the deletion
-        if (onDelete) onDelete();
+      if (success && onDelete) {
+        onDelete(); // Notify parent component about the deletion
       }
     }
   };
 
   return (
-    <tr className={isDisabled ? 'bg-gray-100' : ''}>
-      <td className="px-6 py-4 whitespace-nowrap">
+    <tr className={isDisabled ? 'bg-gray-100 dark:bg-gray-800 opacity-70' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}>
+      {/* Host */}
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
         {resource.host}
         {isDisabled && (
-          <span className="ml-2 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-            Removed from Pangolin
-          </span>
+          <span className="ml-2 badge badge-error">Disabled</span>
         )}
       </td>
+
+      {/* Status */}
       <td className="px-6 py-4 whitespace-nowrap">
         <span
-          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-            isDisabled
-              ? 'bg-gray-100 text-gray-800'
-              : isProtected
-              ? 'bg-green-100 text-green-800'
-              : 'bg-yellow-100 text-yellow-800'
+          className={`badge ${
+            isDisabled ? 'badge-neutral' : isProtected ? 'badge-success' : 'badge-warning'
           }`}
         >
-          {isDisabled
-            ? 'Disabled'
-            : isProtected
-            ? 'Protected'
-            : 'Not Protected'}
+          {isDisabled ? 'Disabled' : isProtected ? 'Protected' : 'Not Protected'}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        {middlewaresList.length > 0
-          ? middlewaresList.length
-          : 'None'}
+
+      {/* Middlewares Count */}
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {middlewaresList.length > 0 ? middlewaresList.length : '0'}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
+
+      {/* Actions */}
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
         <button
           onClick={onView}
-          className="text-blue-600 hover:text-blue-900 mr-3"
+          className="btn-link text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
         >
           {isDisabled ? 'View' : 'Manage'}
         </button>
         {isDisabled && (
           <button
             onClick={handleDelete}
-            className="text-red-600 hover:text-red-900"
+            className="btn-link text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
           >
             Delete
           </button>
