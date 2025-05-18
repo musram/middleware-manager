@@ -11,12 +11,31 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"encoding/json"
+	"io/ioutil"
+	"fmt"
 
 	"github.com/hhftechnology/middleware-manager/api"
 	"github.com/hhftechnology/middleware-manager/config"
 	"github.com/hhftechnology/middleware-manager/database"
 	"github.com/hhftechnology/middleware-manager/services"
 )
+
+// Plugin represents the structure of a plugin in the JSON file
+type Plugin struct {
+	DisplayName string `json:"displayName"`
+	Type        string `json:"type"`
+	IconPath    string `json:"iconPath"`
+	Import      string `json:"import"`
+	Summary     string `json:"summary"`
+	// Add any other fields that might be in your JSON, e.g., author, version
+	Author      string `json:"author,omitempty"`
+	Version     string `json:"version,omitempty"`
+	TestedWith  string `json:"tested_with,omitempty"` // Example: "Traefik v2.10+"
+	Stars       int    `json:"stars,omitempty"`      // Example: GitHub stars
+	Homepage    string `json:"homepage,omitempty"`   // Example: Link to plugin's GitHub repo
+	Docs        string `json:"docs,omitempty"`       // Example: Link to plugin's documentation
+}
 
 // Configuration represents the application configuration
 type Configuration struct {
@@ -34,7 +53,10 @@ type Configuration struct {
 	AllowCORS        bool
 	CORSOrigin       string
 	ActiveDataSource string
+	TraefikStaticConfigPath string // New: Path to traefik_config.yml or traefik.yml
+	PluginsJSONURL         string // New: URL to the plugins.json file
 }
+
 
 // DiscoverTraefikAPI attempts to discover the Traefik API by trying common URLs
 func DiscoverTraefikAPI() (string, error) {
@@ -140,11 +162,12 @@ func main() {
 		CORSOrigin: cfg.CORSOrigin,
 	}
 	
-	server := api.NewServer(db.DB, serverConfig, configManager)
+	// so handlers can access TraefikStaticConfigPath and PluginsJSONURL
+	server := api.NewServer(db.DB, serverConfig, configManager, cfg.TraefikStaticConfigPath, cfg.PluginsJSONURL)
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Printf("Server error: %v", err)
-			close(stopChan)
+			close(stopChan) // Ensure stopChan is closed on server error
 		}
 	}()
 
@@ -171,9 +194,11 @@ func main() {
 	// Graceful shutdown
 	log.Println("Shutting down...")
 	resourceWatcher.Stop()
-	serviceWatcher.Stop() // Add this line
 	configGenerator.Stop()
-	server.Stop()
+	if serviceWatcher != nil { // Check if serviceWatcher was initialized
+		serviceWatcher.Stop()
+	}
+	server.Stop() // Ensure server has a Stop method // Add this line
 	log.Println("Middleware Manager stopped")
 }
 
@@ -221,6 +246,8 @@ func loadConfiguration(debug bool) Configuration {
 		Debug:            debug,
 		AllowCORS:        allowCORS,
 		CORSOrigin:       getEnv("CORS_ORIGIN", ""),
+		TraefikStaticConfigPath: getEnv("TRAEFIK_STATIC_CONFIG_PATH", "/etc/traefik/traefik.yml"), // New
+		PluginsJSONURL:   getEnv("PLUGINS_JSON_URL", "https://raw.githubusercontent.com/hhftechnology/middleware-manager/refs/heads/traefik-int/plugin/plugins.json"), // New
 	}
 }
 
@@ -230,4 +257,28 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// Helper function to fetch and parse plugins.json
+func fetchPlugins(url string) ([]Plugin, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch plugins json: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch plugins json: status code %d", resp.StatusCode)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugins json response body: %w", err)
+	}
+
+	var plugins []Plugin
+	if err := json.Unmarshal(body, &plugins); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal plugins json: %w", err)
+	}
+	return plugins, nil
 }

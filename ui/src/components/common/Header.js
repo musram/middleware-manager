@@ -46,6 +46,7 @@ const Header = ({
     { id: 'resources', label: 'Resources', pages: ['resources', 'resource-detail'] },
     { id: 'middlewares', label: 'Middlewares', pages: ['middlewares', 'middleware-form'] },
     { id: 'services', label: 'Services', pages: ['services', 'service-form'] },
+    { id: 'plugin-hub', label: 'Plugin Hub', pages: ['plugin-hub'] }, // Add Plugin Hub link
   ];
 
   return (
