@@ -390,7 +390,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 	rows, err := db.Query(`
 		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status, 
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers, r.router_priority,
+		       r.custom_headers, r.router_priority, r.source_type,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -404,13 +404,13 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 	var resources []map[string]interface{}
 	for rows.Next() {
-		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
+		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders, sourceType string
 		var tcpEnabled int
 		var routerPriority sql.NullInt64
 		var middlewares sql.NullString
 		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, 
 				   &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-				   &customHeaders, &routerPriority, &middlewares); err != nil {
+				   &customHeaders, &routerPriority, &sourceType, &middlewares); err != nil {
 			return nil, fmt.Errorf("row scan failed: %w", err)
 		}
 
@@ -434,6 +434,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 			"tcp_sni_rule":    tcpSNIRule,
 			"custom_headers":  customHeaders,
 			"router_priority": priority,
+			"source_type":     sourceType,
 		}
 		
 		if middlewares.Valid {
@@ -454,7 +455,7 @@ func (db *DB) GetResources() ([]map[string]interface{}, error) {
 
 // GetResource fetches a specific resource by ID
 func (db *DB) GetResource(id string) (map[string]interface{}, error) {
-	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
+	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders, sourceType string
 	var tcpEnabled int
 	var routerPriority sql.NullInt64
 	var middlewares sql.NullString
@@ -462,7 +463,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 	err := db.QueryRow(`
 		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers, r.router_priority,
+		       r.custom_headers, r.router_priority, r.source_type,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -471,7 +472,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		GROUP BY r.id
 	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
 		    &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-		    &customHeaders, &routerPriority, &middlewares)
+		    &customHeaders, &routerPriority, &sourceType, &middlewares)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("resource not found: %s", id)
@@ -499,6 +500,7 @@ func (db *DB) GetResource(id string) (map[string]interface{}, error) {
 		"tcp_sni_rule":    tcpSNIRule,
 		"custom_headers":  customHeaders,
 		"router_priority": priority,
+		"source_type":     sourceType, // <--- ADDED sourceType
 	}
 
 	if middlewares.Valid {

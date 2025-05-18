@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hhftechnology/middleware-manager/database"
+	"github.com/hhftechnology/middleware-manager/models"
 	"gopkg.in/yaml.v3"
 )
 
@@ -21,6 +22,7 @@ import (
 type ConfigGenerator struct {
 	db             *database.DB
 	confDir        string
+	configManager  *ConfigManager // Add ConfigManager
 	stopChan       chan struct{}
 	isRunning      bool
 	mutex          sync.Mutex // Protects isRunning
@@ -47,10 +49,11 @@ type TraefikConfig struct {
 }
 
 // NewConfigGenerator creates a new config generator
-func NewConfigGenerator(db *database.DB, confDir string) *ConfigGenerator {
+func NewConfigGenerator(db *database.DB, confDir string, configManager *ConfigManager) *ConfigGenerator { // Add configManager parameter
 	return &ConfigGenerator{
 		db:             db,
 		confDir:        confDir,
+		configManager:  configManager, // Store it
 		stopChan:       make(chan struct{}),
 		isRunning:      false,
 		lastConfig:     nil,
@@ -964,27 +967,34 @@ func (cg *ConfigGenerator) updateResourceServices() error {
 
 // processResourcesWithServices processes resources with their assigned services
 func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) error {
-	// Fetch all active resources with custom headers, router priority, and assigned services
-	rows, err := cg.db.Query(`
-		SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains, 
-			   r.custom_headers, r.router_priority, rm.middleware_id, rm.priority,
-			   rs.service_id as custom_service_id
-		FROM resources r
-		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
-		LEFT JOIN resource_services rs ON r.id = rs.resource_id
-		WHERE r.status = 'active'
-		ORDER BY r.id, rm.priority DESC
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to fetch resources: %w", err)
-	}
-	defer rows.Close()
+	activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        log.Printf("Warning: Could not get active data source config in ConfigGenerator: %v. Defaulting provider logic.", err)
+        activeDSConfig.Type = models.PangolinAPI // Default to Pangolin if config is unavailable
+    }
+    // Fetch all active resources with custom headers, router priority, source_type, and assigned services
+    rows, err := cg.db.Query(`
+        SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains,
+               r.custom_headers, r.router_priority, r.source_type, 
+               rm.middleware_id, rm.priority,
+               rs.service_id as custom_service_id
+        FROM resources r
+        LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
+        LEFT JOIN resource_services rs ON r.id = rs.resource_id
+        WHERE r.status = 'active'
+        ORDER BY r.id, rm.priority DESC
+    `)
+    if err != nil {
+        return fmt.Errorf("failed to fetch resources: %w", err)
+    }
+    defer rows.Close()
 
 	// Group middlewares by resource and preserve priority
 	resourceMiddlewares := make(map[string][]MiddlewareWithPriority)
 	resourceInfo := make(map[string]struct {
 		Host          string
 		ServiceID     string
+		SourceType    string // Added
 		Entrypoints   string
 		TLSDomains    string
 		CustomHeaders string
@@ -992,19 +1002,20 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		CustomServiceID sql.NullString
 	})
 
-	for rows.Next() {
-		var resourceID, host, serviceID, entrypoints, tlsDomains, customHeaders string
-		var routerPriority sql.NullInt64
-		var middlewareID sql.NullString
-		var middlewarePriority sql.NullInt64
-		var customServiceID sql.NullString
-		
-		if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains, 
-						   &customHeaders, &routerPriority, &middlewareID, &middlewarePriority,
-						   &customServiceID); err != nil {
-			log.Printf("Failed to scan resource middleware: %v", err)
-			continue
-		}
+    for rows.Next() {
+        var resourceID, host, serviceID, entrypoints, tlsDomains, customHeaders, sourceType string // Added sourceType
+        var routerPriority sql.NullInt64
+        var middlewareID sql.NullString
+        var middlewarePriority sql.NullInt64
+        var customServiceID sql.NullString
+
+        if err := rows.Scan(&resourceID, &host, &serviceID, &entrypoints, &tlsDomains,
+                           &customHeaders, &routerPriority, &sourceType, // Scan sourceType
+                           &middlewareID, &middlewarePriority,
+                           &customServiceID); err != nil {
+            log.Printf("Failed to scan resource middleware: %v", err)
+            continue
+        }
 		
 		// Set default router priority if null
 		priority := 100 // Default priority
@@ -1016,6 +1027,7 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		resourceInfo[resourceID] = struct {
 			Host          string
 			ServiceID     string
+			SourceType    string // Store sourceType
 			Entrypoints   string
 			TLSDomains    string
 			CustomHeaders string
@@ -1024,6 +1036,7 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		}{
 			Host:          host,
 			ServiceID:     serviceID,
+			SourceType:    sourceType, // Store sourceType
 			Entrypoints:   entrypoints,
 			TLSDomains:    tlsDomains,
 			CustomHeaders: customHeaders,
@@ -1058,52 +1071,43 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		})
 		
 		// Process entrypoints (comma-separated list to array)
-		entrypoints := []string{"websecure"} // Default
-		if info.Entrypoints != "" {
-			// Split by comma and trim spaces
-			rawEntrypoints := strings.Split(info.Entrypoints, ",")
-			entrypoints = make([]string, 0, len(rawEntrypoints))
-			for _, ep := range rawEntrypoints {
-				trimmed := strings.TrimSpace(ep)
-				if trimmed != "" {
-					entrypoints = append(entrypoints, trimmed)
-				}
-			}
-			
+        processedEntrypoints := []string{"websecure"} // Default
+        if info.Entrypoints != "" {
+            rawEntrypoints := strings.Split(info.Entrypoints, ",")
+            processedEntrypoints = make([]string, 0, len(rawEntrypoints))
+            for _, ep := range rawEntrypoints {
+                trimmed := strings.TrimSpace(ep)
+                if trimmed != "" {
+                    processedEntrypoints = append(processedEntrypoints, trimmed)
+                }
+            }
 			// If after processing we have no valid entrypoints, use the default
-			if len(entrypoints) == 0 {
-				entrypoints = []string{"websecure"}
-			}
-		}
+            if len(processedEntrypoints) == 0 {
+                processedEntrypoints = []string{"websecure"}
+            }
+        }
+		
 		
 		// Process custom headers if present
-		var customHeadersMiddleware string
-		if info.CustomHeaders != "" && info.CustomHeaders != "{}" && info.CustomHeaders != "null" {
-			// Parse the custom headers
-			var customHeaders map[string]string
-			if err := json.Unmarshal([]byte(info.CustomHeaders), &customHeaders); err != nil {
-				log.Printf("Failed to parse custom headers for resource %s: %v", resourceID, err)
-			} else if len(customHeaders) > 0 {
-				// Create a custom headers middleware
-				customHeadersMiddlewareID := fmt.Sprintf("%s-custom-headers", resourceID)
-				
-				// Preserve empty strings and special characters in custom headers
-				processedHeaders := make(map[string]interface{})
-				for k, v := range customHeaders {
-					processedHeaders[k] = v
-				}
-				
-				// Add the middleware to the config
-				config.HTTP.Middlewares[customHeadersMiddlewareID] = map[string]interface{}{
-					"headers": map[string]interface{}{
-						"customRequestHeaders": processedHeaders,
-					},
-				}
-				
-				// Add reference with file provider suffix
-				customHeadersMiddleware = fmt.Sprintf("%s@file", customHeadersMiddlewareID)
-			}
-		}
+        var customHeadersMiddleware string
+        if info.CustomHeaders != "" && info.CustomHeaders != "{}" && info.CustomHeaders != "null" {
+            var customHeadersMap map[string]string
+            if err := json.Unmarshal([]byte(info.CustomHeaders), &customHeadersMap); err != nil {
+                log.Printf("Failed to parse custom headers for resource %s: %v", resourceID, err)
+            } else if len(customHeadersMap) > 0 {
+                customHeadersMiddlewareID := fmt.Sprintf("%s-custom-headers", resourceID)
+                processedHeaders := make(map[string]interface{})
+                for k, v := range customHeadersMap {
+                    processedHeaders[k] = v
+                }
+                config.HTTP.Middlewares[customHeadersMiddlewareID] = map[string]interface{}{
+                    "headers": map[string]interface{}{
+                        "customRequestHeaders": processedHeaders,
+                    },
+                }
+                customHeadersMiddleware = fmt.Sprintf("%s@file", customHeadersMiddlewareID)
+            }
+        }
 		
 		// Extract middleware IDs from the sorted slice
 		var middlewareIDs []string
@@ -1118,40 +1122,69 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 			middlewareIDs = append(middlewareIDs, mw.ID)
 		}
 		
-		// Add "badger" middleware with http provider suffix if not already present
-		if !stringSliceContains(middlewareIDs, "badger@http") {
-			middlewareIDs = append(middlewareIDs, "badger@http")
-		}
+        // Conditionally add "badger@http" only if in Pangolin mode
+        if activeDSConfig.Type == models.PangolinAPI {
+            if !stringSliceContains(middlewareIDs, "badger@http") {
+                middlewareIDs = append(middlewareIDs, "badger@http")
+            }
+        }
 
 		// Process middleware references to add provider suffixes
-		for i, middleware := range middlewareIDs {
-			// If this is not already a fully qualified middleware reference and not the Pangolin badger middleware
-			if !strings.Contains(middleware, "@") && middleware != "badger@http" && middleware != customHeadersMiddleware {
-				// Assume it's from our file provider
-				middlewareIDs[i] = fmt.Sprintf("%s@file", middleware)
-			}
-		}
+		for i, middlewareIDStr := range middlewareIDs {
+            // Skip if already has a provider or is the dynamically generated custom header middleware (already suffixed)
+            if strings.Contains(middlewareIDStr, "@") || middlewareIDStr == customHeadersMiddleware {
+                continue
+            }
+
+            // Check if this middlewareIDStr matches an ID of a service defined in this config generation pass
+            isServiceAsMiddleware := false
+            if _, ok := config.HTTP.Services[middlewareIDStr]; ok {
+                isServiceAsMiddleware = true
+            } // Add checks for TCP/UDP if services can be middleware, though unlikely for HTTP router
+
+            if isServiceAsMiddleware {
+                // Services defined by this manager (and thus in config.HTTP.Services) are @file
+                middlewareIDs[i] = fmt.Sprintf("%s@file", middlewareIDStr)
+                log.Printf("Middleware %s for resource %s identified as service reference, using @file", middlewareIDStr, resourceID)
+            } else {
+                // Regular middlewares from the DB are considered @file
+                middlewareIDs[i] = fmt.Sprintf("%s@file", middlewareIDStr)
+            }
+        }
 
 		// Create a router with higher priority
 		customRouterID := fmt.Sprintf("%s-auth", resourceID)
 		
 		// Determine which service to use
 		var serviceReference string
-		if info.CustomServiceID.Valid && info.CustomServiceID.String != "" {
-			// Use the custom service with file provider suffix
-			serviceReference = fmt.Sprintf("%s@file", info.CustomServiceID.String)
-			log.Printf("Using custom service %s for resource %s", serviceReference, resourceID)
-		} else {
-			// Use the default service from http provider
-			serviceReference = fmt.Sprintf("%s@http", info.ServiceID)
-			log.Printf("Using default service %s for resource %s", serviceReference, resourceID)
-		}
-		
+        if info.CustomServiceID.Valid && info.CustomServiceID.String != "" {
+            // Custom service assigned via Middleware Manager is always @file
+            serviceReference = fmt.Sprintf("%s@file", info.CustomServiceID.String)
+            log.Printf("Resource %s: Using custom service %s (provider: @file)", resourceID, serviceReference)
+        } else {
+            // No custom service, use the default service_id from the resource.
+            // Determine its provider based on the resource's original source_type and the app's active data source.
+            defaultProviderSuffix := "http" // Fallback or for Pangolin-originated resources in Pangolin mode
+            if activeDSConfig.Type == models.TraefikAPI {
+                if models.DataSourceType(info.SourceType) == models.TraefikAPI {
+                    defaultProviderSuffix = "docker" // Resource from Traefik API, likely a Docker service
+                }
+                // If info.SourceType is PangolinAPI while app is in Traefik mode, still use http.
+            }
+            // If serviceID already contains a provider, use it as is.
+            if strings.Contains(info.ServiceID, "@") {
+                serviceReference = info.ServiceID
+            } else {
+                serviceReference = fmt.Sprintf("%s@%s", info.ServiceID, defaultProviderSuffix)
+            }
+            log.Printf("Resource %s: Using default service %s (resource source: %s, active source: %s)", resourceID, serviceReference, info.SourceType, activeDSConfig.Type)
+        }
+
 		// Basic router configuration - use the resource's router priority
 		routerConfig := map[string]interface{}{
 			"rule":        fmt.Sprintf("Host(`%s`)", info.Host),
 			"service":     serviceReference,
-			"entryPoints": entrypoints,
+			"entryPoints": processedEntrypoints,
 			"middlewares": middlewareIDs,
 			"priority":    info.RouterPriority, // Use the resource's router priority
 		}
@@ -1202,73 +1235,100 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 
 // processTCPRouters fetches and processes all resources with TCP SNI routing enabled
 func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
-	// Fetch resources with TCP routing enabled including router priority
-	rows, err := cg.db.Query(`
-		SELECT id, host, service_id, tcp_entrypoints, tcp_sni_rule, router_priority
-		FROM resources
-		WHERE status = 'active' AND tcp_enabled = 1
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to fetch TCP resources: %w", err)
-	}
-	defer rows.Close()
-	
-	for rows.Next() {
-		var id, host, serviceID, tcpEntrypoints, tcpSNIRule string
-		var routerPriority sql.NullInt64
-		
-		if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypoints, &tcpSNIRule, &routerPriority); err != nil {
-			log.Printf("Failed to scan TCP resource: %v", err)
-			continue
-		}
-		
-		// Set default router priority if null
-		priority := 100 // Default priority
-		if routerPriority.Valid {
-			priority = int(routerPriority.Int64)
-		}
-		
-		// Process TCP entrypoints (comma-separated list to array)
-		entrypoints := []string{"tcp"} // Default
-		if tcpEntrypoints != "" {
-			// Split by comma and trim spaces
-			rawEntrypoints := strings.Split(tcpEntrypoints, ",")
-			entrypoints = make([]string, 0, len(rawEntrypoints))
-			for _, ep := range rawEntrypoints {
-				trimmed := strings.TrimSpace(ep)
-				if trimmed != "" {
-					entrypoints = append(entrypoints, trimmed)
-				}
-			}
-			
-			// If after processing we have no valid entrypoints, use the default
-			if len(entrypoints) == 0 {
-				entrypoints = []string{"tcp"}
-			}
-		}
-		
-		// Create the rule - default to HostSNI for the domain if no custom rule
-		rule := fmt.Sprintf("HostSNI(`%s`)", host)
-		if tcpSNIRule != "" {
-			rule = tcpSNIRule
-		}
-		
-		// Create TCP router config with the specified priority
-		tcpRouterID := fmt.Sprintf("%s-tcp", id)
-		config.TCP.Routers[tcpRouterID] = map[string]interface{}{
-			"rule":        rule,
-			"service":     serviceID, // Reference service from http provider
-			"entryPoints": entrypoints,
-			"tls":         map[string]interface{}{},  // Enable TLS for SNI
-			"priority":    priority,  // Use the resource's router priority
-		}
-	}
-	
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error during TCP resources iteration: %w", err)
-	}
-	
-	return nil
+    activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        log.Printf("Warning: Could not get active data source config in processTCPRouters: %v. Defaulting provider logic.", err)
+        activeDSConfig.Type = models.PangolinAPI // Default
+    }
+
+    rows, err := cg.db.Query(`
+        SELECT r.id, r.host, r.service_id, r.tcp_entrypoints, r.tcp_sni_rule, r.router_priority, r.source_type, 
+               rs.service_id as custom_service_id
+        FROM resources r
+        LEFT JOIN resource_services rs ON r.id = rs.resource_id
+        WHERE r.status = 'active' AND r.tcp_enabled = 1
+    `)
+    if err != nil {
+        return fmt.Errorf("failed to fetch TCP resources: %w", err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var id, host, serviceID, tcpEntrypoints, tcpSNIRule, resourceSourceType string
+        var customServiceID sql.NullString
+        var routerPriority sql.NullInt64
+
+        if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypoints, &tcpSNIRule, &routerPriority, &resourceSourceType, &customServiceID); err != nil {
+            log.Printf("Failed to scan TCP resource: %v", err)
+            continue
+        }
+
+        priority := 100
+        if routerPriority.Valid {
+            priority = int(routerPriority.Int64)
+        }
+
+        processedTCPEntrypoints := []string{"tcp"} // Default
+        if tcpEntrypoints != "" {
+            rawTCPEntrypoints := strings.Split(tcpEntrypoints, ",")
+            processedTCPEntrypoints = make([]string, 0, len(rawTCPEntrypoints))
+            for _, ep := range rawTCPEntrypoints {
+                trimmed := strings.TrimSpace(ep)
+                if trimmed != "" {
+                    processedTCPEntrypoints = append(processedTCPEntrypoints, trimmed)
+                }
+            }
+            if len(processedTCPEntrypoints) == 0 {
+                processedTCPEntrypoints = []string{"tcp"}
+            }
+        }
+
+        rule := fmt.Sprintf("HostSNI(`%s`)", host)
+        if tcpSNIRule != "" {
+            rule = tcpSNIRule
+        }
+
+        var tcpServiceReference string
+        if customServiceID.Valid && customServiceID.String != "" {
+            tcpServiceReference = fmt.Sprintf("%s@file", customServiceID.String)
+            log.Printf("TCP Router %s: Using custom service %s (provider: @file)", id, tcpServiceReference)
+        } else {
+            defaultProviderSuffix := "http" // Fallback or Pangolin
+            if activeDSConfig.Type == models.TraefikAPI {
+                if models.DataSourceType(resourceSourceType) == models.TraefikAPI {
+                     // For TCP, if service is from Docker, it's usually referenced by name directly by Traefik's Docker provider
+                     // or if it's a loadbalancer of IPs, it has no specific provider for Traefik to auto-discover.
+                     // If serviceID contains "@", assume it's already correct.
+                    if !strings.Contains(serviceID, "@") {
+                        // This implies the serviceID is a name Traefik's Docker provider will resolve.
+                        defaultProviderSuffix = "docker" 
+                    } else {
+                        defaultProviderSuffix = "" // Keep existing provider
+                    }
+                }
+            }
+            if defaultProviderSuffix != "" && !strings.Contains(serviceID, "@") {
+                tcpServiceReference = fmt.Sprintf("%s@%s", serviceID, defaultProviderSuffix)
+            } else {
+                tcpServiceReference = serviceID // Use as-is (already has provider or needs none for Traefik internal)
+            }
+             log.Printf("TCP Router %s: Using default service %s (resource source: %s, active source: %s)", id, tcpServiceReference, resourceSourceType, activeDSConfig.Type)
+        }
+
+        tcpRouterID := fmt.Sprintf("%s-tcp", id)
+        config.TCP.Routers[tcpRouterID] = map[string]interface{}{
+            "rule":        rule,
+            "service":     tcpServiceReference,
+            "entryPoints": processedTCPEntrypoints,
+            "tls":         map[string]interface{}{}, // Enable TLS for SNI by default for TCP routers
+            "priority":    priority,
+        }
+    }
+
+    if err := rows.Err(); err != nil {
+        return fmt.Errorf("error during TCP resources iteration: %w", err)
+    }
+    return nil
 }
 
 // stringSliceContains checks if a string is in a slice

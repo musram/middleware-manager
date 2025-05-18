@@ -40,14 +40,14 @@ func (h *ResourceHandler) GetResources(c *gin.Context) {
 
 	var resources []map[string]interface{}
 	for rows.Next() {
-		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
+		var id, host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders, sourceType string
 		var tcpEnabled int
 		var routerPriority sql.NullInt64
 		var middlewares sql.NullString
 		
 		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, 
 				&entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-				&customHeaders, &routerPriority, &middlewares); err != nil {
+				&customHeaders, &routerPriority, &sourceType, &middlewares); err != nil {
 			log.Printf("Error scanning resource row: %v", err)
 			continue
 		}
@@ -72,6 +72,7 @@ func (h *ResourceHandler) GetResources(c *gin.Context) {
 			"tcp_sni_rule":    tcpSNIRule,
 			"custom_headers":  customHeaders,
 			"router_priority": priority,
+			"source_type":     sourceType, // <--- ADDED sourceType
 		}
 		
 		if middlewares.Valid {
@@ -100,7 +101,7 @@ func (h *ResourceHandler) GetResource(c *gin.Context) {
 		return
 	}
 
-	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
+	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders, sourceType string
 	var tcpEnabled int
 	var routerPriority sql.NullInt64
 	var middlewares sql.NullString
@@ -108,7 +109,7 @@ func (h *ResourceHandler) GetResource(c *gin.Context) {
 	err := h.DB.QueryRow(`
 		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers, r.router_priority,
+		       r.custom_headers, r.router_priority, r.source_type,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -117,7 +118,7 @@ func (h *ResourceHandler) GetResource(c *gin.Context) {
 		GROUP BY r.id
 	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
 		    &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-		    &customHeaders, &routerPriority, &middlewares)
+		    &customHeaders, &routerPriority, &sourceType, &middlewares)
 
 	if err == sql.ErrNoRows {
 		ResponseWithError(c, http.StatusNotFound, fmt.Sprintf("Resource not found: %s", id))
@@ -148,6 +149,7 @@ func (h *ResourceHandler) GetResource(c *gin.Context) {
 		"tcp_sni_rule":    tcpSNIRule,
 		"custom_headers":  customHeaders,
 		"router_priority": priority,
+		"source_type":     sourceType, // <--- ADDED sourceType
 	}
 
 	if middlewares.Valid {

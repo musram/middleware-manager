@@ -128,7 +128,7 @@ func main() {
 	go resourceWatcher.Start(cfg.CheckInterval)
 
 	// Start configuration generator
-	configGenerator := services.NewConfigGenerator(db, cfg.TraefikConfDir)
+	configGenerator := services.NewConfigGenerator(db, cfg.TraefikConfDir, configManager)
 	go configGenerator.Start(cfg.GenerateInterval)
 
 	// Start API server
