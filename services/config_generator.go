@@ -227,6 +227,9 @@ func (cg *ConfigGenerator) processServices(config *TraefikConfig) error {
 	return rows.Err()
 }
 
+// In services/config_generator.go
+
+// processResourcesWithServices processes resources with their assigned services
 func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) error {
 	activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
 	if err != nil {
@@ -251,86 +254,94 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 	}
 	defer rows.Close()
 
-	resourceDataMap := make(map[string]struct {
-		Info        models.Resource
-		Middlewares []MiddlewareWithPriority
+	type resourceProcessedData struct {
+		Info            models.Resource
+		Middlewares     []MiddlewareWithPriority
 		CustomServiceID sql.NullString
-	})
+	}
+	resourceDataMap := make(map[string]resourceProcessedData)
 
 	for rows.Next() {
-		var rID, host, serviceID, entrypoints, tlsDomains, customHeadersStr, sourceType string
-		var routerPriority sql.NullInt64 // Use sql.NullInt64 for router_priority
-		var middlewareID sql.NullString
-		var middlewarePriority sql.NullInt64
-		var customServiceIDVal sql.NullString
+		var rID_db, host_db, serviceID_db, entrypoints_db, tlsDomains_db, customHeadersStr_db, sourceType_db string
+		var routerPriority_db sql.NullInt64
+		var middlewareID_db sql.NullString
+		var middlewarePriority_db sql.NullInt64
+		var customServiceID_db sql.NullString
 
 		err := rows.Scan(
-			&rID, &host, &serviceID, &entrypoints, &tlsDomains,
-			&customHeadersStr, &routerPriority, &sourceType,
-			&middlewareID, &middlewarePriority, &customServiceIDVal,
+			&rID_db, &host_db, &serviceID_db, &entrypoints_db, &tlsDomains_db,
+			&customHeadersStr_db, &routerPriority_db, &sourceType_db,
+			&middlewareID_db, &middlewarePriority_db, &customServiceID_db,
 		)
 		if err != nil {
 			log.Printf("Failed to scan resource data for HTTP router: %v", err)
 			continue
 		}
 		
-		data, exists := resourceDataMap[rID]
+		data, exists := resourceDataMap[rID_db]
 		if !exists {
 			data.Info = models.Resource{
-				ID:            rID,
-				Host:          host,
-				ServiceID:     serviceID,
-				Entrypoints:   entrypoints,
-				TLSDomains:    tlsDomains,
-				CustomHeaders: customHeadersStr,
-				SourceType:    sourceType,
-				// RouterPriority will be set from sql.NullInt64
+				ID:            rID_db,
+				Host:          host_db,
+				ServiceID:     serviceID_db,
+				Entrypoints:   entrypoints_db,
+				TLSDomains:    tlsDomains_db,
+				CustomHeaders: customHeadersStr_db,
+				SourceType:    sourceType_db,
 			}
-			if routerPriority.Valid {
-				data.Info.RouterPriority = int(routerPriority.Int64)
+			if routerPriority_db.Valid {
+				data.Info.RouterPriority = int(routerPriority_db.Int64)
 			} else {
-				data.Info.RouterPriority = 100 // Default if NULL
+				data.Info.RouterPriority = 100 // Default
 			}
-			data.CustomServiceID = customServiceIDVal
+			data.CustomServiceID = customServiceID_db
 		}
-		if middlewareID.Valid {
-			mwPriority := 100 // Default priority
-			if middlewarePriority.Valid {
-				mwPriority = int(middlewarePriority.Int64)
+
+		if middlewareID_db.Valid {
+			mwPriority := 100 
+			if middlewarePriority_db.Valid {
+				mwPriority = int(middlewarePriority_db.Int64)
 			}
 			data.Middlewares = append(data.Middlewares, MiddlewareWithPriority{
-				ID:       middlewareID.String,
+				ID:       middlewareID_db.String,
 				Priority: mwPriority,
 			})
 		}
-		resourceDataMap[rID] = data
+		resourceDataMap[rID_db] = data
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("error iterating resource rows for HTTP: %w", err)
 	}
 	
-	for _, data := range resourceDataMap {
-		info := data.Info
-		assignedMiddlewares := data.Middlewares // Already sorted by DB or sort here if needed
+	for _, mapValueDataEntry := range resourceDataMap { // Variables for this loop
+		info := mapValueDataEntry.Info         // Use mapValueDataEntry to access Info
+		assignedMiddlewares := mapValueDataEntry.Middlewares // Use mapValueDataEntry to access Middlewares
+		
 		sort.SliceStable(assignedMiddlewares, func(i, j int) bool {
 			return assignedMiddlewares[i].Priority > assignedMiddlewares[j].Priority
 		})
 
 		routerEntryPoints := strings.Split(strings.TrimSpace(info.Entrypoints), ",")
-		if len(routerEntryPoints) == 0 || routerEntryPoints[0] == "" {
+		if len(routerEntryPoints) == 0 || (len(routerEntryPoints) == 1 && routerEntryPoints[0] == "") {
 			routerEntryPoints = []string{"websecure"}
 		}
 
 		var customHeadersMiddlewareID string
 		if info.CustomHeaders != "" && info.CustomHeaders != "{}" && info.CustomHeaders != "null" {
-			var headersMap map[string]string
+			var headersMap map[string]string 
 			if err := json.Unmarshal([]byte(info.CustomHeaders), &headersMap); err == nil && len(headersMap) > 0 {
-				middlewareName := fmt.Sprintf("%s-customheaders", info.ID)
+				middlewareName := fmt.Sprintf("%s-customheaders", info.ID) 
+				customRequestHeadersMap := make(map[string]string)
+				for k,v := range headersMap {
+					customRequestHeadersMap[k] = v
+				}
 				config.HTTP.Middlewares[middlewareName] = map[string]interface{}{
-					"headers": map[string]interface{}{"customRequestHeaders": headersMap},
+					"headers": map[string]interface{}{"customRequestHeaders": customRequestHeadersMap},
 				}
 				customHeadersMiddlewareID = fmt.Sprintf("%s@file", middlewareName)
-			}
+			} else if err != nil {
+                 log.Printf("Failed to parse custom headers for resource %s: %v. Headers: %s", info.ID, err, info.CustomHeaders)
+            }
 		}
 
 		var finalMiddlewares []string
@@ -341,7 +352,6 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 			finalMiddlewares = append(finalMiddlewares, fmt.Sprintf("%s@file", mw.ID))
 		}
 		
-		// Conditionally add "badger@http"
 		if activeDSConfig.Type == models.PangolinAPI {
 			isBadgerPresent := false
 			for _, m := range finalMiddlewares {
@@ -356,30 +366,36 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		}
 		
 		var serviceReference string
-		if data.CustomServiceID.Valid && data.CustomServiceID.String != "" {
-			serviceReference = fmt.Sprintf("%s@file", data.CustomServiceID.String)
+		// Use mapValueDataEntry.CustomServiceID here
+		if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
+			serviceReference = fmt.Sprintf("%s@file", mapValueDataEntry.CustomServiceID.String)
 		} else {
-			providerSuffix := "http" // Default for Pangolin or unknown resource source
+			providerSuffix := "http" 
 			if activeDSConfig.Type == models.TraefikAPI {
 				if models.DataSourceType(info.SourceType) == models.TraefikAPI {
-					providerSuffix = "docker" // Resource from Traefik API, likely a Docker service
+					providerSuffix = "docker" 
 				}
 			}
 			if strings.Contains(info.ServiceID, "@") {
-				serviceReference = info.ServiceID // Already has a provider
+				serviceReference = info.ServiceID 
 			} else {
 				serviceReference = fmt.Sprintf("%s@%s", info.ServiceID, providerSuffix)
 			}
 		}
-		log.Printf("Resource %s (HTTP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)", info.ID, serviceReference, info.SourceType, activeDSConfig.Type, data.CustomServiceID.String)
+		
+		log.Printf("Resource %s (HTTP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
+			info.ID, // This ID comes from the map value's Info struct
+			serviceReference,
+			info.SourceType,
+			activeDSConfig.Type,
+			mapValueDataEntry.CustomServiceID.String) // Use mapValueDataEntry
 
-
-		routerID := fmt.Sprintf("%s-auth", info.ID) // Ensure unique router ID
+		routerIDForTraefik := fmt.Sprintf("%s-auth", info.ID) 
 		routerConfig := map[string]interface{}{
 			"rule":        fmt.Sprintf("Host(`%s`)", info.Host),
 			"service":     serviceReference,
 			"entryPoints": routerEntryPoints,
-			"priority":    info.RouterPriority,
+			"priority":    info.RouterPriority, 
 		}
 		if len(finalMiddlewares) > 0 {
 			routerConfig["middlewares"] = finalMiddlewares
@@ -399,7 +415,7 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 			}
 		}
 		routerConfig["tls"] = tlsConfig
-		config.HTTP.Routers[routerID] = routerConfig
+		config.HTTP.Routers[routerIDForTraefik] = routerConfig
 	}
 	return nil
 }
