@@ -20,11 +20,12 @@ func NewResourceHandler(db *sql.DB) *ResourceHandler {
 }
 
 // GetResources returns all resources and their assigned middlewares
+// GetResources returns all resources and their assigned middlewares
 func (h *ResourceHandler) GetResources(c *gin.Context) {
 	rows, err := h.DB.Query(`
 		SELECT r.id, r.host, r.service_id, r.org_id, r.site_id, r.status, 
 		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers, r.router_priority,
+		       r.custom_headers, r.router_priority, r.source_type,
 		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
 		FROM resources r
 		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
@@ -45,6 +46,7 @@ func (h *ResourceHandler) GetResources(c *gin.Context) {
 		var routerPriority sql.NullInt64
 		var middlewares sql.NullString
 		
+		// Fixed scan operation to match the exact order and number of columns in the query
 		if err := rows.Scan(&id, &host, &serviceID, &orgID, &siteID, &status, 
 				&entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
 				&customHeaders, &routerPriority, &sourceType, &middlewares); err != nil {
@@ -72,7 +74,7 @@ func (h *ResourceHandler) GetResources(c *gin.Context) {
 			"tcp_sni_rule":    tcpSNIRule,
 			"custom_headers":  customHeaders,
 			"router_priority": priority,
-			"source_type":     sourceType, // <--- ADDED sourceType
+			"source_type":     sourceType, // Make sure this is included in the returned resource
 		}
 		
 		if middlewares.Valid {
