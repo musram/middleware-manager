@@ -116,7 +116,7 @@ const App = () => {
       <DataSourceProvider>
         <ResourceProvider>
           <MiddlewareProvider>
-            <ServiceProvider>.
+            <ServiceProvider>
             <PluginProvider> {/* Add PluginProvider */}
               <MainContent />
             </PluginProvider>
