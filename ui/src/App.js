@@ -81,9 +81,14 @@ const MainContent = () => {
           />
         );
         case 'plugin-hub': // Add case for Plugin Hub
-        return <PluginHub navigateTo={navigateTo} />;
+        return 
+          <PluginHub 
+            navigateTo={navigateTo} 
+          />;
       default:
-        return <Dashboard navigateTo={navigateTo} />;
+        return 
+        <Dashboard navigateTo={navigateTo} 
+        />;
     }
   };
 
