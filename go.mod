@@ -2,7 +2,6 @@ module github.com/hhftechnology/middleware-manager
 
 go 1.23
 
-toolchain go1.24.2
 
 require (
 	github.com/gin-contrib/cors v1.7.5
