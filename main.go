@@ -247,7 +247,7 @@ func loadConfiguration(debug bool) Configuration {
 		AllowCORS:        allowCORS,
 		CORSOrigin:       getEnv("CORS_ORIGIN", ""),
 		TraefikStaticConfigPath: getEnv("TRAEFIK_STATIC_CONFIG_PATH", "/etc/traefik/traefik.yml"), // New
-		PluginsJSONURL:   getEnv("PLUGINS_JSON_URL", "https://raw.githubusercontent.com/hhftechnology/middleware-manager/refs/heads/traefik-int/plugin/plugins.json"), // New
+		PluginsJSONURL:   getEnv("PLUGINS_JSON_URL", "https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json"), // New
 	}
 }
 
