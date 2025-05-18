@@ -11,9 +11,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"encoding/json"
-	"io/ioutil"
-	"fmt"
 
 	"github.com/hhftechnology/middleware-manager/api"
 	"github.com/hhftechnology/middleware-manager/config"
@@ -257,28 +254,4 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-// Helper function to fetch and parse plugins.json
-func fetchPlugins(url string) ([]Plugin, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch plugins json: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch plugins json: status code %d", resp.StatusCode)
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read plugins json response body: %w", err)
-	}
-
-	var plugins []Plugin
-	if err := json.Unmarshal(body, &plugins); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal plugins json: %w", err)
-	}
-	return plugins, nil
 }
