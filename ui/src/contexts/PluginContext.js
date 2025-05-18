@@ -1,14 +1,14 @@
 // ui/src/contexts/PluginContext.js
 import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
-import { LoadingSpinner, ErrorMessage as GlobalErrorMessage } from '../components/common'; // Renamed to avoid conflict
+// Ensure GlobalErrorMessage is imported correctly if you use it elsewhere in this file.
+// For now, local error display via alert/setError should suffice for these new functions.
 
 const API_URL = '/api/plugins';
 
-// Create the context
 const PluginContext = createContext();
 
 export const PluginProvider = ({ children }) => {
-  const [plugins, setPlugins] = useState([]);
+  const [plugins, setPlugins] = useState([]); // Will now store plugins with status
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [traefikConfigPath, setTraefikConfigPath] = useState('');
@@ -28,14 +28,14 @@ export const PluginProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch plugins:', err);
       setError(`Failed to load plugins: ${err.message}`);
-      setPlugins([]); // Ensure plugins is an array on error
+      setPlugins([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   const installPlugin = useCallback(async (pluginData) => {
-    setLoading(true);
+    // setLoading(true); // Individual button will handle its loading state
     setError(null);
     try {
       const response = await fetch(`${API_URL}/install`, {
@@ -48,17 +48,46 @@ export const PluginProvider = ({ children }) => {
         throw new Error(errData.message);
       }
       const result = await response.json();
-      // Optionally, refresh plugins or handle success (e.g., show a message)
-      alert(result.message || 'Plugin installation initiated successfully!');
+      alert(result.message || 'Plugin installation initiated successfully! Restart Traefik to apply.');
+      fetchPlugins(); // Refresh plugin list to show installed status
       return true;
     } catch (err) {
       console.error('Failed to install plugin:', err);
       setError(`Failed to install plugin: ${err.message}`);
+      // alert(`Failed to install plugin: ${err.message}`); // Alert is now in the component
       return false;
     } finally {
-      setLoading(false);
+      // setLoading(false);
     }
-  }, []);
+  }, [fetchPlugins]);
+
+  const removePlugin = useCallback(async (moduleName) => {
+    // setLoading(true); // Individual button will handle its loading state
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/remove`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleName }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errData.message);
+      }
+      const result = await response.json();
+      alert(result.message || 'Plugin removal initiated successfully! Restart Traefik to apply.');
+      fetchPlugins(); // Refresh plugin list
+      return true;
+    } catch (err) {
+      console.error('Failed to remove plugin:', err);
+      setError(`Failed to remove plugin: ${err.message}`);
+      // alert(`Failed to remove plugin: ${err.message}`); // Alert is now in the component
+      return false;
+    } finally {
+      // setLoading(false);
+    }
+  }, [fetchPlugins]);
+
 
   const fetchTraefikConfigPath = useCallback(async () => {
     setFetchingPath(true);
@@ -81,7 +110,7 @@ export const PluginProvider = ({ children }) => {
   }, []);
 
   const updateTraefikConfigPath = useCallback(async (newPath) => {
-    setLoading(true); // Use general loading for this action
+    setLoading(true);
     setError(null);
     try {
       const response = await fetch(`${API_URL}/configpath`, {
@@ -94,7 +123,7 @@ export const PluginProvider = ({ children }) => {
         throw new Error(errData.message);
       }
       const data = await response.json();
-      setTraefikConfigPath(data.path || ''); // Update local state with the path confirmed by backend
+      setTraefikConfigPath(data.path || '');
       alert(data.message || 'Traefik config path updated successfully!');
       return true;
     } catch (err) {
@@ -113,16 +142,17 @@ export const PluginProvider = ({ children }) => {
   }, [fetchPlugins, fetchTraefikConfigPath]);
 
   const value = {
-    plugins,
+    plugins, // This will now be []PluginWithStatus
     loading,
     error,
     fetchPlugins,
     installPlugin,
+    removePlugin, // Add removePlugin to context
     traefikConfigPath,
     fetchingPath,
     fetchTraefikConfigPath,
     updateTraefikConfigPath,
-    setError, // Expose setError
+    setError,
   };
 
   return (

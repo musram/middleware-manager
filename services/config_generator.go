@@ -230,6 +230,7 @@ func (cg *ConfigGenerator) processServices(config *TraefikConfig) error {
 // In services/config_generator.go
 
 // processResourcesWithServices processes resources with their assigned services
+// processResourcesWithServices processes resources with their assigned services
 func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) error {
 	activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
 	if err != nil {
@@ -313,9 +314,9 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		return fmt.Errorf("error iterating resource rows for HTTP: %w", err)
 	}
 	
-	for _, mapValueDataEntry := range resourceDataMap { // Variables for this loop
-		info := mapValueDataEntry.Info         // Use mapValueDataEntry to access Info
-		assignedMiddlewares := mapValueDataEntry.Middlewares // Use mapValueDataEntry to access Middlewares
+	for _, mapValueDataEntry := range resourceDataMap {
+		info := mapValueDataEntry.Info
+		assignedMiddlewares := mapValueDataEntry.Middlewares
 		
 		sort.SliceStable(assignedMiddlewares, func(i, j int) bool {
 			return assignedMiddlewares[i].Priority > assignedMiddlewares[j].Priority
@@ -340,8 +341,8 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 				}
 				customHeadersMiddlewareID = fmt.Sprintf("%s@file", middlewareName)
 			} else if err != nil {
-                 log.Printf("Failed to parse custom headers for resource %s: %v. Headers: %s", info.ID, err, info.CustomHeaders)
-            }
+				log.Printf("Failed to parse custom headers for resource %s: %v. Headers: %s", info.ID, err, info.CustomHeaders)
+			}
 		}
 
 		var finalMiddlewares []string
@@ -352,6 +353,7 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 			finalMiddlewares = append(finalMiddlewares, fmt.Sprintf("%s@file", mw.ID))
 		}
 		
+		// Only add the badger middleware when using Pangolin data source
 		if activeDSConfig.Type == models.PangolinAPI {
 			isBadgerPresent := false
 			for _, m := range finalMiddlewares {
@@ -366,29 +368,36 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		}
 		
 		var serviceReference string
-		// Use mapValueDataEntry.CustomServiceID here
 		if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
-			serviceReference = fmt.Sprintf("%s@file", mapValueDataEntry.CustomServiceID.String)
-		} else {
-			providerSuffix := "http" 
-			if activeDSConfig.Type == models.TraefikAPI {
-				if models.DataSourceType(info.SourceType) == models.TraefikAPI {
-					providerSuffix = "docker" 
-				}
+			// If the custom service ID already contains a provider, preserve it
+			if strings.Contains(mapValueDataEntry.CustomServiceID.String, "@") {
+				serviceReference = mapValueDataEntry.CustomServiceID.String
+			} else {
+				serviceReference = fmt.Sprintf("%s@file", mapValueDataEntry.CustomServiceID.String)
 			}
+		} else {
+			// For Docker environments when using Traefik API, prefer docker provider
+			providerSuffix := "docker"
+			
+			// If not using Traefik API as data source, use http provider
+			if activeDSConfig.Type != models.TraefikAPI {
+				providerSuffix = "http"
+			}
+			
+			// If service ID already has a provider suffix, preserve it
 			if strings.Contains(info.ServiceID, "@") {
-				serviceReference = info.ServiceID 
+				serviceReference = info.ServiceID
 			} else {
 				serviceReference = fmt.Sprintf("%s@%s", info.ServiceID, providerSuffix)
 			}
 		}
 		
 		log.Printf("Resource %s (HTTP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
-			info.ID, // This ID comes from the map value's Info struct
+			info.ID,
 			serviceReference,
 			info.SourceType,
 			activeDSConfig.Type,
-			mapValueDataEntry.CustomServiceID.String) // Use mapValueDataEntry
+			mapValueDataEntry.CustomServiceID.String)
 
 		routerIDForTraefik := fmt.Sprintf("%s-auth", info.ID) 
 		routerConfig := map[string]interface{}{

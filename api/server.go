@@ -188,6 +188,7 @@ func (s *Server) setupRoutes(uiPath string) {
 				{
 					pluginsGroup.GET("", s.pluginHandler.GetPlugins) // Endpoint to list plugins
 					pluginsGroup.POST("/install", s.pluginHandler.InstallPlugin) // Endpoint to install a plugin
+					pluginsGroup.DELETE("/remove", s.pluginHandler.RemovePlugin) // New Remove Endpoint
 					pluginsGroup.GET("/configpath", s.pluginHandler.GetTraefikStaticConfigPath) // Endpoint to get current path
 					pluginsGroup.PUT("/configpath", s.pluginHandler.UpdateTraefikStaticConfigPath) // Endpoint to update path
 		
