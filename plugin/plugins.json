@@ -54,7 +54,7 @@
   {
     "displayName": "RequestLogger",
     "type": "middleware",
-    "iconPath": "", // Can be empty if no specific icon, or point to a generic one
+    "iconPath": "", 
     "import": "github.com/acouvreur/traefik-plugin-request-logger",
     "summary": "Logs incoming requests with configurable format.",
     "author": "Antoine Couvreur",
@@ -76,5 +76,4 @@
     "homepage": "https://github.com/BetterCorp/cloudflarewarp",
     "docs": "https://plugins.traefik.io/plugins/62830a3ea380546bcf5399e7/cloudflare-warp-authentication"
   }
-  // Add more plugins here following the same structure
 ]
