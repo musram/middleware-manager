@@ -96,71 +96,72 @@ func (h *ResourceHandler) GetResources(c *gin.Context) {
 }
 
 // GetResource returns a specific resource
+// GetResource returns a specific resource
 func (h *ResourceHandler) GetResource(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
-		return
-	}
+    id := c.Param("id")
+    if id == "" {
+        ResponseWithError(c, http.StatusBadRequest, "Resource ID is required")
+        return
+    }
 
-	var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders, sourceType string
-	var tcpEnabled int
-	var routerPriority sql.NullInt64
-	var middlewares sql.NullString
+    var host, serviceID, orgID, siteID, status, entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders, sourceType string
+    var tcpEnabled int
+    var routerPriority sql.NullInt64
+    var middlewares sql.NullString
 
-	err := h.DB.QueryRow(`
-		SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
-		       r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
-		       r.custom_headers, r.router_priority, r.source_type,
-		       GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
-		FROM resources r
-		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
-		LEFT JOIN middlewares m ON rm.middleware_id = m.id
-		WHERE r.id = ?
-		GROUP BY r.id
-	`, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
-		    &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
-		    &customHeaders, &routerPriority, &sourceType, &middlewares)
+    err := h.DB.QueryRow(`
+        SELECT r.host, r.service_id, r.org_id, r.site_id, r.status,
+               r.entrypoints, r.tls_domains, r.tcp_enabled, r.tcp_entrypoints, r.tcp_sni_rule,
+               r.custom_headers, r.router_priority, r.source_type,
+               GROUP_CONCAT(m.id || ':' || m.name || ':' || rm.priority, ',') as middlewares
+        FROM resources r
+        LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
+        LEFT JOIN middlewares m ON rm.middleware_id = m.id
+        WHERE r.id = ?
+        GROUP BY r.id
+    `, id).Scan(&host, &serviceID, &orgID, &siteID, &status, 
+            &entrypoints, &tlsDomains, &tcpEnabled, &tcpEntrypoints, &tcpSNIRule, 
+            &customHeaders, &routerPriority, &sourceType, &middlewares)
 
-	if err == sql.ErrNoRows {
-		ResponseWithError(c, http.StatusNotFound, fmt.Sprintf("Resource not found: %s", id))
-		return
-	} else if err != nil {
-		log.Printf("Error fetching resource: %v", err)
-		ResponseWithError(c, http.StatusInternalServerError, "Failed to fetch resource")
-		return
-	}
-	
-	// Use default priority if null
-	priority := 100 // Default value
-	if routerPriority.Valid {
-		priority = int(routerPriority.Int64)
-	}
+    if err == sql.ErrNoRows {
+        ResponseWithError(c, http.StatusNotFound, fmt.Sprintf("Resource not found: %s", id))
+        return
+    } else if err != nil {
+        log.Printf("Error fetching resource: %v", err)
+        ResponseWithError(c, http.StatusInternalServerError, "Failed to fetch resource")
+        return
+    }
+    
+    // Use default priority if null
+    priority := 100 // Default value
+    if routerPriority.Valid {
+        priority = int(routerPriority.Int64)
+    }
 
-	resource := map[string]interface{}{
-		"id":              id,
-		"host":            host,
-		"service_id":      serviceID,
-		"org_id":          orgID,
-		"site_id":         siteID,
-		"status":          status,
-		"entrypoints":     entrypoints,
-		"tls_domains":     tlsDomains,
-		"tcp_enabled":     tcpEnabled > 0,
-		"tcp_entrypoints": tcpEntrypoints,
-		"tcp_sni_rule":    tcpSNIRule,
-		"custom_headers":  customHeaders,
-		"router_priority": priority,
-		"source_type":     sourceType, // <--- ADDED sourceType
-	}
+    resource := map[string]interface{}{
+        "id":              id,
+        "host":            host,
+        "service_id":      serviceID,
+        "org_id":          orgID,
+        "site_id":         siteID,
+        "status":          status,
+        "entrypoints":     entrypoints,
+        "tls_domains":     tlsDomains,
+        "tcp_enabled":     tcpEnabled > 0,
+        "tcp_entrypoints": tcpEntrypoints,
+        "tcp_sni_rule":    tcpSNIRule,
+        "custom_headers":  customHeaders,
+        "router_priority": priority,
+        "source_type":     sourceType, // Make sure this is included
+    }
 
-	if middlewares.Valid {
-		resource["middlewares"] = middlewares.String
-	} else {
-		resource["middlewares"] = ""
-	}
+    if middlewares.Valid {
+        resource["middlewares"] = middlewares.String
+    } else {
+        resource["middlewares"] = ""
+    }
 
-	c.JSON(http.StatusOK, resource)
+    c.JSON(http.StatusOK, resource)
 }
 
 // DeleteResource deletes a resource from the database
