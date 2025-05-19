@@ -123,6 +123,13 @@ func main() {
 	if err := config.LoadDefaultServiceTemplates(db); err != nil {
 		log.Printf("Warning: Failed to load default service templates: %v", err)
 	}
+	log.Println("Cleaning up duplicate services...")
+if err := db.CleanupDuplicateServices(); err != nil {
+    log.Printf("Warning: Failed to clean up duplicate services: %v", err)
+} else {
+    log.Println("Service cleanup completed successfully")
+}
+
 
 	configManager, err := services.NewConfigManager(filepath.Join(configDir, "config.json"))
 	if err != nil {

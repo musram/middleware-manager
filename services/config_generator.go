@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/http"
 
 	"github.com/hhftechnology/middleware-manager/database"
 	"github.com/hhftechnology/middleware-manager/models" // Correct import for your models
@@ -97,7 +98,15 @@ func (cg *ConfigGenerator) Start(interval time.Duration) {
 		}
 	}
 }
-
+// Add this helper function at the top of the file with other utility functions
+func normalizeServiceID(id string) string {
+    // Extract the base name (everything before the first @)
+    baseName := id
+    if idx := strings.Index(id, "@"); idx > 0 {
+        baseName = id[:idx]
+    }
+    return baseName
+}
 // Stop stops the config generator
 func (cg *ConfigGenerator) Stop() {
 	cg.mutex.Lock()
@@ -378,26 +387,27 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
             }
         }
         
-        var serviceReference string
-        if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
-            // Extract base name without any suffixes
-            baseName := extractBaseName(mapValueDataEntry.CustomServiceID.String)
-            // Always add the file provider for custom services
-            serviceReference = fmt.Sprintf("%s@file", baseName)
-        } else {
-            // For Docker environments when using Traefik API, prefer docker provider
-            providerSuffix := "docker"
-            
-            // If not using Traefik API as data source, use http provider
-            if activeDSConfig.Type != models.TraefikAPI {
-                providerSuffix = "http"
-            }
-            
-            // Extract base name without any suffixes
-            baseName := extractBaseName(info.ServiceID)
-            // Add the appropriate provider suffix
-            serviceReference = fmt.Sprintf("%s@%s", baseName, providerSuffix)
-        }
+// Find the section where serviceReference is set
+var serviceReference string
+if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
+    // Extract base name without any suffixes
+    baseName := normalizeServiceID(mapValueDataEntry.CustomServiceID.String)
+    // Always add the file provider for custom services
+    serviceReference = fmt.Sprintf("%s@file", baseName)
+} else {
+    // For Docker environments when using Traefik API, prefer docker provider
+    providerSuffix := "docker"
+    
+    // If not using Traefik API as data source, use http provider
+    if activeDSConfig.Type != models.TraefikAPI {
+        providerSuffix = "http"
+    }
+    
+    // Extract base name without any suffixes
+    baseName := normalizeServiceID(info.ServiceID)
+    // Add the appropriate provider suffix
+    serviceReference = fmt.Sprintf("%s@%s", baseName, providerSuffix)
+}
         
         log.Printf("Resource %s (HTTP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
             info.ID,
@@ -437,6 +447,54 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
         config.HTTP.Routers[routerIDForTraefik] = routerConfig
     }
     return nil
+}
+
+// Add to the imports if needed:
+// import "encoding/json"
+
+// Helper to fetch service names from Traefik API
+func (cg *ConfigGenerator) fetchTraefikServiceNames() map[string]string {
+    serviceMap := make(map[string]string)
+    client := &http.Client{Timeout: 5 * time.Second}
+    
+    // Get Traefik API URL from data source config
+    dsConfig, err := cg.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        log.Printf("Warning: Failed to get active data source config: %v", err)
+        return serviceMap
+    }
+    
+    apiURL := dsConfig.URL
+    
+    // Fetch HTTP services
+    resp, err := client.Get(apiURL + "/api/http/services")
+    if err != nil {
+        log.Printf("Warning: Failed to fetch services from Traefik API: %v", err)
+        return serviceMap
+    }
+    defer resp.Body.Close()
+    
+    if resp.StatusCode != http.StatusOK {
+        log.Printf("Warning: Traefik API returned status %d", resp.StatusCode)
+        return serviceMap
+    }
+    
+    var services []struct {
+        Name string `json:"name"`
+    }
+    
+    if err := json.NewDecoder(resp.Body).Decode(&services); err != nil {
+        log.Printf("Warning: Failed to decode Traefik API response: %v", err)
+        return serviceMap
+    }
+    
+    // Build a map of base name -> full name with provider
+    for _, svc := range services {
+        baseName := normalizeServiceID(svc.Name)
+        serviceMap[baseName] = svc.Name
+    }
+    
+    return serviceMap
 }
 
 // processTCPRouters processes TCP router resources
@@ -484,29 +542,28 @@ func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
             rule = fmt.Sprintf("HostSNI(`%s`)", host)
         }
 
-        var tcpServiceReference string
-        if customServiceID.Valid && customServiceID.String != "" {
-            // Extract base name without any suffixes
-            baseName := extractBaseName(customServiceID.String)
-            // Always add the file provider for custom services
-            tcpServiceReference = fmt.Sprintf("%s@file", baseName)
-        } else {
-            // Default provider suffix
-            providerSuffix := "http"
-            
-            // If using Traefik API, consider using docker for appropriate sources
-            if activeDSConfig.Type == models.TraefikAPI {
-                if models.DataSourceType(sourceType) == models.TraefikAPI {
-                    providerSuffix = "docker"
-                }
-            }
-            
-            // Extract base name without any suffixes
-            baseName := extractBaseName(serviceID)
-            // Add the appropriate provider suffix
-            tcpServiceReference = fmt.Sprintf("%s@%s", baseName, providerSuffix)
-        }
-        
+		var tcpServiceReference string
+		if customServiceID.Valid && customServiceID.String != "" {
+			// Extract base name without any suffixes
+			baseName := normalizeServiceID(customServiceID.String)
+			// Always add the file provider for custom services
+			tcpServiceReference = fmt.Sprintf("%s@file", baseName)
+		} else {
+			// Default provider suffix
+			providerSuffix := "http"
+			
+			// If using Traefik API, consider using docker for appropriate sources
+			if activeDSConfig.Type == models.TraefikAPI {
+				if models.DataSourceType(sourceType) == models.TraefikAPI {
+					providerSuffix = "docker"
+				}
+			}
+			
+			// Extract base name without any suffixes
+			baseName := normalizeServiceID(serviceID)
+			// Add the appropriate provider suffix
+			tcpServiceReference = fmt.Sprintf("%s@%s", baseName, providerSuffix)
+		}
         log.Printf("Resource %s (TCP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)", 
             id, tcpServiceReference, sourceType, activeDSConfig.Type, customServiceID.String)
         
