@@ -369,11 +369,14 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 		
 		var serviceReference string
 		if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
-			// If the custom service ID already contains a provider, preserve it
-			if strings.Contains(mapValueDataEntry.CustomServiceID.String, "@") {
-				serviceReference = mapValueDataEntry.CustomServiceID.String
+			customServiceID := mapValueDataEntry.CustomServiceID.String
+			// Check if custom service ID already has a provider suffix
+			if strings.Contains(customServiceID, "@") {
+				// Already has a provider, use as is
+				serviceReference = customServiceID
 			} else {
-				serviceReference = fmt.Sprintf("%s@file", mapValueDataEntry.CustomServiceID.String)
+				// Add the file provider
+				serviceReference = fmt.Sprintf("%s@file", customServiceID)
 			}
 		} else {
 			// For Docker environments when using Traefik API, prefer docker provider
@@ -384,11 +387,17 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 				providerSuffix = "http"
 			}
 			
-			// If service ID already has a provider suffix, preserve it
-			if strings.Contains(info.ServiceID, "@") {
+			// FIX: Check properly for existing suffixes
+			suffix := fmt.Sprintf("@%s", providerSuffix)
+			if strings.HasSuffix(info.ServiceID, suffix) {
+				// Already has the correct suffix, use as is
+				serviceReference = info.ServiceID
+			} else if strings.Contains(info.ServiceID, "@") {
+				// Has a different provider suffix, use as is
 				serviceReference = info.ServiceID
 			} else {
-				serviceReference = fmt.Sprintf("%s@%s", info.ServiceID, providerSuffix)
+				// No provider suffix, add one
+				serviceReference = fmt.Sprintf("%s%s", info.ServiceID, suffix)
 			}
 		}
 		
@@ -428,7 +437,6 @@ func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) e
 	}
 	return nil
 }
-
 
 func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
 	activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
@@ -476,27 +484,41 @@ func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
 
 		var tcpServiceReference string
 		if customServiceID.Valid && customServiceID.String != "" {
-			tcpServiceReference = fmt.Sprintf("%s@file", customServiceID.String)
+			customSvc := customServiceID.String
+			// Check if custom service ID already has a provider suffix
+			if strings.Contains(customSvc, "@") {
+				// Already has a provider, use as is
+				tcpServiceReference = customSvc
+			} else {
+				// Add the file provider
+				tcpServiceReference = fmt.Sprintf("%s@file", customSvc)
+			}
 		} else {
-			providerSuffix := "http" // Default, implies the HTTP service definition might be used or Traefik handles internally
+			providerSuffix := "http" // Default provider
+			
+			// Use appropriate provider based on data source
 			if activeDSConfig.Type == models.TraefikAPI {
 				if models.DataSourceType(sourceType) == models.TraefikAPI {
-					// For TCP services linked to Docker, Traefik often resolves service by name from Docker provider
-					if !strings.Contains(serviceID, "@") { // Only add @docker if no provider specified
-						providerSuffix = "docker"
-					} else {
-						providerSuffix = "" // Keep existing provider
-					}
+					providerSuffix = "docker"
 				}
 			}
-			if providerSuffix != "" && !strings.Contains(serviceID, "@") {
-				tcpServiceReference = fmt.Sprintf("%s@%s", serviceID, providerSuffix)
+			
+			// FIX: Check properly for existing suffixes
+			suffix := fmt.Sprintf("@%s", providerSuffix)
+			if strings.HasSuffix(serviceID, suffix) {
+				// Already has the correct suffix, use as is
+				tcpServiceReference = serviceID
+			} else if strings.Contains(serviceID, "@") {
+				// Has a different provider suffix, use as is
+				tcpServiceReference = serviceID
 			} else {
-				tcpServiceReference = serviceID // Use as-is
+				// No provider suffix, add one
+				tcpServiceReference = fmt.Sprintf("%s%s", serviceID, suffix)
 			}
 		}
-		log.Printf("Resource %s (TCP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)", id, tcpServiceReference, sourceType, activeDSConfig.Type, customServiceID.String)
-
+		
+		log.Printf("Resource %s (TCP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
+			id, tcpServiceReference, sourceType, activeDSConfig.Type, customServiceID.String)
 
 		tcpRouterID := fmt.Sprintf("%s-tcp", id)
 		config.TCP.Routers[tcpRouterID] = map[string]interface{}{
