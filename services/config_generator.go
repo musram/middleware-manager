@@ -230,306 +230,299 @@ func (cg *ConfigGenerator) processServices(config *TraefikConfig) error {
 // In services/config_generator.go
 
 // processResourcesWithServices processes resources with their assigned services
-// processResourcesWithServices processes resources with their assigned services
-func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) error {
-	activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
-	if err != nil {
-		log.Printf("Warning: Could not get active data source config in ConfigGenerator: %v. Defaulting to Pangolin logic.", err)
-		activeDSConfig.Type = models.PangolinAPI
-	}
-
-	query := `
-		SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains,
-		       r.custom_headers, r.router_priority, r.source_type, 
-		       rm.middleware_id, rm.priority,
-		       rs.service_id as custom_service_id
-		FROM resources r
-		LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
-		LEFT JOIN resource_services rs ON r.id = rs.resource_id
-		WHERE r.status = 'active'
-		ORDER BY r.id, rm.priority DESC
-	`
-	rows, err := cg.db.Query(query)
-	if err != nil {
-		return fmt.Errorf("failed to fetch resources for HTTP routers: %w", err)
-	}
-	defer rows.Close()
-
-	type resourceProcessedData struct {
-		Info            models.Resource
-		Middlewares     []MiddlewareWithPriority
-		CustomServiceID sql.NullString
-	}
-	resourceDataMap := make(map[string]resourceProcessedData)
-
-	for rows.Next() {
-		var rID_db, host_db, serviceID_db, entrypoints_db, tlsDomains_db, customHeadersStr_db, sourceType_db string
-		var routerPriority_db sql.NullInt64
-		var middlewareID_db sql.NullString
-		var middlewarePriority_db sql.NullInt64
-		var customServiceID_db sql.NullString
-
-		err := rows.Scan(
-			&rID_db, &host_db, &serviceID_db, &entrypoints_db, &tlsDomains_db,
-			&customHeadersStr_db, &routerPriority_db, &sourceType_db,
-			&middlewareID_db, &middlewarePriority_db, &customServiceID_db,
-		)
-		if err != nil {
-			log.Printf("Failed to scan resource data for HTTP router: %v", err)
-			continue
-		}
-		
-		data, exists := resourceDataMap[rID_db]
-		if !exists {
-			data.Info = models.Resource{
-				ID:            rID_db,
-				Host:          host_db,
-				ServiceID:     serviceID_db,
-				Entrypoints:   entrypoints_db,
-				TLSDomains:    tlsDomains_db,
-				CustomHeaders: customHeadersStr_db,
-				SourceType:    sourceType_db,
-			}
-			if routerPriority_db.Valid {
-				data.Info.RouterPriority = int(routerPriority_db.Int64)
-			} else {
-				data.Info.RouterPriority = 100 // Default
-			}
-			data.CustomServiceID = customServiceID_db
-		}
-
-		if middlewareID_db.Valid {
-			mwPriority := 100 
-			if middlewarePriority_db.Valid {
-				mwPriority = int(middlewarePriority_db.Int64)
-			}
-			data.Middlewares = append(data.Middlewares, MiddlewareWithPriority{
-				ID:       middlewareID_db.String,
-				Priority: mwPriority,
-			})
-		}
-		resourceDataMap[rID_db] = data
-	}
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("error iterating resource rows for HTTP: %w", err)
-	}
-	
-	for _, mapValueDataEntry := range resourceDataMap {
-		info := mapValueDataEntry.Info
-		assignedMiddlewares := mapValueDataEntry.Middlewares
-		
-		sort.SliceStable(assignedMiddlewares, func(i, j int) bool {
-			return assignedMiddlewares[i].Priority > assignedMiddlewares[j].Priority
-		})
-
-		routerEntryPoints := strings.Split(strings.TrimSpace(info.Entrypoints), ",")
-		if len(routerEntryPoints) == 0 || (len(routerEntryPoints) == 1 && routerEntryPoints[0] == "") {
-			routerEntryPoints = []string{"websecure"}
-		}
-
-		var customHeadersMiddlewareID string
-		if info.CustomHeaders != "" && info.CustomHeaders != "{}" && info.CustomHeaders != "null" {
-			var headersMap map[string]string 
-			if err := json.Unmarshal([]byte(info.CustomHeaders), &headersMap); err == nil && len(headersMap) > 0 {
-				middlewareName := fmt.Sprintf("%s-customheaders", info.ID) 
-				customRequestHeadersMap := make(map[string]string)
-				for k,v := range headersMap {
-					customRequestHeadersMap[k] = v
-				}
-				config.HTTP.Middlewares[middlewareName] = map[string]interface{}{
-					"headers": map[string]interface{}{"customRequestHeaders": customRequestHeadersMap},
-				}
-				customHeadersMiddlewareID = fmt.Sprintf("%s@file", middlewareName)
-			} else if err != nil {
-				log.Printf("Failed to parse custom headers for resource %s: %v. Headers: %s", info.ID, err, info.CustomHeaders)
-			}
-		}
-
-		var finalMiddlewares []string
-		if customHeadersMiddlewareID != "" {
-			finalMiddlewares = append(finalMiddlewares, customHeadersMiddlewareID)
-		}
-		for _, mw := range assignedMiddlewares {
-			finalMiddlewares = append(finalMiddlewares, fmt.Sprintf("%s@file", mw.ID))
-		}
-		
-		// Only add the badger middleware when using Pangolin data source
-		if activeDSConfig.Type == models.PangolinAPI {
-			isBadgerPresent := false
-			for _, m := range finalMiddlewares {
-				if m == "badger@http" {
-					isBadgerPresent = true
-					break
-				}
-			}
-			if !isBadgerPresent {
-				finalMiddlewares = append(finalMiddlewares, "badger@http")
-			}
-		}
-		
-		var serviceReference string
-		if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
-			customServiceID := mapValueDataEntry.CustomServiceID.String
-			// Check if custom service ID already has a provider suffix
-			if strings.Contains(customServiceID, "@") {
-				// Already has a provider, use as is
-				serviceReference = customServiceID
-			} else {
-				// Add the file provider
-				serviceReference = fmt.Sprintf("%s@file", customServiceID)
-			}
-		} else {
-			// For Docker environments when using Traefik API, prefer docker provider
-			providerSuffix := "docker"
-			
-			// If not using Traefik API as data source, use http provider
-			if activeDSConfig.Type != models.TraefikAPI {
-				providerSuffix = "http"
-			}
-			
-			// FIX: Check properly for existing suffixes
-			suffix := fmt.Sprintf("@%s", providerSuffix)
-			if strings.HasSuffix(info.ServiceID, suffix) {
-				// Already has the correct suffix, use as is
-				serviceReference = info.ServiceID
-			} else if strings.Contains(info.ServiceID, "@") {
-				// Has a different provider suffix, use as is
-				serviceReference = info.ServiceID
-			} else {
-				// No provider suffix, add one
-				serviceReference = fmt.Sprintf("%s%s", info.ServiceID, suffix)
-			}
-		}
-		
-		log.Printf("Resource %s (HTTP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
-			info.ID,
-			serviceReference,
-			info.SourceType,
-			activeDSConfig.Type,
-			mapValueDataEntry.CustomServiceID.String)
-
-		routerIDForTraefik := fmt.Sprintf("%s-auth", info.ID) 
-		routerConfig := map[string]interface{}{
-			"rule":        fmt.Sprintf("Host(`%s`)", info.Host),
-			"service":     serviceReference,
-			"entryPoints": routerEntryPoints,
-			"priority":    info.RouterPriority, 
-		}
-		if len(finalMiddlewares) > 0 {
-			routerConfig["middlewares"] = finalMiddlewares
-		}
-
-		tlsConfig := map[string]interface{}{"certResolver": "letsencrypt"}
-		if info.TLSDomains != "" {
-			sans := strings.Split(strings.TrimSpace(info.TLSDomains), ",")
-			var cleanSans []string
-			for _, s := range sans {
-				if trimmed := strings.TrimSpace(s); trimmed != "" {
-					cleanSans = append(cleanSans, trimmed)
-				}
-			}
-			if len(cleanSans) > 0 {
-				tlsConfig["domains"] = []map[string]interface{}{{"main": info.Host, "sans": cleanSans}}
-			}
-		}
-		routerConfig["tls"] = tlsConfig
-		config.HTTP.Routers[routerIDForTraefik] = routerConfig
-	}
-	return nil
+// Helper function to extract the base name without provider suffixes
+func extractBaseName(id string) string {
+    // If the ID contains @ character, extract the part before it
+    if idx := strings.Index(id, "@"); idx > 0 {
+        return id[:idx]
+    }
+    return id
 }
 
+// processResourcesWithServices processes resources with their assigned services
+func (cg *ConfigGenerator) processResourcesWithServices(config *TraefikConfig) error {
+    activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        log.Printf("Warning: Could not get active data source config in ConfigGenerator: %v. Defaulting to Pangolin logic.", err)
+        activeDSConfig.Type = models.PangolinAPI
+    }
+
+    query := `
+        SELECT r.id, r.host, r.service_id, r.entrypoints, r.tls_domains,
+               r.custom_headers, r.router_priority, r.source_type, 
+               rm.middleware_id, rm.priority,
+               rs.service_id as custom_service_id
+        FROM resources r
+        LEFT JOIN resource_middlewares rm ON r.id = rm.resource_id
+        LEFT JOIN resource_services rs ON r.id = rs.resource_id
+        WHERE r.status = 'active'
+        ORDER BY r.id, rm.priority DESC
+    `
+    rows, err := cg.db.Query(query)
+    if err != nil {
+        return fmt.Errorf("failed to fetch resources for HTTP routers: %w", err)
+    }
+    defer rows.Close()
+
+    type resourceProcessedData struct {
+        Info            models.Resource
+        Middlewares     []MiddlewareWithPriority
+        CustomServiceID sql.NullString
+    }
+    resourceDataMap := make(map[string]resourceProcessedData)
+
+    for rows.Next() {
+        var rID_db, host_db, serviceID_db, entrypoints_db, tlsDomains_db, customHeadersStr_db, sourceType_db string
+        var routerPriority_db sql.NullInt64
+        var middlewareID_db sql.NullString
+        var middlewarePriority_db sql.NullInt64
+        var customServiceID_db sql.NullString
+
+        err := rows.Scan(
+            &rID_db, &host_db, &serviceID_db, &entrypoints_db, &tlsDomains_db,
+            &customHeadersStr_db, &routerPriority_db, &sourceType_db,
+            &middlewareID_db, &middlewarePriority_db, &customServiceID_db,
+        )
+        if err != nil {
+            log.Printf("Failed to scan resource data for HTTP router: %v", err)
+            continue
+        }
+        
+        data, exists := resourceDataMap[rID_db]
+        if !exists {
+            data.Info = models.Resource{
+                ID:            rID_db,
+                Host:          host_db,
+                ServiceID:     serviceID_db,
+                Entrypoints:   entrypoints_db,
+                TLSDomains:    tlsDomains_db,
+                CustomHeaders: customHeadersStr_db,
+                SourceType:    sourceType_db,
+            }
+            if routerPriority_db.Valid {
+                data.Info.RouterPriority = int(routerPriority_db.Int64)
+            } else {
+                data.Info.RouterPriority = 100 // Default
+            }
+            data.CustomServiceID = customServiceID_db
+        }
+
+        if middlewareID_db.Valid {
+            mwPriority := 100 
+            if middlewarePriority_db.Valid {
+                mwPriority = int(middlewarePriority_db.Int64)
+            }
+            data.Middlewares = append(data.Middlewares, MiddlewareWithPriority{
+                ID:       middlewareID_db.String,
+                Priority: mwPriority,
+            })
+        }
+        resourceDataMap[rID_db] = data
+    }
+    if err = rows.Err(); err != nil {
+        return fmt.Errorf("error iterating resource rows for HTTP: %w", err)
+    }
+    
+    for _, mapValueDataEntry := range resourceDataMap {
+        info := mapValueDataEntry.Info
+        assignedMiddlewares := mapValueDataEntry.Middlewares
+        
+        sort.SliceStable(assignedMiddlewares, func(i, j int) bool {
+            return assignedMiddlewares[i].Priority > assignedMiddlewares[j].Priority
+        })
+
+        routerEntryPoints := strings.Split(strings.TrimSpace(info.Entrypoints), ",")
+        if len(routerEntryPoints) == 0 || (len(routerEntryPoints) == 1 && routerEntryPoints[0] == "") {
+            routerEntryPoints = []string{"websecure"}
+        }
+
+        var customHeadersMiddlewareID string
+        if info.CustomHeaders != "" && info.CustomHeaders != "{}" && info.CustomHeaders != "null" {
+            var headersMap map[string]string 
+            if err := json.Unmarshal([]byte(info.CustomHeaders), &headersMap); err == nil && len(headersMap) > 0 {
+                middlewareName := fmt.Sprintf("%s-customheaders", info.ID) 
+                customRequestHeadersMap := make(map[string]string)
+                for k,v := range headersMap {
+                    customRequestHeadersMap[k] = v
+                }
+                config.HTTP.Middlewares[middlewareName] = map[string]interface{}{
+                    "headers": map[string]interface{}{"customRequestHeaders": customRequestHeadersMap},
+                }
+                customHeadersMiddlewareID = fmt.Sprintf("%s@file", middlewareName)
+            } else if err != nil {
+                log.Printf("Failed to parse custom headers for resource %s: %v. Headers: %s", info.ID, err, info.CustomHeaders)
+            }
+        }
+
+        var finalMiddlewares []string
+        if customHeadersMiddlewareID != "" {
+            finalMiddlewares = append(finalMiddlewares, customHeadersMiddlewareID)
+        }
+        for _, mw := range assignedMiddlewares {
+            // Use extractBaseName here too for middleware IDs if needed
+            middlewareID := extractBaseName(mw.ID)
+            finalMiddlewares = append(finalMiddlewares, fmt.Sprintf("%s@file", middlewareID))
+        }
+        
+        // Only add the badger middleware when using Pangolin data source
+        if activeDSConfig.Type == models.PangolinAPI {
+            isBadgerPresent := false
+            for _, m := range finalMiddlewares {
+                if m == "badger@http" {
+                    isBadgerPresent = true
+                    break
+                }
+            }
+            if !isBadgerPresent {
+                finalMiddlewares = append(finalMiddlewares, "badger@http")
+            }
+        }
+        
+        var serviceReference string
+        if mapValueDataEntry.CustomServiceID.Valid && mapValueDataEntry.CustomServiceID.String != "" {
+            // Extract base name without any suffixes
+            baseName := extractBaseName(mapValueDataEntry.CustomServiceID.String)
+            // Always add the file provider for custom services
+            serviceReference = fmt.Sprintf("%s@file", baseName)
+        } else {
+            // For Docker environments when using Traefik API, prefer docker provider
+            providerSuffix := "docker"
+            
+            // If not using Traefik API as data source, use http provider
+            if activeDSConfig.Type != models.TraefikAPI {
+                providerSuffix = "http"
+            }
+            
+            // Extract base name without any suffixes
+            baseName := extractBaseName(info.ServiceID)
+            // Add the appropriate provider suffix
+            serviceReference = fmt.Sprintf("%s@%s", baseName, providerSuffix)
+        }
+        
+        log.Printf("Resource %s (HTTP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
+            info.ID,
+            serviceReference,
+            info.SourceType,
+            activeDSConfig.Type,
+            mapValueDataEntry.CustomServiceID.String)
+
+        // Make sure we don't have duplicated suffixes in router ID
+        routerIDBase := extractBaseName(info.ID)
+        routerIDForTraefik := fmt.Sprintf("%s-auth", routerIDBase) 
+        
+        routerConfig := map[string]interface{}{
+            "rule":        fmt.Sprintf("Host(`%s`)", info.Host),
+            "service":     serviceReference,
+            "entryPoints": routerEntryPoints,
+            "priority":    info.RouterPriority, 
+        }
+        if len(finalMiddlewares) > 0 {
+            routerConfig["middlewares"] = finalMiddlewares
+        }
+
+        tlsConfig := map[string]interface{}{"certResolver": "letsencrypt"}
+        if info.TLSDomains != "" {
+            sans := strings.Split(strings.TrimSpace(info.TLSDomains), ",")
+            var cleanSans []string
+            for _, s := range sans {
+                if trimmed := strings.TrimSpace(s); trimmed != "" {
+                    cleanSans = append(cleanSans, trimmed)
+                }
+            }
+            if len(cleanSans) > 0 {
+                tlsConfig["domains"] = []map[string]interface{}{{"main": info.Host, "sans": cleanSans}}
+            }
+        }
+        routerConfig["tls"] = tlsConfig
+        config.HTTP.Routers[routerIDForTraefik] = routerConfig
+    }
+    return nil
+}
+
+// processTCPRouters processes TCP router resources
 func (cg *ConfigGenerator) processTCPRouters(config *TraefikConfig) error {
-	activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
-	if err != nil {
-		log.Printf("Warning: Could not get active data source config for TCP routers: %v. Defaulting to Pangolin logic.", err)
-		activeDSConfig.Type = models.PangolinAPI
-	}
-	
-	query := `
-		SELECT r.id, r.host, r.service_id, r.tcp_entrypoints, r.tcp_sni_rule, r.router_priority, r.source_type,
-		       rs.service_id as custom_service_id
-		FROM resources r
-		LEFT JOIN resource_services rs ON r.id = rs.resource_id
-		WHERE r.status = 'active' AND r.tcp_enabled = 1
-	`
-	rows, err := cg.db.Query(query)
-	if err != nil {
-		return fmt.Errorf("failed to fetch TCP resources: %w", err)
-	}
-	defer rows.Close()
+    activeDSConfig, err := cg.configManager.GetActiveDataSourceConfig()
+    if err != nil {
+        log.Printf("Warning: Could not get active data source config for TCP routers: %v. Defaulting to Pangolin logic.", err)
+        activeDSConfig.Type = models.PangolinAPI
+    }
+    
+    query := `
+        SELECT r.id, r.host, r.service_id, r.tcp_entrypoints, r.tcp_sni_rule, r.router_priority, r.source_type,
+               rs.service_id as custom_service_id
+        FROM resources r
+        LEFT JOIN resource_services rs ON r.id = rs.resource_id
+        WHERE r.status = 'active' AND r.tcp_enabled = 1
+    `
+    rows, err := cg.db.Query(query)
+    if err != nil {
+        return fmt.Errorf("failed to fetch TCP resources: %w", err)
+    }
+    defer rows.Close()
 
-	for rows.Next() {
-		var id, host, serviceID, tcpEntrypointsStr, tcpSNIRule, sourceType string
-		var routerPriority sql.NullInt64
-		var customServiceID sql.NullString
-		if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypointsStr, &tcpSNIRule, &routerPriority, &sourceType, &customServiceID); err != nil {
-			log.Printf("Failed to scan TCP resource: %v", err)
-			continue
-		}
+    for rows.Next() {
+        var id, host, serviceID, tcpEntrypointsStr, tcpSNIRule, sourceType string
+        var routerPriority sql.NullInt64
+        var customServiceID sql.NullString
+        if err := rows.Scan(&id, &host, &serviceID, &tcpEntrypointsStr, &tcpSNIRule, &routerPriority, &sourceType, &customServiceID); err != nil {
+            log.Printf("Failed to scan TCP resource: %v", err)
+            continue
+        }
 
-		priority := 100
-		if routerPriority.Valid {
-			priority = int(routerPriority.Int64)
-		}
+        priority := 100
+        if routerPriority.Valid {
+            priority = int(routerPriority.Int64)
+        }
 
-		entrypoints := strings.Split(strings.TrimSpace(tcpEntrypointsStr), ",")
-		if len(entrypoints) == 0 || entrypoints[0] == "" {
-			entrypoints = []string{"tcp"} // Default TCP entrypoint
-		}
-		
-		rule := tcpSNIRule
-		if rule == "" { // Default SNI rule if not specified
-			rule = fmt.Sprintf("HostSNI(`%s`)", host)
-		}
+        entrypoints := strings.Split(strings.TrimSpace(tcpEntrypointsStr), ",")
+        if len(entrypoints) == 0 || entrypoints[0] == "" {
+            entrypoints = []string{"tcp"} // Default TCP entrypoint
+        }
+        
+        rule := tcpSNIRule
+        if rule == "" { // Default SNI rule if not specified
+            rule = fmt.Sprintf("HostSNI(`%s`)", host)
+        }
 
-		var tcpServiceReference string
-		if customServiceID.Valid && customServiceID.String != "" {
-			customSvc := customServiceID.String
-			// Check if custom service ID already has a provider suffix
-			if strings.Contains(customSvc, "@") {
-				// Already has a provider, use as is
-				tcpServiceReference = customSvc
-			} else {
-				// Add the file provider
-				tcpServiceReference = fmt.Sprintf("%s@file", customSvc)
-			}
-		} else {
-			providerSuffix := "http" // Default provider
-			
-			// Use appropriate provider based on data source
-			if activeDSConfig.Type == models.TraefikAPI {
-				if models.DataSourceType(sourceType) == models.TraefikAPI {
-					providerSuffix = "docker"
-				}
-			}
-			
-			// FIX: Check properly for existing suffixes
-			suffix := fmt.Sprintf("@%s", providerSuffix)
-			if strings.HasSuffix(serviceID, suffix) {
-				// Already has the correct suffix, use as is
-				tcpServiceReference = serviceID
-			} else if strings.Contains(serviceID, "@") {
-				// Has a different provider suffix, use as is
-				tcpServiceReference = serviceID
-			} else {
-				// No provider suffix, add one
-				tcpServiceReference = fmt.Sprintf("%s%s", serviceID, suffix)
-			}
-		}
-		
-		log.Printf("Resource %s (TCP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)",
-			id, tcpServiceReference, sourceType, activeDSConfig.Type, customServiceID.String)
-
-		tcpRouterID := fmt.Sprintf("%s-tcp", id)
-		config.TCP.Routers[tcpRouterID] = map[string]interface{}{
-			"rule":        rule,
-			"service":     tcpServiceReference,
-			"entryPoints": entrypoints,
-			"priority":    priority,
-			"tls":         map[string]interface{}{}, // TCP routers with SNI usually involve TLS
-		}
-	}
-	return rows.Err()
+        var tcpServiceReference string
+        if customServiceID.Valid && customServiceID.String != "" {
+            // Extract base name without any suffixes
+            baseName := extractBaseName(customServiceID.String)
+            // Always add the file provider for custom services
+            tcpServiceReference = fmt.Sprintf("%s@file", baseName)
+        } else {
+            // Default provider suffix
+            providerSuffix := "http"
+            
+            // If using Traefik API, consider using docker for appropriate sources
+            if activeDSConfig.Type == models.TraefikAPI {
+                if models.DataSourceType(sourceType) == models.TraefikAPI {
+                    providerSuffix = "docker"
+                }
+            }
+            
+            // Extract base name without any suffixes
+            baseName := extractBaseName(serviceID)
+            // Add the appropriate provider suffix
+            tcpServiceReference = fmt.Sprintf("%s@%s", baseName, providerSuffix)
+        }
+        
+        log.Printf("Resource %s (TCP): Router service set to %s. (SourceType: %s, ActiveDS: %s, CustomSvc: %s)", 
+            id, tcpServiceReference, sourceType, activeDSConfig.Type, customServiceID.String)
+        
+        // Make sure we don't have duplicated suffixes in router ID
+        routerIDBase := extractBaseName(id)
+        tcpRouterID := fmt.Sprintf("%s-tcp", routerIDBase)
+        
+        config.TCP.Routers[tcpRouterID] = map[string]interface{}{
+            "rule":        rule,
+            "service":     tcpServiceReference,
+            "entryPoints": entrypoints,
+            "priority":    priority,
+            "tls":         map[string]interface{}{}, // TCP routers with SNI usually involve TLS
+        }
+    }
+    return rows.Err()
 }
 
 
