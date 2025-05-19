@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+// ui/src/components/settings/DataSourceSettings.js
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback import
 import { LoadingSpinner, ErrorMessage } from '../common';
 import { useDataSource, useApp } from '../../contexts';
 
 /**
  * DataSourceSettings component for managing API data sources
- * 
+ *
  * @param {Object} props
  * @param {function} props.onClose - Function to close settings panel
  * @returns {JSX.Element}
  */
 const DataSourceSettings = ({ onClose }) => {
-  // Get data source state from context
   const {
     dataSources,
     activeSource,
@@ -21,143 +21,71 @@ const DataSourceSettings = ({ onClose }) => {
     updateDataSource,
     setError
   } = useDataSource();
-
-  // Get app context to refresh the app state
   const { fetchActiveDataSource } = useApp();
-  
-  // State for UI
+
   const [saving, setSaving] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState({});
-  
-  // Form state for editing a data source
-  const [editSource, setEditSource] = useState(null);
+  const [editSource, setEditSource] = useState(null); // Name of the source being edited
   const [sourceForm, setSourceForm] = useState({
     type: 'pangolin',
     url: '',
-    basicAuth: {
-      username: '',
-      password: ''
-    }
+    basicAuth: { username: '', password: '' }
   });
-  
-  // Test connection handler with improved endpoints
-  const testConnection = async (name, config) => {
-    try {
-      setConnectionStatus(prev => ({
-        ...prev,
-        [name]: { testing: true }
-      }));
-      
-      // Modify the config to use the correct endpoints for testing
-      const testConfig = {...config};
-      
-      // Use the endpoints we know work from the successful curl commands
-      if (testConfig.type === 'pangolin') {
-        // Use the working traefik-config endpoint instead of status
-        testConfig.url = testConfig.url.replace(/\/+$/, ''); // Remove trailing slashes
-        
-        // Test request will be made to /api/datasource/{name}/test
-        // We'll configure the backend test to use /traefik-config for testing Pangolin
-      } else if (testConfig.type === 'traefik') {
-        // Use the working /api/http/routers endpoint for Traefik
-        testConfig.url = testConfig.url.replace(/\/+$/, ''); // Remove trailing slashes
-        
-        // Test request will use /api/http/routers for testing Traefik
-      }
-      
-      // Make a POST request to test the connection
-      const response = await fetch(`/api/datasource/${name}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testConfig)
-      });
-      
-      if (response.ok) {
-        setConnectionStatus(prev => ({
-          ...prev,
-          [name]: { success: true, message: 'Connection successful!' }
-        }));
-      } else {
-        const data = await response.json();
-        setConnectionStatus(prev => ({
-          ...prev,
-          [name]: { 
-            error: true, 
-            message: `Connection failed: ${data.message || response.statusText}` 
-          }
-        }));
-      }
-    } catch (err) {
-      setConnectionStatus(prev => ({
-        ...prev,
-        [name]: { 
-          error: true, 
-          message: `Connection test failed: ${err.message}` 
-        }
-      }));
-    }
-  };
-  
-  // Set active data source handler
-  const handleSetActiveSource = async (sourceName) => {
-    try {
-      setSaving(true);
-      
-      const success = await setActiveDataSource(sourceName);
-      
-      if (success) {
-        // Refresh the app state
-        fetchActiveDataSource();
-        
-        // Show a success message
-        alert(`Data source changed to ${sourceName}`);
 
-        // Test connections again to update status
-        testAllConnections();
-      }
-      
-    } catch (err) {
-      console.error('Error setting active data source:', err);
-      setError(`Failed to set active data source: ${err.message}`);
-    } finally {
-      setSaving(false);
+  // Define testConnection using useCallback
+   const testConnection = useCallback(async (name, config) => {
+     setConnectionStatus(prev => ({ ...prev, [name]: { testing: true } }));
+     try {
+         const testConfig = { ...config, url: config.url?.replace(/\/+$/, '') };
+         const response = await fetch(`/api/datasource/${name}/test`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify(testConfig)
+         });
+         if (response.ok) {
+             setConnectionStatus(prev => ({ ...prev, [name]: { success: true, message: 'Connection successful!' } }));
+         } else {
+             const data = await response.json();
+             setConnectionStatus(prev => ({ ...prev, [name]: { error: true, message: `Connection failed: ${data.message || response.statusText}` } }));
+         }
+     } catch (err) {
+         setConnectionStatus(prev => ({ ...prev, [name]: { error: true, message: `Test request failed: ${err.message}` } }));
+     }
+   }, []); // Empty dependency array as it doesn't depend on component state/props directly
+
+
+  const handleSetActiveSource = async (sourceName) => {
+    setSaving(true);
+    setError(null);
+    const success = await setActiveDataSource(sourceName);
+    if (success) {
+      await fetchActiveDataSource();
+      await fetchDataSources();
+      testAllConnections();
     }
+    setSaving(false);
   };
-  
-  // Update a data source handler
+
   const handleUpdateDataSource = async (e) => {
     e.preventDefault();
-    
     if (!editSource) return;
-    
-    try {
-      setSaving(true);
-      
-      const success = await updateDataSource(editSource, sourceForm);
-      
-      if (success) {
-        // Close the form
-        setEditSource(null);
-        
-        // Show a success message
-        alert(`Data source ${editSource} updated successfully`);
-        
-        // Refresh the list
-        fetchDataSources();
-        
-        // Test this connection
-        testConnection(editSource, sourceForm);
-      }
-      
-    } catch (err) {
-      console.error('Error updating data source:', err);
-      setError(`Failed to update data source: ${err.message}`);
-    } finally {
-      setSaving(false);
+    setSaving(true);
+    setError(null);
+
+    const dataToUpdate = { ...sourceForm };
+    if (dataToUpdate.basicAuth.password === '••••••••') {
+       delete dataToUpdate.basicAuth.password;
     }
+
+    const success = await updateDataSource(editSource, dataToUpdate);
+    if (success) {
+      setEditSource(null);
+      await fetchDataSources();
+      testConnection(editSource, sourceForm);
+    }
+    setSaving(false);
   };
-  
-  // Edit a data source
+
   const handleEditSource = (name) => {
     const source = dataSources[name];
     setSourceForm({
@@ -165,314 +93,180 @@ const DataSourceSettings = ({ onClose }) => {
       url: source.url || '',
       basicAuth: {
         username: source.basic_auth?.username || '',
-        password: '' // Don't populate password field for security
+        password: source.basic_auth?.username ? '••••••••' : ''
       }
     });
     setEditSource(name);
+    setError(null);
   };
-  
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name.startsWith('basicAuth.')) {
-      // Handle nested basicAuth fields
-      const field = name.split('.')[1];
-      setSourceForm({
-        ...sourceForm,
-        basicAuth: {
-          ...sourceForm.basicAuth,
-          [field]: value
-        }
-      });
-    } else {
-      // Handle top-level fields
-      setSourceForm({
-        ...sourceForm,
-        [name]: value
-      });
-    }
-  };
-  
-  // Cancel editing
+
+   const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setSourceForm(prev => {
+            const newState = { ...prev };
+            if (name.startsWith('basicAuth.')) {
+                const field = name.split('.')[1];
+                newState.basicAuth = { ...newState.basicAuth, [field]: value };
+                 if (field === 'password' && value === '••••••••') {
+                     return prev; // Ignore placeholder typing
+                 }
+            } else {
+                newState[name] = value;
+            }
+            return newState;
+        });
+    };
+
   const handleCancelEdit = () => {
     setEditSource(null);
-    setSourceForm({
-      type: 'pangolin',
-      url: '',
-      basicAuth: {
-        username: '',
-        password: ''
-      }
-    });
+    setError(null);
   };
-  
-  // Render the connection status for each data source
+
   const renderConnectionStatus = (name) => {
     const status = connectionStatus[name];
-    
-    if (!status) return null;
-    
-    if (status.testing) {
-      return <div className="text-sm text-gray-500">Testing connection...</div>;
-    }
-    
-    if (status.success) {
-      return <div className="text-sm text-green-500">{status.message}</div>;
-    }
-    
-    if (status.error) {
-      return <div className="text-sm text-red-500">{status.message}</div>;
-    }
-    
+    if (!status) return <span className="text-xs text-gray-400 dark:text-gray-500 italic ml-2">Untested</span>;
+    if (status.testing) return <span className="text-xs text-gray-400 dark:text-gray-500 italic ml-2">Testing...</span>;
+    if (status.success) return <span className="text-xs text-green-600 dark:text-green-400 ml-2">✓ Success</span>;
+    if (status.error) return <span className="text-xs text-red-600 dark:text-red-400 ml-2" title={status.message}>✗ Failed</span>;
     return null;
   };
-  
-  // Function to test all connections
-  const testAllConnections = () => {
-    Object.entries(dataSources).forEach(([name, source]) => {
-      testConnection(name, source);
-    });
-  };
-  
-  // Test connections on mount
+
+  // Define testAllConnections using useCallback
+   const testAllConnections = useCallback(() => {
+     Object.entries(dataSources).forEach(([name, source]) => {
+       testConnection(name, source);
+     });
+   }, [dataSources, testConnection]); // Add testConnection to dependencies
+
   useEffect(() => {
     if (Object.keys(dataSources).length > 0) {
       testAllConnections();
     }
-  }, [dataSources]);
-  
-  // Test manual connection during editing
-  const handleTestFormConnection = async () => {
-    try {
-      // Use the form data for the test
-      const result = await fetch(`/api/datasource/${editSource}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sourceForm)
-      });
-      
-      if (result.ok) {
-        alert('Connection test successful!');
-      } else {
-        const data = await result.json();
-        alert(`Connection test failed: ${data.message || result.statusText}`);
-      }
-    } catch (err) {
-      alert(`Connection test failed: ${err.message}`);
-    }
-  };
-  
-  if (loading && Object.keys(dataSources).length === 0) {
-    return <LoadingSpinner message="Loading data source settings..." />;
-  }
-  
-  return (
-    <div className="bg-white p-4 md:p-6 rounded-lg shadow-lg overflow-y-auto max-h-[90vh]">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Data Source Settings</h2>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ×
-        </button>
-      </div>
-      
-      {error && (
-        <ErrorMessage 
-          message={error} 
-          onDismiss={() => setError(null)} 
-        />
-      )}
-      
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">Active Data Source</h3>
-        <div className="flex items-center">
-          <span className="font-medium mr-3">Current:</span>
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-            {activeSource}
-          </span>
-        </div>
-        
-        <div className="mt-4">
-          <h4 className="font-medium mb-2">Change Active Source:</h4>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(dataSources).map(name => (
-              <button
-                key={name}
-                onClick={() => handleSetActiveSource(name)}
-                disabled={activeSource === name || saving}
-                className={`px-4 py-2 rounded ${
-                  activeSource === name
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-      
-      <div>
-        <h3 className="text-lg font-semibold mb-3">Configured Sources</h3>
-        
-        {Object.keys(dataSources).length === 0 ? (
-          <p className="text-gray-500">No data sources configured</p>
-        ) : (
-          <div className="space-y-4">
-            {Object.entries(dataSources).map(([name, source]) => (
-              <div key={name} className="border rounded p-4">
-                <div className="flex flex-col sm:flex-row sm:justify-between">
-                  <div>
-                    <h4 className="font-medium">{name}</h4>
-                    <p className="text-sm text-gray-600">Type: {source.type}</p>
-                    <p className="text-sm text-gray-600">URL: {source.url}</p>
-                    {source.basic_auth?.username && (
-                      <p className="text-sm text-gray-600">
-                        Basic Auth: {source.basic_auth.username}
-                      </p>
-                    )}
-                    {renderConnectionStatus(name)}
-                  </div>
-                  <div className="mt-2 sm:mt-0">
-                    <button
-                      onClick={() => testConnection(name, source)}
-                      className="mr-2 text-green-600 hover:text-green-800"
-                      disabled={saving}
-                    >
-                      Test
-                    </button>
-                    <button
-                      onClick={() => handleEditSource(name)}
-                      className="text-blue-600 hover:text-blue-800"
-                      disabled={editSource === name || saving}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-                
-                {editSource === name && (
-                  <form onSubmit={handleUpdateDataSource} className="mt-4 border-t pt-4">
-                    <div className="mb-4">
-                      <label className="block text-gray-700 text-sm font-bold mb-2">
-                        Type
-                      </label>
-                      <select
-                        name="type"
-                        value={sourceForm.type}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={saving}
-                      >
-                        <option value="pangolin">Pangolin API</option>
-                        <option value="traefik">Traefik API</option>
-                      </select>
-                    </div>
-                    <div className="mb-4">
-                      <label className="block text-gray-700 text-sm font-bold mb-2">
-                        URL
-                      </label>
-                      <input
-                        type="text"
-                        name="url"
-                        value={sourceForm.url}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder={sourceForm.type === 'pangolin' 
-                          ? 'http://pangolin:3001/api/v1' 
-                          : 'http://traefik:8080'}
-                        required
-                        disabled={saving}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        {sourceForm.type === 'pangolin' 
-                          ? 'Pangolin API URL (e.g., http://pangolin:3001/api/v1)' 
-                          : 'Traefik API URL (e.g., http://traefik:8080)'}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {sourceForm.type === 'traefik' && 
-                          'Docker container access: Use http://traefik:8080 when both containers are on the same network'}
-                      </p>
-                    </div>
-                    <div className="mb-4">
-                      <label className="block text-gray-700 text-sm font-bold mb-2">
-                        Basic Auth Username (optional)
-                      </label>
-                      <input
-                        type="text"
-                        name="basicAuth.username"
-                        value={sourceForm.basicAuth.username}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Username"
-                        disabled={saving}
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <label className="block text-gray-700 text-sm font-bold mb-2">
-                        Basic Auth Password (optional)
-                      </label>
-                      <input
-                        type="password"
-                        name="basicAuth.password"
-                        value={sourceForm.basicAuth.password}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Password"
-                        disabled={saving}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Leave empty to keep the existing password
-                      </p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
-                      <button
-                        type="button"
-                        onClick={handleCancelEdit}
-                        className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                        disabled={saving}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleTestFormConnection}
-                        className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                        disabled={saving || !sourceForm.url}
-                      >
-                        Test Connection
-                      </button>
-                      <button
-                        type="submit"
-                        className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                        disabled={saving}
-                      >
-                        {saving ? 'Saving...' : 'Save Changes'}
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+  }, [dataSources, testAllConnections]); // Add testAllConnections dependency
 
-      <div className="mt-6 p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700">
-        <h4 className="font-semibold mb-1">Troubleshooting Connection Issues</h4>
-        <ul className="list-disc ml-5 text-sm">
-          <li>For Docker containers, use <code className="bg-blue-100 px-1 rounded">http://traefik:8080</code> instead of localhost</li>
-          <li>For Pangolin, use <code className="bg-blue-100 px-1 rounded">http://pangolin:3001/api/v1</code></li>
-          <li>Ensure container names match those in your docker-compose file</li>
-          <li>Check if Traefik API is enabled with <code className="bg-blue-100 px-1 rounded">--api.insecure=true</code> flag</li>
-          <li>Verify that both containers are on the same Docker network</li>
-          <li>From command line, testing with curl commands can help identify issues</li>
-        </ul>
-      </div>
+
+  const handleTestFormConnection = async () => {
+    if (!editSource) return;
+    testConnection(editSource, sourceForm); // Use the main testConnection function
+  };
+
+
+  if (loading && Object.keys(dataSources).length === 0) {
+    return <LoadingSpinner message="Loading settings..." />;
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full h-full overflow-y-auto">
+        <div className="flex justify-between items-center mb-6 border-b pb-4 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Data Source Settings</h2>
+            <button onClick={onClose} className="modal-close-button" aria-label="Close Settings">&times;</button>
+        </div>
+
+        {error && (
+            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+        )}
+
+        {/* Active Source Section */}
+        <div className="mb-8 p-4 bg-gray-50 dark:bg-gray-700 rounded-md border dark:border-gray-600">
+            <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Active Data Source</h3>
+            <div className="flex items-center mb-3">
+                <span className="font-medium mr-2 text-gray-700 dark:text-gray-300">Current:</span>
+                <span className="badge badge-info bg-blue-100 text-white-800 dark:bg-blue-900 dark:text-white-200 capitalize">
+                    {activeSource || 'None'}
+                </span>
+            </div>
+            <div>
+                <h4 className="text-sm font-medium mb-2 text-gray-600 dark:text-gray-400">Switch Active Source:</h4>
+                <div className="flex flex-wrap gap-2">
+                    {Object.keys(dataSources).map(name => (
+                        <button
+                            key={name}
+                            onClick={() => handleSetActiveSource(name)}
+                            disabled={activeSource === name || saving}
+                            className={`btn text-sm ${activeSource === name ? 'btn-primary cursor-default' : 'btn-secondary'}`}
+                        >
+                            {name}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+
+        {/* Configured Sources List/Edit Section */}
+        <div>
+            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">Configured Sources</h3>
+            {Object.keys(dataSources).length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400">No data sources found. Check configuration.</p>
+            ) : (
+                <div className="space-y-4">
+                    {Object.entries(dataSources).map(([name, source]) => (
+                        <div key={name} className="border dark:border-gray-600 rounded p-4 transition-shadow hover:shadow-md dark:hover:shadow-gray-700/50">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">
+                                <div className="mb-2 sm:mb-0">
+                                    <h4 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                                        {name} {renderConnectionStatus(name)}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Type: {source.type} | URL: {source.url}</p>
+                                    {source.basic_auth?.username && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Auth User: {source.basic_auth.username}</p>
+                                    )}
+                                </div>
+                                <div className="flex-shrink-0 flex space-x-2">
+                                     <button onClick={() => testConnection(name, source)} className="btn btn-secondary text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 border-green-200 dark:border-green-700" disabled={saving}>Test</button>
+                                    <button onClick={() => handleEditSource(name)} className="btn btn-secondary text-xs" disabled={editSource === name || saving}>Edit</button>
+                                </div>
+                            </div>
+
+                            {/* Edit Form */}
+                            {editSource === name && (
+                                <form onSubmit={handleUpdateDataSource} className="mt-4 border-t dark:border-gray-700 pt-4 space-y-4">
+                                    <div>
+                                        <label className="form-label text-xs">Type</label>
+                                        <select name="type" value={sourceForm.type} onChange={handleInputChange} className="form-input text-sm" disabled={saving}>
+                                            <option value="pangolin">Pangolin API</option>
+                                            <option value="traefik">Traefik API</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="form-label text-xs">URL</label>
+                                        <input type="url" name="url" value={sourceForm.url} onChange={handleInputChange} className="form-input text-sm" placeholder={sourceForm.type === 'pangolin' ? 'http://pangolin:3001/api/v1' : 'http://traefik:8080'} required disabled={saving} />
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Include scheme (http/https). For Docker, use container names (e.g., http://traefik:8080).</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="form-label text-xs">Basic Auth Username <span className="italic">(optional)</span></label>
+                                            <input type="text" name="basicAuth.username" value={sourceForm.basicAuth.username} onChange={handleInputChange} className="form-input text-sm" placeholder="Username" disabled={saving} />
+                                        </div>
+                                        <div>
+                                            <label className="form-label text-xs">Basic Auth Password <span className="italic">(optional)</span></label>
+                                            <input type="password" name="basicAuth.password" value={sourceForm.basicAuth.password} onChange={handleInputChange} className="form-input text-sm" placeholder="Leave unchanged or enter new" disabled={saving} />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+                                        <button type="button" onClick={handleCancelEdit} className="btn btn-secondary text-sm" disabled={saving}>Cancel</button>
+                                        <button type="button" onClick={handleTestFormConnection} className="btn btn-secondary text-sm bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 border-green-200 dark:border-green-700" disabled={saving || !sourceForm.url}>Test Current Values</button>
+                                        <button type="submit" className="btn btn-primary text-sm" disabled={saving}>
+                                            {saving ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+
+         {/* Troubleshooting Info */}
+         <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-white-200 text-xs">
+             <h4 className="font-semibold mb-1">Troubleshooting Tips</h4>
+             <ul className="list-disc ml-4 space-y-1">
+                 <li>Ensure API URLs are correct (e.g., <code className="text-xs font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">http://traefik:8080</code>, <code className="text-xs font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">http://pangolin:3001/api/v1</code>).</li>
+                 <li>Verify container names and network connectivity in Docker.</li>
+                 <li>Check if the Traefik API is enabled (<code className="text-xs font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">--api.insecure=true</code>).</li>
+                 <li>Confirm Basic Auth credentials if used.</li>
+             </ul>
+         </div>
     </div>
   );
 };

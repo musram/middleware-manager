@@ -26,7 +26,11 @@ type Server struct {
 	resourceHandler   *handlers.ResourceHandler
 	configHandler     *handlers.ConfigHandler
 	dataSourceHandler *handlers.DataSourceHandler
+	serviceHandler    *handlers.ServiceHandler
+	pluginHandler     *handlers.PluginHandler // New handler
 	configManager     *services.ConfigManager
+	traefikStaticConfigPath string                 // New
+	pluginsJSONURL          string                 // New
 }
 
 // ServerConfig contains configuration options for the server
@@ -39,7 +43,7 @@ type ServerConfig struct {
 }
 
 // NewServer creates a new API server
-func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigManager) *Server {
+func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigManager, traefikStaticConfigPath string, pluginsJSONURL string) *Server {
 	// Set gin mode based on debug flag
 	if !config.Debug {
 		gin.SetMode(gin.ReleaseMode)
@@ -81,8 +85,11 @@ func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigMa
 	resourceHandler := handlers.NewResourceHandler(db)
 	configHandler := handlers.NewConfigHandler(db)
 	dataSourceHandler := handlers.NewDataSourceHandler(configManager)
+	serviceHandler := handlers.NewServiceHandler(db)
+	// Initialize PluginHandler, passing the path to traefik.yml and the plugins.json URL
+	pluginHandler := handlers.NewPluginHandler(db, traefikStaticConfigPath, pluginsJSONURL)
 
-	// Setup server
+	// Setup server with all handlers
 	server := &Server{
 		db:                db,
 		router:            router,
@@ -90,7 +97,11 @@ func NewServer(db *sql.DB, config ServerConfig, configManager *services.ConfigMa
 		resourceHandler:   resourceHandler,
 		configHandler:     configHandler,
 		dataSourceHandler: dataSourceHandler,
+		serviceHandler:    serviceHandler,
+		pluginHandler:     pluginHandler, // Add to server struct
 		configManager:     configManager,
+		traefikStaticConfigPath: traefikStaticConfigPath, // Store the path
+		pluginsJSONURL:          pluginsJSONURL,          // Store the URL
 		srv: &http.Server{
 			Addr:              ":" + config.Port,
 			Handler:           router,
@@ -127,15 +138,32 @@ func (s *Server) setupRoutes(uiPath string) {
 			middlewares.DELETE("/:id", s.middlewareHandler.DeleteMiddleware)
 		}
 
+		// Service routes
+		services := api.Group("/services")
+		{
+			services.GET("", s.serviceHandler.GetServices)
+			services.POST("", s.serviceHandler.CreateService)
+			services.GET("/:id", s.serviceHandler.GetService)
+			services.PUT("/:id", s.serviceHandler.UpdateService)
+			services.DELETE("/:id", s.serviceHandler.DeleteService)
+		}
+
 		// Resource routes
 		resources := api.Group("/resources")
 		{
 			resources.GET("", s.resourceHandler.GetResources)
 			resources.GET("/:id", s.resourceHandler.GetResource)
 			resources.DELETE("/:id", s.resourceHandler.DeleteResource)
+			
+			// Middleware assignments
 			resources.POST("/:id/middlewares", s.resourceHandler.AssignMiddleware)
 			resources.POST("/:id/middlewares/bulk", s.resourceHandler.AssignMultipleMiddlewares)
 			resources.DELETE("/:id/middlewares/:middlewareId", s.resourceHandler.RemoveMiddleware)
+			
+			// Service assignments
+			resources.GET("/:id/service", s.serviceHandler.GetResourceService)
+			resources.POST("/:id/service", s.serviceHandler.AssignServiceToResource)
+			resources.DELETE("/:id/service", s.serviceHandler.RemoveServiceFromResource)
 			
 			// Router configuration routes
 			resources.PUT("/:id/config/http", s.configHandler.UpdateHTTPConfig)
@@ -154,6 +182,17 @@ func (s *Server) setupRoutes(uiPath string) {
 			datasource.PUT("/:name", s.dataSourceHandler.UpdateDataSource)
 			datasource.POST("/:name/test", s.dataSourceHandler.TestDataSourceConnection)
 		}
+
+		// Plugin Hub Routes
+		pluginsGroup := api.Group("/plugins")
+				{
+					pluginsGroup.GET("", s.pluginHandler.GetPlugins) // Endpoint to list plugins
+					pluginsGroup.POST("/install", s.pluginHandler.InstallPlugin) // Endpoint to install a plugin
+					pluginsGroup.DELETE("/remove", s.pluginHandler.RemovePlugin) // New Remove Endpoint
+					pluginsGroup.GET("/configpath", s.pluginHandler.GetTraefikStaticConfigPath) // Endpoint to get current path
+					pluginsGroup.PUT("/configpath", s.pluginHandler.UpdateTraefikStaticConfigPath) // Endpoint to update path
+		
+				}
 	}
 
 	// Serve the React app

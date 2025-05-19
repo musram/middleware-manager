@@ -58,3 +58,29 @@ INSERT OR IGNORE INTO middlewares (id, name, type, config) VALUES
 ('authelia', 'Authelia', 'forwardAuth', '{"address":"http://authelia:9091/api/authz/forward-auth","trustForwardHeader":true,"authResponseHeaders":["Remote-User","Remote-Groups","Remote-Name","Remote-Email"]}'),
 ('authentik', 'Authentik', 'forwardAuth', '{"address":"http://authentik:9000/outpost.goauthentik.io/auth/traefik","trustForwardHeader":true,"authResponseHeaders":["X-authentik-username","X-authentik-groups","X-authentik-email","X-authentik-name","X-authentik-uid"]}'),
 ('basic-auth', 'Basic Auth', 'basicAuth', '{"users":["admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"]}');
+
+-- Services table stores service definitions
+CREATE TABLE IF NOT EXISTS services (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    config TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Resource_services table stores the relationship between resources and services
+CREATE TABLE IF NOT EXISTS resource_services (
+    resource_id TEXT NOT NULL,
+    service_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (resource_id, service_id),
+    FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+);
+
+-- Insert default services
+INSERT OR IGNORE INTO services (id, name, type, config) VALUES 
+('simple-lb', 'Simple LoadBalancer', 'loadBalancer', '{"servers":[{"url":"http://localhost:8080"}]}'),
+('weighted-demo', 'Weighted Service Demo', 'weighted', '{"services":[{"name":"service1","weight":3},{"name":"service2","weight":1}]}'),
+('failover-demo', 'Failover Demo', 'failover', '{"service":"main","fallback":"backup"}');
