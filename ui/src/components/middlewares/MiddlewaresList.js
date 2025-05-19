@@ -122,7 +122,7 @@ const MiddlewaresList = ({ navigateTo }) => {
                     <div className="text-xs font-mono text-gray-500 dark:text-gray-400">{middleware.id}</div>
                   </td>
                   <td className="py-3 px-6">
-                    <span className="badge badge-info bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <span className="badge badge-info bg-blue-100 text-white-800 dark:bg-blue-900 dark:text-white-200">
                       {middleware.type}
                     </span>
                   </td>

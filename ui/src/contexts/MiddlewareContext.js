@@ -189,7 +189,7 @@ export const MiddlewareProvider = ({ children }) => {
       <div className="py-2">
         <div className="flex items-center">
           <span className="font-medium">{middleware.name}</span>
-          <span className="px-2 py-1 ml-2 text-xs rounded-full bg-blue-100 text-blue-800">
+          <span className="px-2 py-1 ml-2 text-xs rounded-full bg-blue-100 text-white-800">
             {middleware.type}
           </span>
           {isChain && (

@@ -5,6 +5,7 @@ import { ResourceProvider } from './contexts/ResourceContext';
 import { MiddlewareProvider } from './contexts/MiddlewareContext';
 import { DataSourceProvider } from './contexts/DataSourceContext';
 import { ServiceProvider } from './contexts/ServiceContext';
+import { PluginProvider } from './contexts/PluginContext';
 import { Header } from './components/common';
 
 // Import page components
@@ -16,6 +17,7 @@ import MiddlewareForm from './components/middlewares/MiddlewareForm';
 import ServicesList from './components/services/ServicesList';
 import ServiceForm from './components/services/ServiceForm';
 import DataSourceSettings from './components/settings/DataSourceSettings';
+import PluginHub from './components/plugins/PluginHub'; // Import PluginHub component
 
 /**
  * Main application component that renders the current page
@@ -78,6 +80,8 @@ const MainContent = () => {
             navigateTo={navigateTo}
           />
         );
+        case 'plugin-hub': // Add case for Plugin Hub
+        return <PluginHub navigateTo={navigateTo} />;
       default:
         return <Dashboard navigateTo={navigateTo} />;
     }
@@ -113,7 +117,9 @@ const App = () => {
         <ResourceProvider>
           <MiddlewareProvider>
             <ServiceProvider>
+            <PluginProvider> {/* Add PluginProvider */}
               <MainContent />
+            </PluginProvider>
             </ServiceProvider>
           </MiddlewareProvider>
         </ResourceProvider>

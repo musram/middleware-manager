@@ -291,7 +291,7 @@ html.dark-mode .bg-blue-100 {
   background-color: var(--color-accent-primary);
 }
 
-html.dark-mode .text-blue-800 {
+html.dark-mode .text-white-800 {
   color: var(--color-accent-text);
 }
 
