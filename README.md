@@ -1,31 +1,43 @@
-
 <div align="center">
     <h1 align="center"><a href="https://github.com/hhftechnology/middleware-manager-traefik">Traefik Middleware Manager</a></h1>
 </div>
 
 <h3 align="center">Comprehensive Middleware, Router, and Service Management for Traefik</h3>
+
 <div align="center">
+  <img src="https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/screenshots/dashboard.jpeg" alt="Middleware Manager Dashboard" width="600"/>
 </div>
 
 <div align="center">
   <h5>
-    </h5>
+<img src="screenshots/plugin_hubV3.png" alt="plugin_hubV3"/>  
+<img src="screenshots/dashboardV3.png" alt="dashboardV3"/>
+<img src="screenshots/Resources_ManageV3.png" alt="Resources_ManageV3"/>  
+<img src="screenshots/Resources_Manage_HTTP_RouterV3.png" alt="Resources_Manage_HTTP_RouterV3"/>
+<img src="screenshots/Resources_Manage_TLS_CertificateV3.png" alt="Resources_Manage_TLS_CertificateV3"/>
+<img src="screenshots/Resources_Manage_TCP_SNI_RoutingV3.png" alt="Resources_Manage_TCP_SNI_RoutingV3"/>
+<img src="screenshots/Resources_Manage_Assign_Custom_ServiceV3.png" alt="Resources_Manage_Assign_Custom_ServiceV3"/>
+<img src="screenshots/Resources_Manage_Assign_Custom_MiddlewareV3.png" alt="Resources_Manage_Assign_Custom_MiddlewareV3"/>
+<img src="screenshots/middleware-listV3.png" alt="middleware-listV3"/>
+<img src="screenshots/services-listV3.png" alt="services-listV3"/>
+<img src="screenshots/data_source_settingV3.png" alt="data_source_settingV3"/>
+  </h5>
 </div>
 
 The Traefik Middleware Manager is a specialized microservice that empowers you to attach custom Traefik middlewares to your HTTP/TCP/UDP resources, manage router configurations, define custom Traefik services, and install Traefik plugins—all through a user-friendly web interface. It provides crucial functionality for implementing authentication, security headers, rate limiting, custom routing logic, and other middleware-based protections with ease.
 
 ## Overview
 
-The Middleware Manager monitors resources from your chosen data source (either Pangolin API or a direct Traefik API connection) and provides a web UI to:
+The Middleware Manager monitors resources from your chosen data source (either a Pangolin API or a direct Traefik API connection) and provides a web UI to:
 
-* Define and manage custom Traefik middlewares.
-* Attach these middlewares to your resources with specific priorities.
-* Configure advanced router settings for each resource, including entrypoints, TLS Subject Alternative Names (SANs), TCP SNI routing rules, custom request headers, and router priority.
-* Create, update, and delete custom Traefik services (LoadBalancer, Weighted, Mirroring, Failover).
-* Assign these custom services to your resources, overriding default service behavior.
-* Discover, install, and manage Traefik plugins directly from the UI.
+* **Define and manage custom Traefik middlewares.**
+* **Attach these middlewares to your resources** with specific priorities.
+* **Configure advanced router settings** for each resource, including entrypoints, TLS Subject Alternative Names (SANs), TCP SNI routing rules, custom request headers, and router priority.
+* **Create, update, and delete custom Traefik services** (LoadBalancer, Weighted, Mirroring, Failover).
+* **Assign these custom services to your resources**, overriding default service behavior.
+* **Discover, install, and manage Traefik plugins** directly from the UI.
 
-When you make changes, the Middleware Manager generates the necessary Traefik dynamic configuration files, ensuring proper cross-provider references and seamless integration.
+When you make changes, the Middleware Manager generates the necessary Traefik dynamic configuration files (e.g., `resource-overrides.yml`), ensuring proper cross-provider references and seamless integration with your Traefik setup.
 
 ## Key Features
 
@@ -50,50 +62,149 @@ When you make changes, the Middleware Manager generates the necessary Traefik dy
 ## Prerequisites
 
 * Docker and Docker Compose
-* Traefik v2.x or v3.x (either as part of a Pangolin stack or standalone)
-* Network connectivity between the Middleware Manager and your API endpoints (Pangolin or Traefik).
+* Traefik v2.x or v3.x (can be part of a Pangolin stack or standalone)
+* Network connectivity between the Middleware Manager container and your API endpoints (Pangolin or Traefik).
 
-## Quick Start
+## Quick Start & Deployment Examples
 
-You can run the Middleware Manager with either Pangolin or a standalone Traefik setup.
+### 1. Full Stack with Pangolin, Gerbil, and Traefik (Recommended for Pangolin Users)
 
-### Base `docker-compose.yml` Structure
+This example demonstrates integrating Middleware Manager into a typical Pangolin setup.
 
 ```yaml
+networks:
+  pangolin_network: # Define your network
+    driver: bridge
+    name: pangolin # Or your preferred network name
+
 services:
-  middleware-manager:
-    image: hhftechnology/middleware-manager:v3.0.0 # Or :latest for the stable main branch
-    container_name: middleware-manager
+  pangolin:
+    image: fosrl/pangolin:1.3.0 # Use your desired Pangolin version
+    container_name: pangolin
     restart: unless-stopped
     volumes:
-      - ./data:/data                             # For the SQLite database
-      - ./config/traefik/rules:/conf           # For dynamic configuration files generated by Middleware Manager
-      - ./config/middleware-manager/templates.yaml:/app/config/templates.yaml # Optional: Custom middleware templates
-      - ./config/middleware-manager/templates_services.yaml:/app/config/templates_services.yaml # Optional: Custom service templates
-      - ./config/middleware-manager/config.json:/app/config/config.json       # For data source and other persistent settings
-      - ./config/traefik:/etc/traefik          # Mount Traefik's static config directory if managing plugins
+      - ./pangolin_config:/app/config # Map your Pangolin config directory
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
+      interval: "3s"
+      timeout: "3s"
+      retries: 5
+    networks:
+      - pangolin_network
+
+  gerbil: # Gerbil VPN and reverse proxy (often includes Traefik)
+    image: fosrl/gerbil:1.0.0 # Use your desired Gerbil version
+    container_name: gerbil
+    restart: unless-stopped
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - --reachableAt=http://gerbil_container_name_or_ip:3003
+      - --generateAndSaveKeyTo=/var/config/gerbil_key
+      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
+      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
+    volumes:
+      - ./gerbil_config:/var/config # Map your Gerbil config directory
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    # Gerbil often exposes Traefik's ports if network_mode: service:gerbil is used for Traefik
+    ports:
+      - "51820:51820/udp" # Gerbil VPN port
+      # Traefik ports might be exposed here or directly by Traefik service depending on setup
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik API/Dashboard if exposed through Gerbil
+    networks:
+      - pangolin_network
+
+  traefik:
+    image: traefik:v3.3.3
+    container_name: traefik
+    restart: unless-stopped
+
+    network_mode: service:gerbil # Ports appear on the gerbil service
+
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - --configFile=/etc/traefik/traefik_config.yml
+    volumes:
+      - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
+      - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates
+      - ./config/traefik/logs:/var/log/traefik # Volume to store Traefik logs
+      - ./traefik/plugins-storage:/plugins-storage:rw
+      - ./traefik/plugins-storage:/plugins-local:rw
+      - ./config/traefik/rules:/rules
+      - ./public_html:/var/www/html:ro 
+
+  middleware-manager:
+    image: hhftechnology/middleware-manager:v3.0.0 # Use the specific branch tag
+    container_name: middleware-manager
+    restart: unless-stopped
+    depends_on: # Optional, but good practice
+      - pangolin
+      - traefik 
+    volumes:
+      - ./mm_data:/data                             # For the SQLite database
+      - ./traefik_rules:/conf                     # MUST MATCH Traefik's rule directory
+      - ./mm_config/templates.yaml:/app/config/templates.yaml # Optional custom middleware templates
+      - ./mm_config/templates_services.yaml:/app/config/templates_services.yaml # Optional custom service templates
+      - ./mm_config/config.json:/app/config/config.json       # For data source settings
+      # Mount Traefik's static config directory for plugin management
+      - ./traefik_static_config:/etc/traefik 
+    environment:
+      - PANGOLIN_API_URL=http://pangolin:3001/api/v1 # If ACTIVE_DATA_SOURCE is pangolin
+      - TRAEFIK_API_URL=http://traefik:8080 # Or http://gerbil:8080 if Traefik API is via Gerbil
+      - TRAEFIK_CONF_DIR=/conf
+      - DB_PATH=/data/middleware.db
+      - PORT=3456
+      - ACTIVE_DATA_SOURCE=pangolin # Set to 'pangolin' or 'traefik'
+      # Path to Traefik's main static config file *inside this container* (due to volume mount)
+      - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik.yml
+      - PLUGINS_JSON_URL=https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json
+      # - DEBUG=true # Optional for development
     ports:
       - "3456:3456"
-    networks: # Ensure it's on the same network as Traefik and Pangolin (if used)
-      - your_traefik_network 
-      # - pangolin_network # If using Pangolin
+    networks:
+      - pangolin_network
+      
+  # Optional: Other services like error-pages, traefik-relay, redis
+  # Ensure they are on the same pangolin_network
+````
 
-  # Your Traefik service (example)
+**Create necessary directories on your host before starting:**
+`mkdir -p ./pangolin_config ./gerbil_config ./traefik_static_config ./letsencrypt ./traefik_rules ./traefik_plugins ./mm_data ./mm_config`
+And place your `traefik.yml` in `./traefik_static_config/`.
+
+### 2\. Standalone Traefik (Without Pangolin)
+
+This setup connects Middleware Manager directly to Traefik.
+
+```yaml
+networks:
+  traefik_network:
+    name: traefik_proxy
+    driver: bridge
+
+services:
   traefik:
-    image: traefik:v3.0 # Or your preferred version
+    image: traefik:v3.0
     container_name: traefik
+    restart: unless-stopped
     command:
-      - "--api.insecure=true" # Required for Middleware Manager to connect
+      - "--api.insecure=true"
       - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--providers.file.directory=/rules" # Directory for Middleware Manager's generated rules
+      - "--providers.file.directory=/rules" # For Middleware Manager rules
       - "--providers.file.watch=true"
-      # For Plugin Management:
-      - "--experimental.plugins.examplePlugin.moduleName=https://github.com/user/example-plugin
-      - "--experimental.plugins.examplePlugin.version=vx.y.z"
+      # Static config for plugins etc.
+      - "--configFile=/etc/traefik/traefik.yml" 
       # - "--log.level=DEBUG" # For troubleshooting
     ports:
       - "80:80"
@@ -101,31 +212,72 @@ services:
       - "8080:8080" # Traefik API/Dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./config/traefik/traefik.yml:/traefik.yml # Traefik static config (if managing plugins)
-      - ./config/traefik/rules:/rules         # Must match TRAEFIK_CONF_DIR for Middleware Manager rules
-      - ./config/letsencrypt:/letsencrypt
+      - ./traefik_config/static:/etc/traefik          # For traefik.yml
+      - ./traefik_config/rules:/rules                 # For Middleware Manager's generated rules
+      - ./traefik_config/letsencrypt:/letsencrypt
+      - ./traefik_config/plugins:/plugins-storage     # For Traefik v2 plugins
     networks:
-      - your_traefik_network
+      - traefik_network
 
-networks:
-  your_traefik_network:
-    # driver: bridge # or specify existing external network
-  # pangolin_network:
-    # external: true
-````
+  middleware-manager:
+    image: hhftechnology/middleware-manager:traefik-int
+    container_name: middleware-manager
+    restart: unless-stopped
+    depends_on:
+      - traefik
+    volumes:
+      - ./middleware_manager_data:/data
+      - ./traefik_config/rules:/conf # MUST MATCH Traefik's rule directory
+      - ./middleware_manager_config/templates.yaml:/app/config/templates.yaml
+      - ./middleware_manager_config/templates_services.yaml:/app/config/templates_services.yaml
+      - ./middleware_manager_config/config.json:/app/config/config.json
+      # Mount Traefik's static config dir for plugin management
+      - ./traefik_config/static:/etc/traefik 
+    environment:
+      - TRAEFIK_API_URL=http://traefik:8080
+      - TRAEFIK_CONF_DIR=/conf
+      - DB_PATH=/data/middleware.db
+      - PORT=3456
+      - ACTIVE_DATA_SOURCE=traefik # IMPORTANT for standalone mode
+      - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik.yml # Path inside MM container
+      - PLUGINS_JSON_URL=https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json
+    ports:
+      - "3456:3456"
+    networks:
+      - traefik_network
+
+  # Example service managed by Traefik
+  whoami:
+    image: traefik/whoami
+    container_name: whoami
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)" # Replace with your host
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=myresolver" # Configure your cert resolver
+    networks:
+      - traefik_network
+```
+
+**Create necessary directories on your host:**
+`mkdir -p ./traefik_config/static ./traefik_config/rules ./traefik_config/letsencrypt ./traefik_config/plugins ./middleware_manager_data ./middleware_manager_config`
+Place your `traefik.yml` in `./traefik_config/static/`.
+
+After configuring, start services: `docker-compose up -d`.
+Access the UI at `http://your-server-ip:3456`.
 
 ### Environment Variables for Middleware Manager
 
 | Variable                      | Description                                                                 | Default                                                                                      |
 | ----------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `PANGOLIN_API_URL`            | URL to your Pangolin API (if using Pangolin mode)                         | `http://pangolin:3001/api/v1`                                                                  |
+| `PANGOLIN_API_URL`            | URL to your Pangolin API (if `ACTIVE_DATA_SOURCE` is `pangolin`)            | `http://pangolin:3001/api/v1`                                                                  |
 | `TRAEFIK_API_URL`             | URL to your Traefik API                                                     | `http://host.docker.internal:8080` (tries auto-discovery if empty)                           |
 | `TRAEFIK_CONF_DIR`            | Directory inside Middleware Manager to write Traefik dynamic configs        | `/conf`                                                                                      |
 | `DB_PATH`                     | Path to SQLite database inside the container                                | `/data/middleware.db`                                                                        |
 | `PORT`                        | Port for Middleware Manager web UI and API                                    | `3456`                                                                                       |
 | `CONFIG_DIR`                  | Directory for Middleware Manager's internal config files (templates, etc.)    | `/app/config`                                                                                |
 | `ACTIVE_DATA_SOURCE`          | Initial data source: `pangolin` or `traefik`                                | `pangolin`                                                                                   |
-| `TRAEFIK_STATIC_CONFIG_PATH`  | Path to Traefik's main static config file (e.g., `traefik.yml`)             | `/etc/traefik/traefik.yml`                                                                   |
+| `TRAEFIK_STATIC_CONFIG_PATH`  | Path to Traefik's main static config file (e.g., `traefik.yml`) **inside this container** | `/etc/traefik/traefik.yml`                                                                   |
 | `PLUGINS_JSON_URL`            | URL to fetch the list of available Traefik plugins                          | `https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json` |
 | `CHECK_INTERVAL_SECONDS`      | How often to check for new resources (seconds)                              | `30`                                                                                         |
 | `SERVICE_INTERVAL_SECONDS`    | How often to check for new services (seconds)                             | `30`                                                                                         |
@@ -134,57 +286,9 @@ networks:
 | `ALLOW_CORS`                  | Enable CORS for API                                                         | `false`                                                                                      |
 | `CORS_ORIGIN`                 | Allowed CORS origin (if `ALLOW_CORS` is true; empty means allow all)        | `""`                                                                                         |
 
-### 1\. Using with Pangolin (Default Mode)
-
-Set `ACTIVE_DATA_SOURCE=pangolin` (or leave it as default) and configure `PANGOLIN_API_URL`.
-
-```yaml
-# In middleware-manager service definition:
-services:
-  middleware-manager:
-    # ... other config ...
-    environment:
-      - PANGOLIN_API_URL=http://pangolin_container_name:3001/api/v1 # Adjust if needed
-      - TRAEFIK_API_URL=http://traefik_container_name:8080         # Still useful for some operations
-      - TRAEFIK_CONF_DIR=/conf
-      - DB_PATH=/data/middleware.db
-      - PORT=3456
-      - ACTIVE_DATA_SOURCE=pangolin
-      - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik.yml # Path inside Traefik container, for plugin management
-      - PLUGINS_JSON_URL=[https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json](https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json)
-    # ... volumes and ports ...
-```
-
-### 2\. Using with Standalone Traefik (Without Pangolin)
-
-Set `ACTIVE_DATA_SOURCE=traefik` and configure `TRAEFIK_API_URL`.
-
-```yaml
-# In middleware-manager service definition:
-services:
-  middleware-manager:
-    # ... other config ...
-    environment:
-      - TRAEFIK_API_URL=http://traefik_container_name:8080 # Ensure this matches your Traefik API
-      - TRAEFIK_CONF_DIR=/conf
-      - DB_PATH=/data/middleware.db
-      - PORT=3456
-      - ACTIVE_DATA_SOURCE=traefik
-      - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik.yml # Path inside Traefik container, for plugin management
-      - PLUGINS_JSON_URL=[https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json](https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json)
-    # ... volumes and ports ...
-```
-
-You can also manage data source settings via `config.json` (see "Data Source Configuration" below).
-
-After configuring, start the services: `docker-compose up -d`
-Access the UI at `http://your-server-ip:3456`.
-
-## Configuration Details
-
 ### Data Source Configuration (`config.json`)
 
-The Middleware Manager can connect to either Pangolin or Traefik as a data source for discovering resources. You can configure this via the `config.json` file, which will be created by default in the path specified by the `CONFIG_DIR` environment variable (inside the container, e.g., `/app/config/config.json`). Mount a volume to this path to persist your settings.
+The Middleware Manager can connect to either Pangolin or Traefik as a data source for discovering resources. Settings are managed via `/app/config/config.json` (volume mount this path).
 
 Example `config.json`:
 
@@ -202,7 +306,7 @@ Example `config.json`:
     },
     "traefik": {
       "type": "traefik",
-      "url": "http://traefik:8080",
+      "url": "http://traefik_container_name:8080",
       "basic_auth": {
         "username": "",
         "password": ""
@@ -212,150 +316,70 @@ Example `config.json`:
 }
 ```
 
-You can switch the `active_data_source` and update URLs/credentials through the **Settings** panel in the UI.
+Switch `active_data_source` and update URLs/credentials via the **Settings** panel in the UI.
 
 ### Custom Templates
 
-  * **Middleware Templates**: Create `templates.yaml` in your mapped `CONFIG_DIR` (e.g., `./config/middleware-manager/templates.yaml`).
-    ```yaml
-    middlewares:
-      - id: "my-custom-headers"
-        name: "My Strong Security Headers"
-        type: "headers"
-        config:
-          browserXssFilter: true
-          contentTypeNosniff: true
-          # ... other header options
-    ```
-  * **Service Templates**: Create `templates_services.yaml` in your mapped `CONFIG_DIR` (e.g., `./config/middleware-manager/templates_services.yaml`).
-    ```yaml
-    services:
-      - id: "my-custom-lb"
-        name: "My Custom Load Balancer"
-        type: "loadBalancer"
-        config:
-          servers:
-            - url: "http://mybackend1:8000"
-            - url: "http://mybackend2:8000"
-          healthCheck:
-            path: "/healthz"
-            interval: "5s"
-    ```
+  * **Middleware Templates**: Create `templates.yaml` in your mapped `CONFIG_DIR` (e.g., `./middleware_manager_config/templates.yaml`).
+  * **Service Templates**: Create `templates_services.yaml` in your mapped `CONFIG_DIR` (e.g., `./middleware_manager_config/templates_services.yaml`).
+
+(Refer to previous README for example template structures).
 
 ## Usage Guide
 
-### Dashboard
-
-The dashboard provides an at-a-glance overview of your resources, middlewares, services, and their protection status.
+(This section remains largely the same as the previous README, covering Dashboard, Managing Resources, Middlewares, Services, and Plugins. Key updates are integrated below.)
 
 ### Managing Resources
 
-1.  Navigate to the **Resources** tab.
-2.  Resources are automatically discovered from your active data source (Pangolin or Traefik).
-3.  Click **Manage** next to a resource to configure it.
-4.  **Advanced Router Configuration**:
-      * **HTTP Entrypoints**: Click the button to specify which Traefik entrypoints this HTTP router should listen on (e.g., `web`, `websecure`). Comma-separated. Default: `websecure`.
-      * **TLS Domains**: Click to add Subject Alternative Names (SANs) for the TLS certificate. The primary host is automatically included. Comma-separated.
-      * **TCP Routing**: Click to enable and configure TCP SNI routing. Specify TCP entrypoints and the SNI matching rule (e.g., `HostSNI(\`https://www.google.com/search?q=your-tcp-host.example.com\`)\`).
-      * **Custom Headers**: Click to define custom request headers that Traefik will add to requests forwarded to this resource's backend service. Useful for setting `Host` headers or other custom values.
-      * **Router Priority**: Adjust the numerical priority of the router. Higher numbers are evaluated first by Traefik. Default: `100`.
-5.  **Assigning Middlewares**:
-      * In the "Attached Middlewares" section, click **Add Middleware**.
-      * Select one or more middlewares from the list of available (unassigned) middlewares.
-      * Set a **Priority** (higher numbers run first, e.g., an auth middleware should have a higher priority than a headers middleware).
-      * Click **Assign Selected**.
-6.  **Assigning a Custom Service**:
-      * In the "Service Configuration" section, the default service (usually from Docker or Pangolin) is shown.
-      * Click **Assign Custom Service** (or **Change Assigned Service**).
-      * Select a service from the list of services you've defined in the "Services" tab.
-      * Click **Assign Service**. This will make the resource's router use your custom Traefik service definition.
-      * To revert to the default service, remove the custom assignment.
-
-### Managing Middlewares
-
-1.  Navigate to the **Middlewares** tab.
-2.  View existing middlewares or click **Create Middleware**.
-3.  Provide a **Name**, select a **Type** (e.g., `headers`, `basicAuth`, `rateLimit`, `plugin`).
-4.  Configure the middleware using the JSON editor. Templates are provided for common types.
-      * For `chain` middlewares, select other existing middlewares to include in the chain.
-      * For `plugin` middlewares, ensure the plugin is declared in your Traefik static configuration. The config key here should match the plugin's name as defined in Traefik (e.g., if plugin is `crowdsec`, the key in JSON would be `"crowdsec": { ...plugin_config... }`).
-5.  Click **Create Middleware** or **Update Middleware**.
+  * **Advanced Router Configuration**:
+      * **Custom Headers**: Useful for setting the `Host` header correctly if Traefik terminates TLS but your backend expects the original host, or for passing other specific headers.
+  * **Assigning a Custom Service**: When you assign a custom service, the resource's router will use your defined Traefik service (e.g., a load balancer with specific health checks) instead of the default one (e.g., the Docker container itself).
 
 ### Managing Services
 
-1.  Navigate to the **Services** tab.
-2.  View existing services or click **Create Service**.
-3.  Provide a **Name** (e.g., `my-app-blue-green`). This name will be used for referencing (e.g., `my-app-blue-green@file`).
-4.  Select a **Type**:
-      * `loadBalancer`: Distributes requests among multiple backend servers.
-          * **Protocol**: Choose HTTP, TCP, or UDP for the backend servers.
-          * `servers`: Define backend servers with `url` (for HTTP) or `address` (for TCP/UDP). Can include `weight`.
-          * `healthCheck`: Configure health checks for servers.
-          * `sticky`: Configure session stickiness (e.g., cookie-based).
-      * `weighted`: Distributes requests across multiple other *named* services based on weights.
-          * `services`: List of `{ "name": "service-id@provider", "weight": 2 }`.
-      * `mirroring`: Sends requests to a primary service and mirrors a percentage of traffic to other services.
-          * `service`: The primary service ID (e.g., `main-production@file`).
-          * `mirrors`: List of `{ "name": "analytics-mirror@file", "percent": 10 }`.
-      * `failover`: Routes to a primary service, falling back to another if the primary fails.
-          * `service`: The main service ID.
-          * `fallback`: The fallback service ID.
-5.  Configure the service options using the JSON editor. Templates and help text are provided.
-6.  Click **Create Service** or **Update Service**.
+  * **Protocol (for LoadBalancer)**:
+      * **HTTP**: For standard web services. Servers are defined with `"url": "http://backend:port"`.
+      * **TCP**: For raw TCP traffic. Servers are defined with `"address": "backend_ip_or_host:port"`.
+      * **UDP**: For UDP-based services. Servers are defined with `"address": "backend_ip_or_host:port"`.
+  * **Service Naming**: When referencing services within other service definitions (e.g., in `weighted` or `failover` types), ensure you use the correct name and provider, typically `service-id@file` for services created in Middleware Manager.
 
 ### Managing Plugins (Plugin Hub)
 
-1.  Navigate to the **Plugin Hub** tab.
-2.  **Set Traefik Static Configuration Path**:
-      * Input the **absolute path** to your main Traefik static configuration file (e.g., `/etc/traefik/traefik.yml` or `/data/traefik.yml`) *as it exists inside the Middleware Manager container*. This path must be volume-mounted from your host to be accessible by Middleware Manager.
-      * **Important**: For this setting to persist across Middleware Manager restarts, set the `TRAEFIK_STATIC_CONFIG_PATH` environment variable for the Middleware Manager container. Setting it in the UI is temporary for the current session.
-3.  Browse or search for available plugins.
-4.  For each plugin:
-      * Specify the **Version** you want to install (e.g., `v1.2.3`). If left blank, it usually defaults to the latest recommended by the plugin source.
-      * Click **Install Plugin**. This action modifies your Traefik static configuration file to declare the plugin under the `experimental.plugins` section.
-      * To remove a plugin, click **Remove Plugin**.
-5.  **Restart Traefik**: After installing or removing plugins, you **must restart your Traefik container** for the changes to take effect and for the plugin to be loaded/unloaded.
-6.  Once a plugin is installed and Traefik is restarted, you can create a middleware of type `plugin` and configure it. The configuration key in the JSON editor should match the plugin's name (e.g., if you installed a plugin named `myawesomeplugin` in `traefik.yml`, your middleware config would be `{"myawesomeplugin": { /* plugin-specific options */ }}`).
-
-Example of how Middleware Manager adds a plugin to `traefik.yml`:
-
-```yaml
-# In your traefik.yml (or equivalent)
-experimental:
-  plugins:
-    statiq: # This key is derived from the moduleName
-      moduleName: [github.com/hhftechnology/statiq](https://github.com/hhftechnology/statiq)
-      version: v0.3.0
-    crowdsecbouncer: # Another example
-      moduleName: [github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin)
-      version: v1.4.2
-# ... other Traefik static configurations ...
-```
+  * **TRAEFIK\_STATIC\_CONFIG\_PATH**: This environment variable (or UI setting) tells Middleware Manager where to find Traefik's main `traefik.yml` (or `.toml`) file. **This path must be accessible from within the Middleware Manager container** (via a volume mount). For example, if your host's Traefik config is at `./traefik_config/static/traefik.yml` and you mount `./traefik_config/static` to `/etc/traefik` in the Middleware Manager container, then `TRAEFIK_STATIC_CONFIG_PATH` should be `/etc/traefik/traefik.yml`.
+  * **Plugin Installation**: Adds a declaration to your Traefik static config.
+    ```yaml
+    # In your traefik.yml (managed by Middleware Manager's Plugin Hub)
+    experimental:
+      plugins:
+        myplugin: # Key derived from moduleName
+          moduleName: https://github.com/vendor/my-traefik-plugin
+          version: v1.0.0
+    ```
+  * **Restart Traefik**: **Crucial step\!** After installing/removing plugins via Middleware Manager, Traefik must be restarted to load/unload the plugin code.
+  * **Using Plugins**: Create a middleware of type `plugin`. The JSON config key must match the plugin's key in `traefik.yml`.
+    ```json
+    // Middleware config in Middleware Manager UI for 'myplugin'
+    {
+      "myplugin": {
+        "optionA": "value1",
+        "anotherOption": true
+      }
+    }
+    ```
 
 ## Troubleshooting
 
-### Connection Issues
+(Similar to previous README, with emphasis on checking container names and network for API connectivity, and ensuring `TRAEFIK_STATIC_CONFIG_PATH` is correctly set for plugin management.)
 
-  * **Container Naming**: For Docker, use container names (e.g., `http://traefik:8080`, `http://pangolin:3001/api/v1`) not `localhost`.
-  * **Traefik API**: Ensure Traefik API is enabled (`--api.insecure=true`).
-  * **Networking**: Verify containers are on the same Docker network.
-  * `curl` Tests:
-      * `docker exec <middleware_manager_container_name> curl http://pangolin_container_name:3001/api/v1/traefik-config`
-      * `docker exec <middleware_manager_container_name> curl http://traefik_container_name:8080/api/http/routers`
-
-### "The service does not exist" or "The middleware does not exist" in Traefik
-
-  * **Provider Suffixes**: Middleware Manager generally handles this. Manually created services/middlewares in the UI are typically from the `@file` provider. Services/middlewares from the data source (Docker, Pangolin) will have their respective providers (e.g., `@docker`, `@http`).
-  * **Generated Files**: Check `resource-overrides.yml` in your mapped `/conf` directory for correctness.
-  * **Plugin Not Loaded**: If it's a plugin middleware, ensure the plugin is correctly declared in Traefik's static config and Traefik has been restarted.
-
-### Service Templates Not Loading
-
-  * Ensure `templates_services.yaml` is correctly volume-mounted to `/app/config/templates_services.yaml` inside the container.
-  * Verify the YAML syntax in your `templates_services.yaml` file is correct.
-  * Check Middleware Manager logs for errors during template loading.
+  * **Plugin Issues**:
+      * Verify `TRAEFIK_STATIC_CONFIG_PATH` in Middleware Manager points to the *correct path inside its own container* where Traefik's static config is mounted.
+      * Ensure Traefik was restarted after plugin installation/removal.
+      * Check Traefik logs for plugin loading errors.
+      * The plugin `moduleName` and `version` in the static config must be exact.
 
 ## Development
+
+(Same as previous README)
 
 ### Prerequisites
 
@@ -367,20 +391,18 @@ experimental:
 
 ```bash
 # Navigate to the project root
-go run main.go # For development with auto-restart, consider tools like air
+go run main.go 
 # For build:
-go build -o middleware-manager main.go
+# go build -o middleware-manager main.go
 ```
 
 ### Frontend
 
 ```bash
 cd ui
-npm install # or yarn install
-npm start   # or yarn start
+# If node_modules is missing: npm install (or yarn install)
+npm start # or yarn start
 ```
-
-The UI will be available at `http://localhost:3000` and will proxy API requests to the Go backend (defaulting to `http://localhost:3456` as per `ui/package.json` proxy setting).
 
 ## License
 
@@ -388,6 +410,4 @@ MIT License
 
 ## Contributing
 
-Contributions, issues, and feature requests are welcome\! Please feel free to submit a Pull Request or open an issue.
-
-
+Contributions, issues, and feature requests are welcome\! Please feel free to submit a Pull Request or open an issue on the GitHub repository.
