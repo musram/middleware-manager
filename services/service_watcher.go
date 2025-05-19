@@ -182,16 +182,24 @@ func (sw *ServiceWatcher) checkServices() error {
 }
 
 // updateOrCreateService updates an existing service or creates a new one
+// updateOrCreateService updates an existing service or creates a new one
 func (sw *ServiceWatcher) updateOrCreateService(service models.Service) error {
-    // Check if service already exists
-    var exists int
+    // Normalize service ID by removing additional provider suffixes
+    normalizedID := getNormalizedServiceID(service.ID)
     
-    err := sw.db.QueryRow("SELECT 1 FROM services WHERE id = ?", service.ID).Scan(&exists)
+    // Check if service already exists using both original and normalized IDs
+    var exists int
+    var existingType, existingConfig string
+    
+    err := sw.db.QueryRow(
+        "SELECT 1, type, config FROM services WHERE id = ? OR id LIKE ?", 
+        service.ID, normalizedID+"@%",
+    ).Scan(&exists, &existingType, &existingConfig)
     
     if err == nil {
         // Service exists, only update if it changed
         if shouldUpdateService(sw.db, service) {
-            log.Printf("Updating existing service: %s", service.ID)
+            log.Printf("Updating existing service: %s (normalized from %s)", normalizedID, service.ID)
             return sw.updateService(service)
         }
         // Service exists and hasn't changed, skip update
@@ -201,8 +209,17 @@ func (sw *ServiceWatcher) updateOrCreateService(service models.Service) error {
         return fmt.Errorf("error checking if service exists: %w", err)
     }
     
-    // Service doesn't exist, create it
+    // Service doesn't exist, create it with normalized ID
+    service.ID = normalizedID
     return sw.createService(service)
+}
+
+// getNormalizedServiceID removes any provider suffixes from service IDs
+func getNormalizedServiceID(id string) string {
+    if idx := strings.Index(id, "@"); idx > 0 {
+        return id[:idx]
+    }
+    return id
 }
 
 // shouldUpdateService determines if an existing service needs to be updated
@@ -335,6 +352,7 @@ func configsAreDifferent(config1, config2 map[string]interface{}) bool {
 }
 
 // createService creates a new service in the database
+// createService creates a new service in the database
 func (sw *ServiceWatcher) createService(service models.Service) error {
     // Validate service type
     if !models.IsValidServiceType(service.Type) {
@@ -376,17 +394,25 @@ func (sw *ServiceWatcher) createService(service models.Service) error {
         service.Name = formatServiceName(service.ID)
     }
     
+    // Make sure we're not adding @file if the ID already has a provider
+    serviceID := service.ID
+    if !strings.Contains(serviceID, "@") {
+        serviceID = serviceID + "@file" // Only add @file if no provider exists
+    }
+    
+    log.Printf("Creating new service: %s (original ID: %s)", serviceID, service.ID)
+    
     // Insert the service
     _, err = sw.db.Exec(
         "INSERT INTO services (id, name, type, config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        service.ID, service.Name, service.Type, string(configJSON), time.Now(), time.Now(),
+        serviceID, service.Name, service.Type, string(configJSON), time.Now(), time.Now(),
     )
     
     if err != nil {
         return fmt.Errorf("failed to insert service %s: %w", service.ID, err)
     }
     
-    log.Printf("Created new service: %s (%s)", service.Name, service.ID)
+    log.Printf("Created new service: %s (%s)", service.Name, serviceID)
     return nil
 }
 
