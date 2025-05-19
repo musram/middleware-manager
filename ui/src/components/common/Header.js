@@ -60,7 +60,7 @@ const Header = ({
               Middleware Manager
             </span>
              {/* Active Data Source Indicator */}
-             <span className="ml-4 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-white-200 text-xs font-medium capitalize">
+             <span className="ml-4 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-white-800 dark:text-white-200 text-xs font-medium capitalize">
                {activeDataSource} Mode
              </span>
           </div>

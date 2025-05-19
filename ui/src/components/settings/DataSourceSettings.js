@@ -171,7 +171,7 @@ const DataSourceSettings = ({ onClose }) => {
             <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Active Data Source</h3>
             <div className="flex items-center mb-3">
                 <span className="font-medium mr-2 text-gray-700 dark:text-gray-300">Current:</span>
-                <span className="badge badge-info bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-white-200 capitalize">
+                <span className="badge badge-info bg-blue-100 text-white-800 dark:bg-blue-900 dark:text-white-200 capitalize">
                     {activeSource || 'None'}
                 </span>
             </div>
