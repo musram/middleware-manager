@@ -214,7 +214,7 @@ const Dashboard = ({ navigateTo }) => {
                    </svg>
                 </div>
                 <div className="ml-3 flex-1 md:flex md:justify-between">
-                  <p className="text-sm text-blue-700 dark:text-blue-200">
+                  <p className="text-sm text-blue-700 dark:text-white-200">
                     {disabledResourcesCount} resource{disabledResourcesCount !== 1 ? 's are' : ' is'} currently disabled (not found in {activeDataSource}).
                   </p>
                   <p className="mt-3 text-sm md:mt-0 md:ml-6">

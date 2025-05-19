@@ -171,7 +171,7 @@ const DataSourceSettings = ({ onClose }) => {
             <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Active Data Source</h3>
             <div className="flex items-center mb-3">
                 <span className="font-medium mr-2 text-gray-700 dark:text-gray-300">Current:</span>
-                <span className="badge badge-info bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 capitalize">
+                <span className="badge badge-info bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-white-200 capitalize">
                     {activeSource || 'None'}
                 </span>
             </div>
@@ -258,7 +258,7 @@ const DataSourceSettings = ({ onClose }) => {
         </div>
 
          {/* Troubleshooting Info */}
-         <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-200 text-xs">
+         <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-white-200 text-xs">
              <h4 className="font-semibold mb-1">Troubleshooting Tips</h4>
              <ul className="list-disc ml-4 space-y-1">
                  <li>Ensure API URLs are correct (e.g., <code className="text-xs font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">http://traefik:8080</code>, <code className="text-xs font-mono bg-blue-100 dark:bg-blue-800 px-1 rounded">http://pangolin:3001/api/v1</code>).</li>
