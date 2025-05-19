@@ -1,12 +1,8 @@
 <div align="center">
-    <h1 align="center"><a href="https://github.com/hhftechnology/middleware-manager-traefik">Traefik Middleware Manager</a></h1>
+    <h1 align="center"><a href="https://github.com/hhftechnology/middleware-manager-traefik">Traefik/Pangolin Middleware Manager</a></h1>
 </div>
 
 <h3 align="center">Comprehensive Middleware, Router, and Service Management for Traefik</h3>
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/screenshots/dashboard.jpeg" alt="Middleware Manager Dashboard" width="600"/>
-</div>
 
 <div align="center">
   <h5>
