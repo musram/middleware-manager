@@ -246,6 +246,8 @@ func normalizeResourceID(id string) string {
 }
 
 // updateOrCreateResource updates an existing resource or creates a new one
+
+// updateOrCreateResource updates an existing resource or creates a new one
 func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) error {
     // Normalize the resource ID to handle cascading auth suffixes
     normalizedID := normalizeResourceID(resource.ID)
@@ -368,7 +370,6 @@ func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) erro
     log.Printf("Added new resource: %s (%s)", resource.Host, resource.ID)
     return nil
 }
-
 // fetchTraefikConfig fetches the Traefik configuration from the data source
 // This method is kept for backward compatibility with the original implementation
 func (rw *ResourceWatcher) fetchTraefikConfig(ctx context.Context) (*models.PangolinTraefikConfig, error) {
