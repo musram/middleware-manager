@@ -205,33 +205,116 @@ func (rw *ResourceWatcher) checkResources() error {
 }
 
 // updateOrCreateResource updates an existing resource or creates a new one
+// normalizeResourceID removes cascading auth suffixes and provider suffixes from resource IDs
+func normalizeResourceID(id string) string {
+    // First, remove any provider suffix (if present)
+    baseName := id
+    if idx := strings.Index(baseName, "@"); idx > 0 {
+        baseName = baseName[:idx]
+    }
+    
+    // Check if this is a router resource
+    if !strings.Contains(baseName, "-router") {
+        return baseName // Not a router resource, return without suffix processing
+    }
+    
+    // Handle cascading auth patterns
+    // Extract the base router pattern (e.g., "1-router" from "1-router-auth-auth-auth...")
+    routerParts := strings.SplitN(baseName, "-router", 2)
+    if len(routerParts) != 2 {
+        return baseName // Unexpected format, return as is
+    }
+    
+    // Check if we have auth suffixes
+    suffixPart := routerParts[1]
+    if strings.Contains(suffixPart, "-auth") {
+        // Replace all cascading -auth suffixes with just one -auth
+        // First, handle the case of -router-auth pattern
+        if strings.HasPrefix(suffixPart, "-auth") {
+            return routerParts[0] + "-router-auth"
+        }
+        
+        // Handle cases like -router-redirect-auth with a single preserved redirect component
+        redirectParts := strings.SplitN(suffixPart, "-auth", 2)
+        if len(redirectParts) > 1 && redirectParts[0] != "" {
+            return routerParts[0] + "-router" + redirectParts[0] + "-auth"
+        }
+    }
+    
+    // If no auth suffixes or couldn't parse properly, return the original base name
+    return baseName
+}
+
+// updateOrCreateResource updates an existing resource or creates a new one
 func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) error {
-    // Check if resource already exists
+    // Normalize the resource ID to handle cascading auth suffixes
+    normalizedID := normalizeResourceID(resource.ID)
+    
+    // For logging purposes, keep track if we normalized the ID
+    originalID := resource.ID
+    wasNormalized := normalizedID != originalID
+    
+    // Check if resource already exists with either the original or normalized ID
     var exists int
     var status string
     var entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
     var tcpEnabled int
     var routerPriority sql.NullInt64
     
+    // First try exact match with the original ID
     err := rw.db.QueryRow(`
         SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
                custom_headers, router_priority
         FROM resources WHERE id = ?
     `, resource.ID).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
-                        &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
+                       &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
+    
+    // If exact match not found and ID was normalized, try with pattern matching
+    if err == sql.ErrNoRows && wasNormalized {
+        // Try to find any resource that matches the normalized pattern with potential suffixes
+        // Use LIKE query with escape for special characters in the ID
+        normalizedPattern := normalizedID + "%"
+        if strings.Contains(normalizedID, "-router") {
+            // For router resources, specifically match auth suffix pattern
+            normalizedPattern = strings.Replace(normalizedID, "-router", "-router%", 1)
+        }
+        
+        err = rw.db.QueryRow(`
+            SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
+                   custom_headers, router_priority
+            FROM resources WHERE id LIKE ? LIMIT 1
+        `, normalizedPattern).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
+                                &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
+        
+        // If found via pattern match, log it for debugging
+        if err == nil {
+            log.Printf("Found resource via pattern matching: %s matches normalized pattern %s", 
+                     resource.ID, normalizedPattern)
+        }
+    }
     
     if err == nil {
         // Resource exists, update essential fields but preserve custom configuration
+        // If we found a match via normalization, use the normalized ID for the update
+        updateID := resource.ID
+        if wasNormalized {
+            // Use the normalized ID for the update to prevent future duplication
+            updateID = normalizedID
+            log.Printf("Updating with normalized ID: %s (was %s)", normalizedID, originalID)
+        }
+        
         _, err = rw.db.Exec(
-            "UPDATE resources SET host = ?, service_id = ?, status = 'active', source_type = ?, updated_at = ? WHERE id = ?",
-            resource.Host, resource.ServiceID, resource.SourceType, time.Now(), resource.ID,
+            "UPDATE resources SET id = ?, host = ?, service_id = ?, status = 'active', source_type = ?, updated_at = ? WHERE id LIKE ?",
+            updateID, resource.Host, resource.ServiceID, resource.SourceType, time.Now(), 
+            // Use pattern matching for the WHERE clause to catch all variations
+            strings.Replace(normalizedID, "-router", "-router%", 1),
         )
         if err != nil {
             return fmt.Errorf("failed to update resource %s: %w", resource.ID, err)
         }
         
         if status == "disabled" {
-            log.Printf("Resource %s was disabled but is now active again", resource.ID)
+            log.Printf("Resource %s was disabled but is now active again", updateID)
         }
         
         return nil
@@ -258,6 +341,12 @@ func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) erro
     // Use default router priority if not set
     if resource.RouterPriority == 0 {
         resource.RouterPriority = 100 // Default priority
+    }
+    
+    // For new resources, always use the normalized ID to prevent duplication
+    if wasNormalized {
+        log.Printf("Creating new resource with normalized ID: %s (was %s)", normalizedID, originalID)
+        resource.ID = normalizedID
     }
     
     // Create new resource with default configuration
