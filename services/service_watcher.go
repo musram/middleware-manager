@@ -11,6 +11,7 @@ import (
 
     "github.com/hhftechnology/middleware-manager/database"
     "github.com/hhftechnology/middleware-manager/models"
+    "github.com/hhftechnology/middleware-manager/util"
 )
 
 // ServiceWatcher watches for services using configured data source
@@ -155,6 +156,14 @@ func (sw *ServiceWatcher) checkServices() error {
             continue
         }
 
+        // Get active data source for context
+        dsConfig, _ := sw.configManager.GetActiveDataSourceConfig()
+        
+        // Determine source type for tracking
+        if service.SourceType == "" {
+            service.SourceType = string(dsConfig.Type)
+        }
+
         // Process service
         if err := sw.updateOrCreateService(service); err != nil {
             log.Printf("Error processing service %s: %v", service.ID, err)
@@ -162,15 +171,17 @@ func (sw *ServiceWatcher) checkServices() error {
             continue
         }
         
-        // Mark this service as found
-        foundServices[service.ID] = true
+        // Mark normalized version of this service as found
+        normalizedID := util.NormalizeID(service.ID)
+        foundServices[normalizedID] = true
     }
     
     // Optionally, mark services as "inactive" if they no longer exist in the data source
     // This is commented out by default to avoid deleting user-created services
     /*
     for _, serviceID := range existingServices {
-        if !foundServices[serviceID] {
+        normalizedID := util.NormalizeID(serviceID)
+        if !foundServices[normalizedID] {
             log.Printf("Service %s no longer exists in data source, consider marking as inactive", serviceID)
             // Optional: You could update a status field if you add one to the services table
             // _, err := sw.db.Exec("UPDATE services SET status = 'inactive' WHERE id = ?", serviceID)
@@ -182,25 +193,25 @@ func (sw *ServiceWatcher) checkServices() error {
 }
 
 // updateOrCreateService updates an existing service or creates a new one
-// updateOrCreateService updates an existing service or creates a new one
 func (sw *ServiceWatcher) updateOrCreateService(service models.Service) error {
-    // Normalize service ID by removing additional provider suffixes
-    normalizedID := getNormalizedServiceID(service.ID)
+    // Use our centralized normalization function
+    normalizedID := util.NormalizeID(service.ID)
+    originalID := service.ID
     
-    // Check if service already exists using both original and normalized IDs
+    // Check if service already exists using normalized ID
     var exists int
     var existingType, existingConfig string
     
     err := sw.db.QueryRow(
-        "SELECT 1, type, config FROM services WHERE id = ? OR id LIKE ?", 
-        service.ID, normalizedID+"@%",
+        "SELECT 1, type, config FROM services WHERE id = ?", 
+        normalizedID,
     ).Scan(&exists, &existingType, &existingConfig)
     
     if err == nil {
         // Service exists, only update if it changed
-        if shouldUpdateService(sw.db, service) {
-            log.Printf("Updating existing service: %s (normalized from %s)", normalizedID, service.ID)
-            return sw.updateService(service)
+        if shouldUpdateService(sw.db, service, normalizedID) {
+            log.Printf("Updating existing service: %s (normalized from %s)", normalizedID, originalID)
+            return sw.updateService(service, normalizedID)
         }
         // Service exists and hasn't changed, skip update
         return nil
@@ -209,38 +220,50 @@ func (sw *ServiceWatcher) updateOrCreateService(service models.Service) error {
         return fmt.Errorf("error checking if service exists: %w", err)
     }
     
-    // Service doesn't exist, create it with normalized ID
-    service.ID = normalizedID
-    return sw.createService(service)
-}
-
-// getNormalizedServiceID removes redundant provider suffixes from service IDs
-func getNormalizedServiceID(id string) string {
-    // Remove any provider suffix but only if it's duplicated
-    if strings.Contains(id, "@file@file") {
-        // Handle double @file suffix
-        if idx := strings.Index(id, "@file"); idx > 0 {
-            return id[:idx] + "@file"
+    // Try checking if service exists with different provider suffixes
+    var found bool
+    err = sw.db.QueryRow(
+        "SELECT 1 FROM services WHERE id LIKE ?", 
+        normalizedID+"%",
+    ).Scan(&exists)
+    
+    if err == nil {
+        // Found a service with this base name but different suffix
+        found = true
+        var altID string
+        err = sw.db.QueryRow(
+            "SELECT id FROM services WHERE id LIKE ? LIMIT 1",
+            normalizedID+"%",
+        ).Scan(&altID)
+        
+        if err == nil {
+            log.Printf("Found existing service with different suffix: %s - will update", altID)
+            return sw.updateService(service, altID)
         }
-    } else if idx := strings.Index(id, "@"); idx > 0 {
-        // For other cases, just extract the base name
-        return id[:idx]
     }
-    return id
+    
+    if !found {
+        // Service doesn't exist with any suffix, create it
+        service.ID = normalizedID
+        return sw.createService(service)
+    }
+    
+    // This shouldn't be reached, but just in case
+    return nil
 }
 
 // shouldUpdateService determines if an existing service needs to be updated
-func shouldUpdateService(db *database.DB, newService models.Service) bool {
+func shouldUpdateService(db *database.DB, newService models.Service, normalizedID string) bool {
     var existingType, existingConfig string
     
     err := db.QueryRow(
         "SELECT type, config FROM services WHERE id = ?", 
-        newService.ID,
+        normalizedID,
     ).Scan(&existingType, &existingConfig)
     
     if err != nil {
         // If there's an error, assume we should update
-        log.Printf("Error checking existing service %s: %v", newService.ID, err)
+        log.Printf("Error checking existing service %s: %v", normalizedID, err)
         return true
     }
     
@@ -255,12 +278,12 @@ func shouldUpdateService(db *database.DB, newService models.Service) bool {
     var newConfigMap map[string]interface{}
     
     if err := json.Unmarshal([]byte(existingConfig), &existingConfigMap); err != nil {
-        log.Printf("Error parsing existing config for %s: %v", newService.ID, err)
+        log.Printf("Error parsing existing config for %s: %v", normalizedID, err)
         return true
     }
     
     if err := json.Unmarshal([]byte(newService.Config), &newConfigMap); err != nil {
-        log.Printf("Error parsing new config for %s: %v", newService.ID, err)
+        log.Printf("Error parsing new config for %s: %v", normalizedID, err)
         return true
     }
     
@@ -298,6 +321,10 @@ func configsAreDifferent(config1, config2 map[string]interface{}) bool {
         
         // Compare each server
         for i, server1 := range servers1 {
+            if i >= len(servers2) {
+                return true
+            }
+            
             server1Map, ok1 := server1.(map[string]interface{})
             server2Map, ok2 := servers2[i].(map[string]interface{})
             
@@ -349,16 +376,12 @@ func configsAreDifferent(config1, config2 map[string]interface{}) bool {
                     return true
                 }
             }
-            
-            // We don't do deep comparison of nested structures like healthCheck
-            // If we need to be more precise, we could expand this function
         }
     }
     
     return false
 }
 
-// createService creates a new service in the database
 // createService creates a new service in the database
 func (sw *ServiceWatcher) createService(service models.Service) error {
     // Validate service type
@@ -401,36 +424,64 @@ func (sw *ServiceWatcher) createService(service models.Service) error {
         service.Name = formatServiceName(service.ID)
     }
     
-    // Make sure we're not adding @file if the ID already has a provider
-    serviceID := service.ID
-    if !strings.Contains(serviceID, "@") {
-        serviceID = serviceID + "@file" // Only add @file if no provider exists
-    }
-    
-    log.Printf("Creating new service: %s (original ID: %s)", serviceID, service.ID)
-    
-    // Insert the service
-    _, err = sw.db.Exec(
-        "INSERT INTO services (id, name, type, config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        serviceID, service.Name, service.Type, string(configJSON), time.Now(), time.Now(),
-    )
-    
+    // Get active data source to determine provider suffix
+    dsConfig, err := sw.configManager.GetActiveDataSourceConfig()
     if err != nil {
-        return fmt.Errorf("failed to insert service %s: %w", service.ID, err)
+        log.Printf("Warning: Could not get active data source: %v. Using default file provider.", err)
+        dsConfig.Type = models.PangolinAPI
     }
     
-    log.Printf("Created new service: %s (%s)", service.Name, serviceID)
-    return nil
+    // Determine the appropriate provider suffix based on context
+    providerSuffix := "@file"
+    if !strings.Contains(service.ID, "@") {
+        // Only add a suffix if one doesn't already exist
+        service.ID = service.ID + providerSuffix
+    }
+    
+    // Use a database transaction for insert
+    return sw.db.WithTransaction(func(tx *sql.Tx) error {
+        log.Printf("Creating new service: %s", service.ID)
+        
+        // Check for existing service one more time within transaction
+        var exists int
+        err := tx.QueryRow("SELECT 1 FROM services WHERE id = ?", service.ID).Scan(&exists)
+        if err == nil {
+            // Service exists, silently skip
+            return nil
+        } else if err != sql.ErrNoRows {
+            // Unexpected error
+            return fmt.Errorf("error checking service existence in transaction: %w", err)
+        }
+        
+        // Insert the service
+        _, err = tx.Exec(
+            "INSERT INTO services (id, name, type, config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            service.ID, service.Name, service.Type, string(configJSON), time.Now(), time.Now(),
+        )
+        
+        if err != nil {
+            // Check if it's a duplicate key error
+            if strings.Contains(err.Error(), "UNIQUE constraint") {
+                // Log but don't return error to continue processing other services
+                log.Printf("Service %s already exists, skipping", service.ID)
+                return nil
+            }
+            return fmt.Errorf("failed to insert service %s: %w", service.ID, err)
+        }
+        
+        log.Printf("Created new service: %s", service.ID)
+        return nil
+    })
 }
 
 // updateService updates an existing service in the database
-func (sw *ServiceWatcher) updateService(service models.Service) error {
+func (sw *ServiceWatcher) updateService(service models.Service, existingID string) error {
     // Get the existing service to preserve the name
     var existingName string
-    err := sw.db.QueryRow("SELECT name FROM services WHERE id = ?", service.ID).Scan(&existingName)
+    err := sw.db.QueryRow("SELECT name FROM services WHERE id = ?", existingID).Scan(&existingName)
     
     if err != nil {
-        log.Printf("Error fetching existing service name for %s: %v, using provided name", service.ID, err)
+        log.Printf("Error fetching existing service name for %s: %v, using provided name", existingID, err)
     } else if existingName != "" {
         // Preserve existing name unless the new name is meaningful
         if service.Name == service.ID || service.Name == "" {
@@ -455,18 +506,28 @@ func (sw *ServiceWatcher) updateService(service models.Service) error {
         configJSON = []byte("{}")
     }
     
-    // Update the service
-    _, err = sw.db.Exec(
-        "UPDATE services SET name = ?, type = ?, config = ?, updated_at = ? WHERE id = ?",
-        service.Name, service.Type, string(configJSON), time.Now(), service.ID,
-    )
-    
-    if err != nil {
-        return fmt.Errorf("failed to update service %s: %w", service.ID, err)
-    }
-    
-    log.Printf("Updated existing service: %s (%s)", service.Name, service.ID)
-    return nil
+    // Update the service using a transaction
+    return sw.db.WithTransaction(func(tx *sql.Tx) error {
+        // Update the service using the existing ID
+        result, err := tx.Exec(
+            "UPDATE services SET name = ?, type = ?, config = ?, updated_at = ? WHERE id = ?",
+            service.Name, service.Type, string(configJSON), time.Now(), existingID,
+        )
+        
+        if err != nil {
+            return fmt.Errorf("failed to update service %s: %w", service.ID, err)
+        }
+        
+        rowsAffected, err := result.RowsAffected()
+        if err != nil {
+            log.Printf("Error getting rows affected: %v", err)
+        } else if rowsAffected == 0 {
+            log.Printf("Warning: Update did not affect any rows for service %s", existingID)
+        }
+        
+        log.Printf("Updated existing service: %s", existingID)
+        return nil
+    })
 }
 
 // formatServiceName creates a readable name from a service ID
