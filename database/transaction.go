@@ -1,9 +1,11 @@
 package database
 
 import (
+  "context"
   "database/sql"
   "fmt"
   "log"
+  "time"
 )
 
 // TxFn represents a function that uses a transaction
@@ -42,58 +44,81 @@ func (db *DB) WithTransaction(fn TxFn) error {
   return nil
 }
 
-// QueryRow executes a query that returns a single row and scans the result into the provided destination
-func (db *DB) QueryRowSafe(query string, dest interface{}, args ...interface{}) error {
-  row := db.QueryRow(query, args...)
-  if err := row.Scan(dest); err != nil {
-    if err == sql.ErrNoRows {
-      return ErrNotFound
+// WithTimeoutTransaction wraps a function with a transaction that has a timeout
+func (db *DB) WithTimeoutTransaction(ctx context.Context, timeout time.Duration, fn TxFn) error {
+  // Create a context with timeout
+  ctx, cancel := context.WithTimeout(ctx, timeout)
+  defer cancel()
+  
+  // Create a done channel to signal completion
+  done := make(chan error, 1)
+  
+  // Run the transaction in a goroutine
+  go func() {
+    done <- db.WithTransaction(fn)
+  }()
+  
+  // Wait for either context timeout or transaction completion
+  select {
+  case <-ctx.Done():
+    // Context timed out
+    return fmt.Errorf("transaction timed out after %v: %w", timeout, ctx.Err())
+  case err := <-done:
+    // Transaction completed
+    return err
+  }
+}
+
+// BatchTransaction executes multiple operations in a single transaction
+// All operations must succeed or the transaction is rolled back
+func (db *DB) BatchTransaction(operations []TxFn) error {
+  return db.WithTransaction(func(tx *sql.Tx) error {
+    for i, op := range operations {
+      if err := op(tx); err != nil {
+        return fmt.Errorf("operation %d failed: %w", i, err)
+      }
     }
-    return fmt.Errorf("scan failed: %w", err)
-  }
-  return nil
+    return nil
+  })
 }
 
-// ExecSafe executes a statement and returns the result summary
-func (db *DB) ExecSafe(query string, args ...interface{}) (sql.Result, error) {
-  result, err := db.Exec(query, args...)
-  if err != nil {
-    return nil, fmt.Errorf("exec failed: %w", err)
-  }
-  return result, nil
+// UpdateInTransaction updates a record in a transaction
+func (db *DB) UpdateInTransaction(table string, id string, updates map[string]interface{}) error {
+  return db.WithTransaction(func(tx *sql.Tx) error {
+    // Build the update statement
+    query := fmt.Sprintf("UPDATE %s SET ", table)
+    var params []interface{}
+    
+    i := 0
+    for field, value := range updates {
+      if i > 0 {
+        query += ", "
+      }
+      query += field + " = ?"
+      params = append(params, value)
+      i++
+    }
+    
+    // Add the WHERE clause and updated_at
+    query += ", updated_at = ? WHERE id = ?"
+    params = append(params, time.Now(), id)
+    
+    // Execute the update
+    result, err := tx.Exec(query, params...)
+    if err != nil {
+      return fmt.Errorf("update failed: %w", err)
+    }
+    
+    // Check if any rows were affected
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+      return fmt.Errorf("failed to get rows affected: %w", err)
+    }
+    
+    if rowsAffected == 0 {
+      return fmt.Errorf("no rows affected, record with ID %s not found", id)
+    }
+    
+    return nil
+  })
 }
-
-// CustomError types for database operations
-var (
-  ErrNotFound = fmt.Errorf("record not found")
-  ErrDuplicate = fmt.Errorf("duplicate record")
-  ErrConstraint = fmt.Errorf("constraint violation")
-)
-
-// ExecTx executes a statement within a transaction and returns the result
-func ExecTx(tx *sql.Tx, query string, args ...interface{}) (sql.Result, error) {
-  result, err := tx.Exec(query, args...)
-  if err != nil {
-    return nil, fmt.Errorf("exec in transaction failed: %w", err)
-  }
-  return result, nil
-}
-
-// GetRowsAffected is a helper to get rows affected from a result
-func GetRowsAffected(result sql.Result) (int64, error) {
-  affected, err := result.RowsAffected()
-  if err != nil {
-    return 0, fmt.Errorf("failed to get rows affected: %w", err)
-  }
-  return affected, nil
-}
-
-// GetLastInsertID is a helper to get last insert ID from a result
-func GetLastInsertID(result sql.Result) (int64, error) {
-  id, err := result.LastInsertId()
-  if err != nil {
-    return 0, fmt.Errorf("failed to get last insert ID: %w", err)
-  }
-  return id, nil
-}
-
