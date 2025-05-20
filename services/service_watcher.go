@@ -214,9 +214,16 @@ func (sw *ServiceWatcher) updateOrCreateService(service models.Service) error {
     return sw.createService(service)
 }
 
-// getNormalizedServiceID removes any provider suffixes from service IDs
+// getNormalizedServiceID removes redundant provider suffixes from service IDs
 func getNormalizedServiceID(id string) string {
-    if idx := strings.Index(id, "@"); idx > 0 {
+    // Remove any provider suffix but only if it's duplicated
+    if strings.Contains(id, "@file@file") {
+        // Handle double @file suffix
+        if idx := strings.Index(id, "@file"); idx > 0 {
+            return id[:idx] + "@file"
+        }
+    } else if idx := strings.Index(id, "@"); idx > 0 {
+        // For other cases, just extract the base name
         return id[:idx]
     }
     return id

@@ -206,47 +206,55 @@ func (rw *ResourceWatcher) checkResources() error {
 
 // updateOrCreateResource updates an existing resource or creates a new one
 // normalizeResourceID removes cascading auth suffixes and provider suffixes from resource IDs
+// normalizeResourceID removes redundant cascading auth suffixes but preserves essential distinctions
 func normalizeResourceID(id string) string {
-    // First, remove any provider suffix (if present)
+    // Extract the base name (everything before the first @)
     baseName := id
     if idx := strings.Index(baseName, "@"); idx > 0 {
         baseName = baseName[:idx]
     }
     
-    // Check if this is a router resource
+    // If not a router resource, return as is
     if !strings.Contains(baseName, "-router") {
-        return baseName // Not a router resource, return without suffix processing
+        return baseName
     }
     
-    // Handle cascading auth patterns
-    // Extract the base router pattern (e.g., "1-router" from "1-router-auth-auth-auth...")
-    routerParts := strings.SplitN(baseName, "-router", 2)
-    if len(routerParts) != 2 {
-        return baseName // Unexpected format, return as is
+    // Handle cascading auth patterns more carefully
+    // Replace multiple consecutive -auth suffixes with just one -auth
+    // but preserve redirect and other important suffixes
+    parts := strings.Split(baseName, "-router")
+    if len(parts) != 2 {
+        return baseName // Unexpected format
     }
     
-    // Check if we have auth suffixes
-    suffixPart := routerParts[1]
-    if strings.Contains(suffixPart, "-auth") {
-        // Replace all cascading -auth suffixes with just one -auth
-        // First, handle the case of -router-auth pattern
-        if strings.HasPrefix(suffixPart, "-auth") {
-            return routerParts[0] + "-router-auth"
+    prefix := parts[0] // e.g., "api"
+    suffix := parts[1] // e.g., "-auth-auth-redirect"
+    
+    // Process the suffix to preserve distinctive parts
+    if strings.Contains(suffix, "-auth") {
+        // Preserve redirect component if present
+        redirectPart := ""
+        if strings.Contains(suffix, "-redirect") {
+            redirectParts := strings.Split(suffix, "-redirect")
+            suffix = redirectParts[0]
+            redirectPart = "-redirect"
         }
         
-        // Handle cases like -router-redirect-auth with a single preserved redirect component
-        redirectParts := strings.SplitN(suffixPart, "-auth", 2)
-        if len(redirectParts) > 1 && redirectParts[0] != "" {
-            return routerParts[0] + "-router" + redirectParts[0] + "-auth"
+        // Replace multiple auth suffixes with single auth
+        for strings.Contains(suffix, "-auth-auth") {
+            suffix = strings.Replace(suffix, "-auth-auth", "-auth", 1)
         }
+        
+        // Reconstruct with preserved components
+        return prefix + "-router" + suffix + redirectPart
     }
     
-    // If no auth suffixes or couldn't parse properly, return the original base name
     return baseName
 }
 
 // updateOrCreateResource updates an existing resource or creates a new one
 
+// updateOrCreateResource updates an existing resource or creates a new one
 // updateOrCreateResource updates an existing resource or creates a new one
 func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) error {
     // Normalize the resource ID to handle cascading auth suffixes
@@ -258,6 +266,7 @@ func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) erro
     
     // Check if resource already exists with either the original or normalized ID
     var exists int
+    var existingID string // Store the actual ID found in the database
     var status string
     var entrypoints, tlsDomains, tcpEntrypoints, tcpSNIRule, customHeaders string
     var tcpEnabled int
@@ -265,58 +274,119 @@ func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) erro
     
     // First try exact match with the original ID
     err := rw.db.QueryRow(`
-        SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
+        SELECT id, 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
                custom_headers, router_priority
         FROM resources WHERE id = ?
-    `, resource.ID).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
+    `, resource.ID).Scan(&existingID, &exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
                        &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
     
-    // If exact match not found and ID was normalized, try with pattern matching
-    if err == sql.ErrNoRows && wasNormalized {
-        // Try to find any resource that matches the normalized pattern with potential suffixes
-        // Use LIKE query with escape for special characters in the ID
-        normalizedPattern := normalizedID + "%"
-        if strings.Contains(normalizedID, "-router") {
-            // For router resources, specifically match auth suffix pattern
-            normalizedPattern = strings.Replace(normalizedID, "-router", "-router%", 1)
-        }
-        
+    // If not found by original ID, try normalized ID
+    if err == sql.ErrNoRows {
         err = rw.db.QueryRow(`
-            SELECT 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
+            SELECT id, 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
                    custom_headers, router_priority
-            FROM resources WHERE id LIKE ? LIMIT 1
-        `, normalizedPattern).Scan(&exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
-                                &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
-        
-        // If found via pattern match, log it for debugging
-        if err == nil {
-            log.Printf("Found resource via pattern matching: %s matches normalized pattern %s", 
-                     resource.ID, normalizedPattern)
+            FROM resources WHERE id = ?
+        `, normalizedID).Scan(&existingID, &exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
+                           &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
+    }
+    
+    // If still not found and ID was normalized, try with more precise pattern matching
+    if err == sql.ErrNoRows && wasNormalized && strings.Contains(normalizedID, "-router") {
+        parts := strings.Split(normalizedID, "-router")
+        if len(parts) == 2 {
+            // Create a more specific pattern that includes the prefix to avoid unrelated matches
+            prefix := parts[0]
+            suffix := parts[1]
+            
+            // If there's a specific suffix like "-redirect", create an even more precise pattern
+            var pattern string
+            if strings.Contains(suffix, "-redirect") {
+                pattern = prefix + "-router%-redirect%"
+            } else if strings.Contains(suffix, "-auth") {
+                pattern = prefix + "-router%-auth%"
+            } else {
+                pattern = prefix + "-router%"
+            }
+            
+            log.Printf("Trying to find resource with more specific pattern: %s", pattern)
+            err = rw.db.QueryRow(`
+                SELECT id, 1, status, entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule, 
+                       custom_headers, router_priority
+                FROM resources WHERE id LIKE ? LIMIT 1
+            `, pattern).Scan(&existingID, &exists, &status, &entrypoints, &tlsDomains, &tcpEnabled, 
+                             &tcpEntrypoints, &tcpSNIRule, &customHeaders, &routerPriority)
+            
+            // If found via pattern match, log it for debugging
+            if err == nil {
+                log.Printf("Found resource via precise pattern matching: %s matches pattern %s", 
+                         resource.ID, pattern)
+            }
         }
     }
     
     if err == nil {
-        // Resource exists, update essential fields but preserve custom configuration
-        // If we found a match via normalization, use the normalized ID for the update
-        updateID := resource.ID
-        if wasNormalized {
-            // Use the normalized ID for the update to prevent future duplication
-            updateID = normalizedID
-            log.Printf("Updating with normalized ID: %s (was %s)", normalizedID, originalID)
+        // Resource exists, update it using its existing ID to prevent conflicts
+        log.Printf("Updating resource %s using existing ID %s in database", resource.ID, existingID)
+        
+        // Preserve custom configuration if available from existing resource
+        if resource.Entrypoints == "" && entrypoints != "" {
+            resource.Entrypoints = entrypoints
+        }
+        if resource.TLSDomains == "" && tlsDomains != "" {
+            resource.TLSDomains = tlsDomains
+        }
+        if resource.TCPEntrypoints == "" && tcpEntrypoints != "" {
+            resource.TCPEntrypoints = tcpEntrypoints
+        }
+        if resource.TCPSNIRule == "" && tcpSNIRule != "" {
+            resource.TCPSNIRule = tcpSNIRule
+        }
+        if resource.CustomHeaders == "" && customHeaders != "" {
+            resource.CustomHeaders = customHeaders
+        }
+        if !resource.TCPEnabled && tcpEnabled > 0 {
+            resource.TCPEnabled = true
+        }
+        if resource.RouterPriority == 0 && routerPriority.Valid {
+            resource.RouterPriority = int(routerPriority.Int64)
         }
         
-        _, err = rw.db.Exec(
-            "UPDATE resources SET id = ?, host = ?, service_id = ?, status = 'active', source_type = ?, updated_at = ? WHERE id LIKE ?",
-            updateID, resource.Host, resource.ServiceID, resource.SourceType, time.Now(), 
-            // Use pattern matching for the WHERE clause to catch all variations
-            strings.Replace(normalizedID, "-router", "-router%", 1),
+        // Use the existing ID for update to prevent conflicts
+        _, err = rw.db.Exec(`
+            UPDATE resources SET 
+                host = ?, 
+                service_id = ?, 
+                status = 'active', 
+                source_type = ?,
+                entrypoints = ?,
+                tls_domains = ?,
+                tcp_enabled = ?,
+                tcp_entrypoints = ?,
+                tcp_sni_rule = ?,
+                custom_headers = ?,
+                router_priority = ?,
+                updated_at = ? 
+            WHERE id = ?`,
+            resource.Host, 
+            resource.ServiceID, 
+            resource.SourceType,
+            resource.Entrypoints,
+            resource.TLSDomains,
+            boolToInt(resource.TCPEnabled),
+            resource.TCPEntrypoints,
+            resource.TCPSNIRule,
+            resource.CustomHeaders,
+            resource.RouterPriority,
+            time.Now(), 
+            existingID,
         )
+        
         if err != nil {
-            return fmt.Errorf("failed to update resource %s: %w", resource.ID, err)
+            return fmt.Errorf("failed to update resource %s (using ID %s): %w", resource.ID, existingID, err)
         }
         
         if status == "disabled" {
-            log.Printf("Resource %s was disabled but is now active again", updateID)
+            log.Printf("Resource %s was disabled but is now active again", existingID)
         }
         
         return nil
@@ -335,40 +405,72 @@ func (rw *ResourceWatcher) updateOrCreateResource(resource models.Resource) erro
         resource.SiteID = "unknown"
     }
     
-    tcpEnabledValue := 0
-    if resource.TCPEnabled {
-        tcpEnabledValue = 1
-    }
-    
-    // Use default router priority if not set
     if resource.RouterPriority == 0 {
         resource.RouterPriority = 100 // Default priority
     }
     
-    // For new resources, always use the normalized ID to prevent duplication
-    if wasNormalized {
+    // For new resources, choose an appropriate ID to prevent future duplications
+    createID := resource.ID
+    
+    // Only normalize in cases where we know there's redundancy
+    if strings.Contains(resource.ID, "@file@file") || 
+       strings.Count(resource.ID, "-auth") > 1 ||
+       (wasNormalized && !strings.Contains(resource.ID, "@")) {
+        createID = normalizedID
         log.Printf("Creating new resource with normalized ID: %s (was %s)", normalizedID, originalID)
-        resource.ID = normalizedID
     }
     
-    // Create new resource with default configuration
+    // Additional safeguard - check one more time if the ID we're about to use already exists
+    var finalIDExists int
+    err = rw.db.QueryRow("SELECT 1 FROM resources WHERE id = ?", createID).Scan(&finalIDExists)
+    if err == nil {
+        // The ID we were going to use already exists! Generate a unique variation
+        uniqueID := fmt.Sprintf("%s-%d", createID, time.Now().UnixNano() % 10000)
+        log.Printf("Warning: ID %s already exists, using unique ID %s instead", createID, uniqueID)
+        createID = uniqueID
+    }
+    
+    // Create new resource with chosen ID
+    tcpEnabledValue := boolToInt(resource.TCPEnabled)
+    
     _, err = rw.db.Exec(`
         INSERT INTO resources (
             id, host, service_id, org_id, site_id, status, source_type,
             entrypoints, tls_domains, tcp_enabled, tcp_entrypoints, tcp_sni_rule,
             custom_headers, router_priority, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, resource.ID, resource.Host, resource.ServiceID, resource.OrgID, resource.SiteID,
-       resource.SourceType, resource.Entrypoints, resource.TLSDomains, tcpEnabledValue,
-       resource.TCPEntrypoints, resource.TCPSNIRule, resource.CustomHeaders, 
-       resource.RouterPriority, time.Now(), time.Now())
+    `, 
+        createID, 
+        resource.Host, 
+        resource.ServiceID, 
+        resource.OrgID, 
+        resource.SiteID,
+        resource.SourceType, 
+        resource.Entrypoints, 
+        resource.TLSDomains, 
+        tcpEnabledValue,
+        resource.TCPEntrypoints, 
+        resource.TCPSNIRule, 
+        resource.CustomHeaders, 
+        resource.RouterPriority, 
+        time.Now(), 
+        time.Now(),
+    )
     
     if err != nil {
-        return fmt.Errorf("failed to create resource %s: %w", resource.ID, err)
+        return fmt.Errorf("failed to create resource %s (with ID %s): %w", resource.ID, createID, err)
     }
 
-    log.Printf("Added new resource: %s (%s)", resource.Host, resource.ID)
+    log.Printf("Added new resource: %s (%s)", resource.Host, createID)
     return nil
+}
+
+// boolToInt converts a boolean to an integer (1 for true, 0 for false)
+func boolToInt(b bool) int {
+    if b {
+        return 1
+    }
+    return 0
 }
 // fetchTraefikConfig fetches the Traefik configuration from the data source
 // This method is kept for backward compatibility with the original implementation
