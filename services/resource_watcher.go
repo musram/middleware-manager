@@ -391,7 +391,12 @@ func (rw *ResourceWatcher) createNewResource(resource models.Resource, normalize
             
             return fmt.Errorf("failed to create resource %s: %w", resourceID, err)
         }
-        
+        rowsAffected, err := result.RowsAffected()
+if err != nil {
+    log.Printf("Error getting rows affected: %v", err)
+} else if rowsAffected > 0 {
+    log.Printf("Successfully updated/inserted %d rows", rowsAffected)
+}
         log.Printf("Added new resource: %s (%s)", resource.Host, resourceID)
         return nil
     })

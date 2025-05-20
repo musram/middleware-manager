@@ -156,14 +156,6 @@ func (sw *ServiceWatcher) checkServices() error {
             continue
         }
 
-        // Get active data source for context
-        dsConfig, _ := sw.configManager.GetActiveDataSourceConfig()
-        
-        // Determine source type for tracking
-        if service.SourceType == "" {
-            service.SourceType = string(dsConfig.Type)
-        }
-
         // Process service
         if err := sw.updateOrCreateService(service); err != nil {
             log.Printf("Error processing service %s: %v", service.ID, err)
