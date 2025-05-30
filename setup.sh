@@ -331,7 +331,7 @@ services:
       - DB_PATH=/data/middleware.db
       - PORT=3456
       - ACTIVE_DATA_SOURCE=pangolin
-      - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik.yml
+      - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik_config.yml
       - PLUGINS_JSON_URL=https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json
     ports:
       - "3456:3456"
@@ -343,7 +343,7 @@ fi
 # Set proper permissions
 print_status "Setting proper permissions..."
 chmod 600 ./mm_config/config.json
-chmod 644 ./traefik_static_config/traefik.yml
+chmod 644 ./traefik_static_config/traefik_config.yml
 chmod 644 ./docker-compose.yml
 chmod 644 ./mm_config/templates.yaml
 chmod 644 ./mm_config/templates_services.yaml
