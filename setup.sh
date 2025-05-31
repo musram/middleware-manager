@@ -126,6 +126,39 @@ print_status "Verifying Pangolin configuration..."
 ls -l ./pangolin_config/config.yml
 cat ./pangolin_config/config.yml
 
+# Create Gerbil configuration
+print_status "Creating Gerbil configuration..."
+cat > ./gerbil_config/config.yml << 'EOL'
+network:
+  interface: wg0
+  mtu: 1280
+  ipv4:
+    cidr: "100.89.137.0/24"
+    address: "100.89.137.2/24"
+  ipv6:
+    cidr: "fd00::/64"
+    address: "fd00::2/64"
+  dns:
+    - "1.1.1.1"
+    - "8.8.8.8"
+  persistent_keepalive: 25
+
+server:
+  listen: ":3003"
+  reachable_at: "http://gerbil:3003"
+  log_level: "DEBUG"
+
+pangolin:
+  remote_config: "http://pangolin:3002/api/v1/gerbil/get-config"
+  report_bandwidth_to: "http://pangolin:3002/api/v1/gerbil/receive-bandwidth"
+  access_token:
+    id: "gerbil"
+    token: "supersecret123"
+EOL
+
+# Set proper permissions for Gerbil config
+chmod 644 ./gerbil_config/config.yml
+
 # Create basic traefik.yml if it doesn't exist
 if [ ! -f ./traefik_static_config/traefik.yml ]; then
     print_status "Creating basic traefik.yml configuration..."
