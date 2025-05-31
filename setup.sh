@@ -55,7 +55,7 @@ mkdir -p ./pangolin_config \
 # Create basic traefik.yml if it doesn't exist
 if [ ! -f ./traefik_static_config/traefik.yml ]; then
     print_status "Creating basic traefik.yml configuration..."
-    cat > ./traefik_static_config/traefik.yml << 'EOL'
+    cat > ./traefik_static_config/traefik_config.yml << 'EOL'
 # Global configuration
 global:
   checkNewVersion: true
@@ -349,7 +349,7 @@ chmod 644 ./mm_config/templates.yaml
 chmod 644 ./mm_config/templates_services.yaml
 
 # Pull required images
-print_status "Pulling required Docker images..."
+print_status "Pulling required docker images..."
 docker-compose pull
 
 # Start the services
