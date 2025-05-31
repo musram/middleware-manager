@@ -56,13 +56,13 @@ mkdir -p ./pangolin_config \
 print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
-  dashboard_url: "http://localhost:3001"
+  dashboard_url: "http://localhost:3002"
   log_level: "info"
   save_logs: true
   log_failed_attempts: true
 
 server:
-  external_port: 3001
+  external_port: 3002
   internal_port: 3001
   next_port: 3002
   internal_hostname: "pangolin"
