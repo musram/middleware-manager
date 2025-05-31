@@ -99,6 +99,20 @@ gerbil:
   block_size: 24
   site_block_size: 30
   subnet_group: "100.89.137.0/20"
+  network:
+    ipv4:
+      cidr: "100.89.137.0/24"
+      start_ip: "100.89.137.2"
+      end_ip: "100.89.137.254"
+    ipv6:
+      cidr: "fd00::/64"
+      start_ip: "fd00::2"
+      end_ip: "fd00::ffff"
+    dns:
+      - "1.1.1.1"
+      - "8.8.8.8"
+    mtu: 1420
+    persistent_keepalive: 25
 
 rate_limits:
   global:
