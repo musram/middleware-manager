@@ -36,6 +36,8 @@ services:
     environment:
       - NODE_ENV=development
       - CONFIG_PATH=/app/config/config.yml
+    ports:
+      - "3001:3001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
       interval: "10s"
