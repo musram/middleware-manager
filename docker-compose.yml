@@ -162,43 +162,43 @@ services:
     networks:
       - pangolin_network
 
-  MCP Server (Example with 3 replicas)
-  mcp-server:
-    image: your-mcp-server-image
-    deploy:
-      replicas: 3
-      update_config:
-        parallelism: 1
-        delay: 10s
-      restart_policy:
-        condition: on-failure
-    environment:
-      - MCP_SERVER_ID=${MCP_SERVER_ID:-mcp-${HOSTNAME}}
-      - REDIS_URL=redis://redis:6379
-      - REGISTER_WITH_PANGOLIN=true
-      - PANGOLIN_API_URL=http://pangolin:3002/api/v1
-      - PANGOLIN_INTEGRATION_API_URL=http://pangolin:3002/api/v1/integration
-      - SERVICE_NAME=mcp-server
-      - SERVICE_PORT=8080
-      - SERVICE_TYPE=http
-      - SERVICE_PROTOCOL=http
-      - SERVICE_DOMAIN=localhost
-      - SERVICE_PATH=/
-      - SERVICE_HEALTH_CHECK_PATH=/health
-      - SERVICE_HEALTH_CHECK_INTERVAL=30s
-      - SERVICE_HEALTH_CHECK_TIMEOUT=5s
-      - SERVICE_HEALTH_CHECK_RETRIES=3
-    networks:
-      - pangolin_network
-    depends_on:
-      - pangolin
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: "30s"
-      timeout: "5s"
-      retries: 3
-      start_period: "30s"
+  # MCP Server (Example with 3 replicas)
+  # mcp-server:
+  #   image: your-mcp-server-image
+  #   deploy:
+  #     replicas: 3
+  #     update_config:
+  #       parallelism: 1
+  #       delay: 10s
+  #     restart_policy:
+  #       condition: on-failure
+  #   environment:
+  #     - MCP_SERVER_ID=${MCP_SERVER_ID:-mcp-${HOSTNAME}}
+  #     - REDIS_URL=redis://redis:6379
+  #     - REGISTER_WITH_PANGOLIN=true
+  #     - PANGOLIN_API_URL=http://pangolin:3002/api/v1
+  #     - PANGOLIN_INTEGRATION_API_URL=http://pangolin:3002/api/v1/integration
+  #     - SERVICE_NAME=mcp-server
+  #     - SERVICE_PORT=8080
+  #     - SERVICE_TYPE=http
+  #     - SERVICE_PROTOCOL=http
+  #     - SERVICE_DOMAIN=localhost
+  #     - SERVICE_PATH=/
+  #     - SERVICE_HEALTH_CHECK_PATH=/health
+  #     - SERVICE_HEALTH_CHECK_INTERVAL=30s
+  #     - SERVICE_HEALTH_CHECK_TIMEOUT=5s
+  #     - SERVICE_HEALTH_CHECK_RETRIES=3
+  #   networks:
+  #     - pangolin_network
+  #   depends_on:
+  #     - pangolin
+  #     - redis
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: "30s"
+  #     timeout: "5s"
+  #     retries: 3
+  #     start_period: "30s"
 
 volumes:
   redis_data:
