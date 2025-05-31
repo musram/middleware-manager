@@ -33,11 +33,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./pangolin_config:/app/config
-      - ./pangolin_config:/app/server/config
-      - ./pangolin_config:/config
     environment:
       - NODE_ENV=development
-      - CONFIG_PATH=/app/config
+      - CONFIG_PATH=/app/config/config.yml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
       interval: "10s"

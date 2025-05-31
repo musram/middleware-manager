@@ -54,42 +54,77 @@ mkdir -p ./pangolin_config \
 
 # Create Pangolin configuration
 print_status "Creating Pangolin configuration..."
-cat > ./pangolin_config/config.json << 'EOL'
-{
-  "server": {
-    "port": 3001,
-    "host": "0.0.0.0"
-  },
-  "database": {
-    "type": "sqlite",
-    "path": "/app/config/pangolin.db"
-  },
-  "security": {
-    "jwtSecret": "your-secret-key-here",
-    "tokenExpiration": "24h"
-  },
-  "logging": {
-    "level": "info",
-    "format": "json"
-  },
-  "api": {
-    "prefix": "/api/v1",
-    "cors": {
-      "origin": "*",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "allowedHeaders": ["Content-Type", "Authorization"]
-    }
-  }
-}
+cat > ./pangolin_config/config.yml << 'EOL'
+app:
+  dashboard_url: "http://localhost:3001"
+  log_level: "info"
+  save_logs: true
+  log_failed_attempts: true
+
+server:
+  external_port: 3001
+  internal_port: 3001
+  next_port: 3002
+  internal_hostname: "pangolin"
+  session_cookie_name: "p_session_token"
+  resource_access_token_param: "p_token"
+  resource_access_token_headers:
+    id: "P-Access-Token-Id"
+    token: "P-Access-Token"
+  resource_session_request_param: "p_session_request"
+  secret: "d28@a2b.2HFTe2bMtZHGneNYgQFKT2X4vm4HuXUXBcq6aVyNZjdGt6Dx-_A@9b3y"
+  cors:
+    origins: ["*"]
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["Content-Type", "Authorization"]
+    credentials: true
+  trust_proxy: true
+  dashboard_session_length_hours: 720
+  resource_session_length_hours: 720
+
+domains:
+  default:
+    base_domain: "localhost"
+    cert_resolver: "letsencrypt"
+    prefer_wildcard_cert: false
+
+traefik:
+  http_entrypoint: "web"
+  https_entrypoint: "websecure"
+
+gerbil:
+  start_port: 51820
+  base_endpoint: "localhost"
+  use_subdomain: false
+  block_size: 24
+  site_block_size: 30
+  subnet_group: "100.89.137.0/20"
+
+rate_limits:
+  global:
+    window_minutes: 1
+    max_requests: 100
+
+users:
+  server_admin:
+    email: "admin@example.com"
+    password: "Password123!"
+
+flags:
+  require_email_verification: false
+  disable_signup_without_invite: false
+  disable_user_create_org: false
+  allow_raw_resources: true
+  allow_base_domain_resources: true
 EOL
 
 # Set proper permissions for Pangolin config
-chmod 644 ./pangolin_config/config.json
+chmod 644 ./pangolin_config/config.yml
 
 # Debug: Verify config file exists and show its contents
 print_status "Verifying Pangolin configuration..."
-ls -l ./pangolin_config/config.json
-cat ./pangolin_config/config.json
+ls -l ./pangolin_config/config.yml
+cat ./pangolin_config/config.yml
 
 # Create basic traefik.yml if it doesn't exist
 if [ ! -f ./traefik_static_config/traefik.yml ]; then
