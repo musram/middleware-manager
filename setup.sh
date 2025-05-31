@@ -52,6 +52,40 @@ mkdir -p ./pangolin_config \
          ./config/traefik/logs \
          ./public_html
 
+# Create Pangolin configuration
+print_status "Creating Pangolin configuration..."
+cat > ./pangolin_config/config.json << 'EOL'
+{
+  "server": {
+    "port": 3001,
+    "host": "0.0.0.0"
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "/app/config/pangolin.db"
+  },
+  "security": {
+    "jwtSecret": "your-secret-key-here",
+    "tokenExpiration": "24h"
+  },
+  "logging": {
+    "level": "info",
+    "format": "json"
+  },
+  "api": {
+    "prefix": "/api/v1",
+    "cors": {
+      "origin": "*",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      "allowedHeaders": ["Content-Type", "Authorization"]
+    }
+  }
+}
+EOL
+
+# Set proper permissions for Pangolin config
+chmod 644 ./pangolin_config/config.json
+
 # Create basic traefik.yml if it doesn't exist
 if [ ! -f ./traefik_static_config/traefik.yml ]; then
     print_status "Creating basic traefik.yml configuration..."
