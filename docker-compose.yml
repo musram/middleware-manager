@@ -36,10 +36,11 @@ services:
     environment:
       - NODE_ENV=development
       - CONFIG_PATH=/app/config/config.yml
+      - PORT=3002
     ports:
-      - "3002:3001"
+      - "3002:3002"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/v1/"]
       interval: "10s"
       timeout: "5s"
       retries: 3
@@ -58,8 +59,8 @@ services:
     command:
       - --reachableAt=http://gerbil:3003
       - --generateAndSaveKeyTo=/var/config/gerbil_key
-      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
-      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
+      - --remoteConfig=http://pangolin:3002/api/v1/gerbil/get-config
+      - --reportBandwidthTo=http://pangolin:3002/api/v1/gerbil/receive-bandwidth
     volumes:
       - ./gerbil_config:/var/config
     cap_add:
@@ -125,7 +126,7 @@ services:
       - ./mm_config/config.json:/app/config/config.json
       - ./traefik_static_config:/etc/traefik
     environment:
-      - PANGOLIN_API_URL=http://pangolin:3001/api/v1
+      - PANGOLIN_API_URL=http://pangolin:3002/api/v1
       - TRAEFIK_API_URL=http://traefik:8080
       - TRAEFIK_CONF_DIR=/conf
       - DB_PATH=/data/middleware.db
@@ -173,7 +174,7 @@ services:
       - MCP_SERVER_ID=${MCP_SERVER_ID}
       - REDIS_URL=redis://redis:6379
       - REGISTER_WITH_PANGOLIN=true
-      - PANGOLIN_API_URL=http://pangolin:3001/api/v1
+      - PANGOLIN_API_URL=http://pangolin:3002/api/v1
       - SERVICE_NAME=mcp-server
       - SERVICE_PORT=8080
     networks:

@@ -63,7 +63,7 @@ app:
 
 server:
   external_port: 3002
-  internal_port: 3001
+  internal_port: 3002
   next_port: 3002
   internal_hostname: "pangolin"
   session_cookie_name: "p_session_token"
