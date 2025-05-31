@@ -354,15 +354,35 @@ docker-compose pull
 
 # Start the services
 print_status "Starting services..."
+docker-compose up -d pangolin
+
+# Wait for Pangolin to be healthy
+print_status "Waiting for Pangolin to be healthy..."
+until docker-compose ps pangolin | grep -q "healthy"; do
+    sleep 5
+    if [ $((SECONDS)) -gt 60 ]; then
+        print_error "Pangolin failed to become healthy within 60 seconds"
+        exit 1
+    fi
+done
+
+# Start remaining services
+print_status "Starting remaining services..."
 docker-compose up -d
 
 # Wait for services to be ready
 print_status "Waiting for services to be ready..."
-sleep 10
+sleep 30
 
 # Check if services are running
 print_status "Checking service status..."
 docker-compose ps
+
+# Verify service health
+print_status "Verifying service health..."
+if ! docker-compose ps | grep -q "healthy"; then
+    print_warning "Some services may not be healthy. Check logs with: docker-compose logs"
+fi
 
 print_status "Setup completed!"
 print_status "You can access the middleware-manager UI at: http://localhost:3456"
