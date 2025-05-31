@@ -63,7 +63,7 @@ services:
       - --reportBandwidthTo=http://pangolin:3002/api/v1/gerbil/receive-bandwidth
       - --listen=:3003
       - --mtu=1280
-      - --log-level=INFO
+      - --log-level=DEBUG
       - --interface=wg0
     volumes:
       - ./gerbil_config:/var/config
