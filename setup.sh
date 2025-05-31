@@ -99,20 +99,6 @@ gerbil:
   block_size: 24
   site_block_size: 30
   subnet_group: "100.89.137.0/20"
-  network:
-    ipv4:
-      cidr: "100.89.137.0/24"
-      start_ip: "100.89.137.2"
-      end_ip: "100.89.137.254"
-    ipv6:
-      cidr: "fd00::/64"
-      start_ip: "fd00::2"
-      end_ip: "fd00::ffff"
-    dns:
-      - "1.1.1.1"
-      - "8.8.8.8"
-    mtu: 1420
-    persistent_keepalive: 25
 
 rate_limits:
   global:
@@ -130,18 +116,6 @@ flags:
   disable_user_create_org: false
   allow_raw_resources: true
   allow_base_domain_resources: true
-  enable_integration_api: true
-
-service_discovery:
-  enabled: true
-  refresh_interval: 30
-  health_check:
-    interval: 30
-    timeout: 5
-    retries: 3
-  load_balancing:
-    strategy: "round-robin"
-    sticky: false
 EOL
 
 # Set proper permissions for Pangolin config
