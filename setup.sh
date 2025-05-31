@@ -116,6 +116,18 @@ flags:
   disable_user_create_org: false
   allow_raw_resources: true
   allow_base_domain_resources: true
+  enable_integration_api: true
+
+service_discovery:
+  enabled: true
+  refresh_interval: 30
+  health_check:
+    interval: 30
+    timeout: 5
+    retries: 3
+  load_balancing:
+    strategy: "round-robin"
+    sticky: false
 EOL
 
 # Set proper permissions for Pangolin config
