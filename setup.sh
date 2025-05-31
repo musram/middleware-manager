@@ -86,6 +86,11 @@ EOL
 # Set proper permissions for Pangolin config
 chmod 644 ./pangolin_config/config.json
 
+# Debug: Verify config file exists and show its contents
+print_status "Verifying Pangolin configuration..."
+ls -l ./pangolin_config/config.json
+cat ./pangolin_config/config.json
+
 # Create basic traefik.yml if it doesn't exist
 if [ ! -f ./traefik_static_config/traefik.yml ]; then
     print_status "Creating basic traefik.yml configuration..."
