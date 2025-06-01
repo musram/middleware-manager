@@ -327,7 +327,13 @@ cat > ./mm_config/config.json << 'EOL'
           "Accept": "application/json"
         },
         "store_session": true,
-        "session_storage": "cookie"
+        "session_storage": "cookie",
+        "csrf": {
+          "enabled": true,
+          "token_url": "http://pangolin:3002/api/v1/auth/csrf",
+          "token_header": "X-CSRF-Token",
+          "cookie_name": "csrf_token"
+        }
       }
     },
     "traefik": {
