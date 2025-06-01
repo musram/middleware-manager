@@ -263,7 +263,7 @@ cat > ./mm_config/config.json << 'EOL'
   "data_sources": {
     "pangolin": {
       "type": "pangolin",
-      "url": "http://pangolin:3001/api/v1",
+      "url": "http://pangolin:3002/api/v1",
       "basic_auth": {
         "username": "",
         "password": ""
