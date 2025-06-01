@@ -46,7 +46,7 @@ rm -rf ./pangolin_config \
        ./gerbil_config \
        ./traefik_static_config \
        ./letsencrypt \
-       ./traefik_rules \
+       ./config/traefik/rules \
        ./traefik_plugins \
        ./mm_data \
        ./mm_config \
@@ -59,7 +59,7 @@ mkdir -p ./pangolin_config \
          ./gerbil_config \
          ./traefik_static_config \
          ./letsencrypt \
-         ./traefik_rules \
+         ./config/traefik/rules \
          ./traefik_plugins \
          ./mm_data \
          ./mm_config \
@@ -72,7 +72,7 @@ print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
   dashboard_url: "http://localhost:3002"
-  log_level: "info"
+  log_level: "info" # Set to DEBUG for troubleshooting
   save_logs: true
   log_failed_attempts: true
 
@@ -252,6 +252,55 @@ experimental:
     # myplugin:
     #   moduleName: github.com/vendor/my-traefik-plugin
     #   version: v1.0.0
+EOL
+fi
+
+
+# Create dynnamic config for traefik
+if [ ! -f ./config/traefik/traefik_dynamic_config.yml ]; then
+    print_status "Creating dynamic config for traefik..."
+    cat > ./config/traefik/traefik_dynamic_config.yml << 'EOL'
+    # Dynamic config for traefik
+    http:
+      routers:
+        - name: "traefik-router"
+          rule: "Host(`traefik.yourdomain.com`)"
+          entrypoints:
+            - web
+            - websecure
+          service: "traefik-service"
+          middlewares:
+            - mcp-auth@file
+            - redirect-regex@file
+            - crowdsec@file
+          tls:
+            certResolver: letsencrypt
+            domains:
+              - "traefik.yourdomain.com"
+              - "www.traefik.yourdomain.com"
+
+      middlewares:
+        - name: "mcp-auth"
+          forwardAuth:
+            address: "http://mcpauth:11000/sse"
+            authResponseHeaders:
+              - "X-Forwarded-User"
+        - name: "redirect-regex"
+          redirectRegex:
+            regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
+            replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
+            permanent: true
+        - name: "crowdsec"
+          plugin:
+            name: crowdsec
+            enabled: true
+            crowdsecAppsecHost: "crowdsec:7422"
+            crowdsecAppsecPort: 7422
+            crowdsecApiKey: "your-api-key"
+            captchaProvider: turnstile
+            httpTimeout: 10s
+            updateIntervalSeconds: 15
+            updateMaxFailures: 0
 EOL
 fi
 
