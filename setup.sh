@@ -72,7 +72,7 @@ print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
   dashboard_url: "http://localhost:3002"
-  log_level: "info" # Set to DEBUG for troubleshooting
+  log_level: "debug" # Set to DEBUG for troubleshooting
   save_logs: true
   log_failed_attempts: true
 
@@ -91,7 +91,7 @@ server:
   cors:
     origins: ["*"]
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allowed_headers: ["Content-Type", "Authorization"]
+    allowed_headers: ["Content-Type", "Authorization", "Cookie"]
     credentials: true
   trust_proxy: true
   dashboard_session_length_hours: 720
@@ -320,7 +320,10 @@ cat > ./mm_config/config.json << 'EOL'
           "email": "admin@example.com",
           "password": "Password123!"
         },
-        "session_cookie": "p_session_token"
+        "session_cookie": "p_session_token",
+        "headers": {
+          "Content-Type": "application/json"
+        }
       }
     },
     "traefik": {
