@@ -93,17 +93,24 @@ server:
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allowed_headers: ["*"]
     credentials: true
+    exposed_headers: ["*"]
   trust_proxy: true
   dashboard_session_length_hours: 720
   resource_session_length_hours: 720
   csrf:
-    enabled: false  # Disable CSRF for development
+    enabled: false
     ignore_paths:
       - "/api/v1/auth/login"
       - "/api/v1/auth/csrf"
       - "/api/v1/traefik-config"
       - "/api/v1/resources"
       - "/api/v1/services"
+      - "/api/v1/sessions"
+      - "/api/v1/auth/sessions"
+  security:
+    csrf: false
+    cors: true
+    rate_limit: false
 
 domains:
   default:
@@ -139,7 +146,8 @@ flags:
   disable_user_create_org: false
   allow_raw_resources: true
   allow_base_domain_resources: true
-  disable_csrf: true  # Disable CSRF globally for development
+  disable_csrf: true
+  disable_security: true  # Disable all security features for development
 EOL
 
 # Set proper permissions for Pangolin config
@@ -324,10 +332,10 @@ cat > ./mm_config/config.json << 'EOL'
       "url": "http://pangolin:3002/api/v1",
       "auth": {
         "type": "session",
-        "login_url": "http://pangolin:3002/api/v1/auth/login",
+        "login_url": "http://pangolin:3002/api/v1/sessions",
         "credentials": {
-          "email": "admin@example.com",
-          "password": "Password123!"
+          "accessTokenId": "admin@example.com",
+          "accessToken": "Password123!"
         },
         "headers": {
           "Content-Type": "application/json",
