@@ -136,6 +136,38 @@ EOL
 # Set proper permissions for Pangolin config
 chmod 644 ./pangolin_config/config.yml
 
+# Create Gerbil configuration
+print_status "Creating Gerbil configuration..."
+cat > ./gerbil_config/config.json << 'EOL'
+{
+    "privateKey": "kBGTgk7c+zncEEoSnMl+jsLjVh5ZVoL/HwBSQem+d1M=",
+    "listenPort": 51820,
+    "ipAddress": "10.0.0.1/24",
+    "peers": [
+        {
+            "publicKey": "5UzzoeveFVSzuqK3nTMS5bA1jIMs1fQffVQzJ8MXUQM=",
+            "allowedIps": ["10.0.0.0/28"]
+        },
+        {
+            "publicKey": "kYrZpuO2NsrFoBh1GMNgkhd1i9Rgtu1rAjbJ7qsfngU=",
+            "allowedIps": ["10.0.0.16/28"]
+        },
+        {
+            "publicKey": "1YfPUVr9ZF4zehkbI2BQhCxaRLz+Vtwa4vJwH+mpK0A=",
+            "allowedIps": ["10.0.0.32/28"]
+        },
+        {
+            "publicKey": "2/U4oyZ+sai336Dal/yExCphL8AxyqvIxMk4qsUy4iI=",
+            "allowedIps": ["10.0.0.48/28"]
+        }
+    ]
+}
+EOL
+
+# set proper permissions for gerbil config
+chmod 644 ./gerbil_config/config.json
+
+
 # Debug: Verify config file exists and show its contents
 print_status "Verifying Pangolin configuration..."
 ls -l ./pangolin_config/config.yml
