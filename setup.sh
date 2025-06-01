@@ -264,9 +264,14 @@ cat > ./mm_config/config.json << 'EOL'
     "pangolin": {
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
-      "headers": {
-        "P-Access-Token-Id": "admin@example.com",
-        "P-Access-Token": "Password123!"
+      "auth": {
+        "type": "session",
+        "login_url": "http://pangolin:3002/api/v1/auth/login",
+        "credentials": {
+          "email": "admin@example.com",
+          "password": "Password123!"
+        },
+        "session_cookie": "p_session_token"
       }
     },
     "traefik": {
