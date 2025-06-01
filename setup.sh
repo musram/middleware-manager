@@ -187,6 +187,7 @@ global:
 api:
   dashboard: true
   insecure: true  # Set to false in production and configure proper authentication
+  debug: true
 
 # Entrypoints configuration
 entryPoints:
@@ -202,6 +203,8 @@ entryPoints:
     http:
       tls:
         certResolver: letsencrypt
+  traefik:
+    address: ":8080"
 
 # Certificate resolver configuration
 certificatesResolvers:
@@ -218,13 +221,14 @@ providers:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     network: pangolin
+    useBindPortIP: true
   file:
     directory: "/rules"
     watch: true
 
 # Logging configuration
 log:
-  level: INFO  # Set to DEBUG for troubleshooting
+  level: DEBUG  # Set to DEBUG for troubleshooting
 
 # Access log configuration
 accessLog:
