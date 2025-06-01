@@ -105,9 +105,8 @@ services:
     container_name: middleware-manager
     restart: unless-stopped
     depends_on:
-      pangolin:
-        condition: service_healthy
-      traefik:  # This is important for Traefik to work with Gerbil
+      - pangolin
+      - traefik  # This is important for Traefik to work with Gerbil
     volumes:
       - ./mm_data:/data                             # For the SQLite database
       - ./traefik_rules:/conf                     # MUST MATCH Traefik's rule directory
