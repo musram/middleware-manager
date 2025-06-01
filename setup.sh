@@ -329,48 +329,40 @@ EOL
 print_status "Creating middleware templates..."
 cat > ./mm_config/templates.yaml << 'EOL'
 # Middleware templates for common use cases
-templates:
-  - name: "Basic Auth"
-    type: "basicAuth"
+middlewares:
+  - id: mcp-auth
+    name: MCP Authentication
+    type: forwardAuth
     config:
-      users:
-        - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"  # Change this
-
-  - name: "Rate Limit"
-    type: "rateLimit"
-    config:
-      average: 100
-      burst: 50
-
-  - name: "Headers"
-    type: "headers"
-    config:
-      customRequestHeaders:
-        X-Custom-Header: "value"
-      customResponseHeaders:
-        X-Response-Header: "value"
-      sslRedirect: true
-      forceSTSHeader: true
-      stsIncludeSubdomains: true
-      stsPreload: true
-      stsSeconds: 31536000
-
-  - name: "IP Whitelist"
-    type: "ipWhiteList"
-    config:
-      sourceRange:
-        - "10.0.0.0/8"
-        - "172.16.0.0/12"
-        - "192.168.0.0/16"
-
-  - name: "Forward Auth"
-    type: "forwardAuth"
-    config:
-      address: "http://auth-service:8080/verify"
-      trustForwardHeader: true
+      address: "http://mcpauth:11000/sse"
       authResponseHeaders:
-        - "X-User"
-        - "X-Email"
+        - "X-Forwarded-User"
+
+  - id: mcp-cors-headers
+    name: MCP CORS Headers
+    type: headers
+    config:
+      accessControlAllowMethods:
+        - GET
+        - POST
+        - OPTIONS
+      accessControlAllowOriginList:
+        - "*"
+      accessControlAllowHeaders:
+        - Authorization
+        - Content-Type
+        - mcp-protocol-version
+      accessControlMaxAge: 86400
+      accessControlAllowCredentials: true
+      addVaryHeader: true
+
+  - id: redirect-regex
+    name: Regex Redirect
+    type: redirectregex
+    config:
+      regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
+      replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
+      permanent: true
 EOL
 
 # Create docker-compose.yml if it doesn't exist
