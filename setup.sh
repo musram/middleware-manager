@@ -314,11 +314,9 @@ cat > ./mm_config/config.json << 'EOL'
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
       "auth": {
-        "type": "resource_token",
+        "type": "api_key",
         "headers": {
-          "P-Access-Token-Id": "admin@example.com",
-          "P-Access-Token": "Password123!",
-          "P-Session-Request": "true"
+          "Authorization": "Bearer admin@example.com:Password123!"
         }
       }
     },
