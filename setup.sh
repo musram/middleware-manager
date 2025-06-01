@@ -91,26 +91,11 @@ server:
   cors:
     origins: ["*"]
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allowed_headers: ["*"]
+    allowed_headers: ["Content-Type", "Authorization", "Cookie"]
     credentials: true
-    exposed_headers: ["*"]
   trust_proxy: true
   dashboard_session_length_hours: 720
   resource_session_length_hours: 720
-  csrf:
-    enabled: false
-    ignore_paths:
-      - "/api/v1/auth/login"
-      - "/api/v1/auth/csrf"
-      - "/api/v1/traefik-config"
-      - "/api/v1/resources"
-      - "/api/v1/services"
-      - "/api/v1/sessions"
-      - "/api/v1/auth/sessions"
-  security:
-    csrf: false
-    cors: true
-    rate_limit: false
 
 domains:
   default:
@@ -146,8 +131,6 @@ flags:
   disable_user_create_org: false
   allow_raw_resources: true
   allow_base_domain_resources: true
-  disable_csrf: true
-  disable_security: true  # Disable all security features for development
 EOL
 
 # Set proper permissions for Pangolin config
@@ -331,13 +314,11 @@ cat > ./mm_config/config.json << 'EOL'
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
       "auth": {
-        "type": "session",
-        "login_url": "http://pangolin:3002/api/v1/sessions",
-        "credentials": {
-          "accessTokenId": "admin@example.com",
-          "accessToken": "Password123!"
-        },
+        "type": "resource_token",
         "headers": {
+          "P-Access-Token-Id": "admin@example.com",
+          "P-Access-Token": "Password123!",
+          "P-Session-Request": "true",
           "Content-Type": "application/json",
           "Accept": "application/json"
         }
