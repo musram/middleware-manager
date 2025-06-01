@@ -74,12 +74,6 @@ services:
       - "80:80"
       - "443:443"
       - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
-      interval: "10s"
-      timeout: "5s"
-      retries: 3
-      start_period: "30s"
     networks:
       - pangolin_network
 
