@@ -57,7 +57,6 @@ services:
       pangolin:
         condition: service_healthy
     command:
-      - --config=/var/config/config.yml
       - --reachableAt=http://gerbil:3003
       - --generateAndSaveKeyTo=/var/config/gerbil_key
       - --remoteConfig=http://pangolin:3002/api/v1/gerbil/get-config
