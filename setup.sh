@@ -257,9 +257,9 @@ fi
 
 
 # Create dynnamic config for traefik
-if [ ! -f ./config/traefik/traefik_dynamic_config.yml ]; then
+if [ ! -f ./config/traefik/rules/traefik_dynamic_config.yml ]; then
     print_status "Creating dynamic config for traefik..."
-    cat > ./config/traefik/traefik_dynamic_config.yml << 'EOL'
+    cat > ./config/traefik/rules/traefik_dynamic_config.yml << 'EOL'
     # Dynamic config for traefik
     http:
       routers:
