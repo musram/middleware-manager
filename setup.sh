@@ -91,11 +91,19 @@ server:
   cors:
     origins: ["*"]
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allowed_headers: ["Content-Type", "Authorization", "Cookie"]
+    allowed_headers: ["*"]
     credentials: true
   trust_proxy: true
   dashboard_session_length_hours: 720
   resource_session_length_hours: 720
+  csrf:
+    enabled: false  # Disable CSRF for development
+    ignore_paths:
+      - "/api/v1/auth/login"
+      - "/api/v1/auth/csrf"
+      - "/api/v1/traefik-config"
+      - "/api/v1/resources"
+      - "/api/v1/services"
 
 domains:
   default:
@@ -131,6 +139,7 @@ flags:
   disable_user_create_org: false
   allow_raw_resources: true
   allow_base_domain_resources: true
+  disable_csrf: true  # Disable CSRF globally for development
 EOL
 
 # Set proper permissions for Pangolin config
@@ -314,11 +323,13 @@ cat > ./mm_config/config.json << 'EOL'
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
       "auth": {
-        "type": "resource_token",
+        "type": "session",
+        "login_url": "http://pangolin:3002/api/v1/auth/login",
+        "credentials": {
+          "email": "admin@example.com",
+          "password": "Password123!"
+        },
         "headers": {
-          "P-Access-Token-Id": "admin@example.com",
-          "P-Access-Token": "Password123!",
-          "P-Session-Request": "true",
           "Content-Type": "application/json",
           "Accept": "application/json"
         }
@@ -419,26 +430,57 @@ EOL
 if [ ! -f ./docker-compose.yml ]; then
     print_status "Creating docker-compose.yml..."
     cat > ./docker-compose.yml << 'EOL'
+version: '3.8'
+
 networks:
   pangolin_network:
     driver: bridge
     name: pangolin
 
 services:
+  # MCPAuth Service
+  # mcpauth:
+  #   build: .
+  #   environment:
+  #     - PORT=11000
+  #     - CLIENT_ID=${CLIENT_ID}
+  #     - CLIENT_SECRET=${CLIENT_SECRET}
+  #     - OAUTH_DOMAIN=${OAUTH_DOMAIN}
+  #     - ALLOWED_EMAILS=${ALLOWED_EMAILS}
+  #   networks:
+  #     - pangolin_network
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:11000/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   depends_on:
+  #     pangolin:
+  #       condition: service_healthy
+
+  # Pangolin Router
   pangolin:
     image: fosrl/pangolin:1.3.0
     container_name: pangolin
     restart: unless-stopped
     volumes:
       - ./pangolin_config:/app/config
+    environment:
+      - NODE_ENV=development
+      - CONFIG_PATH=/app/config/config.yml
+      - PORT=3002
+    ports:
+      - "3002:3002"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
-      interval: "3s"
-      timeout: "3s"
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/v1/"]
+      interval: "10s"
+      timeout: "5s"
+      retries: 3
+      start_period: "30s"
     networks:
       - pangolin_network
 
+  # Gerbil Service
   gerbil:
     image: fosrl/gerbil:1.0.0
     container_name: gerbil
@@ -447,69 +489,135 @@ services:
       pangolin:
         condition: service_healthy
     command:
+      - --config=/var/config/config.json
       - --reachableAt=http://gerbil:3003
-      - --generateAndSaveKeyTo=/var/config/gerbil_key
-      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
-      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
+      - --generateAndSaveKeyTo=/var/config/key
+      #- --reportBandwidthTo=http://pangolin:3002/api/v1/gerbil/receive-bandwidth 
+      - --log-level=DEBUG
+      - --interface=wg0
+      - --listen=:3003
     volumes:
       - ./gerbil_config:/var/config
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
+    # Gerbil often exposes Traefik's ports if network_mode: service:gerbil is used for Traefik
     ports:
-      - "51820:51820/udp"
+      - "51820:51820/udp" # Gerbil VPN port
+      # Traefik ports might be exposed here or directly by Traefik service depending on setup
       - "80:80"
       - "443:443"
-      - "8080:8080"
+      - "8080:8080" # Traefik API/Dashboard if exposed through Gerbil
     networks:
       - pangolin_network
 
+  # Traefik Gateway
   traefik:
     image: traefik:v3.3.3
     container_name: traefik
     restart: unless-stopped
-    network_mode: service:gerbil
+    network_mode: service:gerbil # This is important for Traefik to work with Gerbil
     depends_on:
       pangolin:
         condition: service_healthy
     command:
       - --configFile=/etc/traefik/traefik_config.yml
     volumes:
-      - ./config/traefik:/etc/traefik:ro
-      - ./config/letsencrypt:/letsencrypt
-      - ./config/traefik/logs:/var/log/traefik
+      - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
+      - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates
+      - ./config/traefik/logs:/var/log/traefik # Volume to store Traefik logs
       - ./traefik/plugins-storage:/plugins-storage:rw
       - ./traefik/plugins-storage:/plugins-local:rw
       - ./config/traefik/rules:/rules
-      - ./public_html:/var/www/html:ro
-
+      - ./public_html:/var/www/html:ro 
+  
+  # Middleware Manager
   middleware-manager:
     image: hhftechnology/middleware-manager:v3.0.0
     container_name: middleware-manager
     restart: unless-stopped
     depends_on:
       - pangolin
-      - traefik
+      - traefik  # This is important for Traefik to work with Gerbil
     volumes:
-      - ./mm_data:/data
-      - ./traefik_rules:/conf
-      - ./mm_config/templates.yaml:/app/config/templates.yaml
-      - ./mm_config/templates_services.yaml:/app/config/templates_services.yaml
-      - ./mm_config/config.json:/app/config/config.json
-      - ./traefik_static_config:/etc/traefik
+      - ./mm_data:/data                             # For the SQLite database
+      - ./traefik_rules:/conf                     # MUST MATCH Traefik's rule directory
+      - ./mm_config/templates.yaml:/app/config/templates.yaml # Optional custom middleware templates
+      - ./mm_config/templates_services.yaml:/app/config/templates_services.yaml # Optional custom service templates
+      - ./mm_config/config.json:/app/config/config.json       # For data source settings
+      # Mount Traefik's static config directory for plugin management
+      - ./traefik_static_config:/etc/traefik 
     environment:
-      - PANGOLIN_API_URL=http://pangolin:3001/api/v1
-      - TRAEFIK_API_URL=http://traefik:8080
+      - PANGOLIN_API_URL=http://pangolin:3002/api/v1 # If ACTIVE_DATA_SOURCE is pangolin
+      - TRAEFIK_API_URL=http://traefik:8080 # Or http://gerbil:8080 if Traefik API is via Gerbil
       - TRAEFIK_CONF_DIR=/conf
       - DB_PATH=/data/middleware.db
       - PORT=3456
-      - ACTIVE_DATA_SOURCE=pangolin
+      - ACTIVE_DATA_SOURCE=pangolin # Set to 'pangolin' or 'traefik'
+      # Path to Traefik's main static config file *inside this container* (due to volume mount)
       - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik_config.yml
       - PLUGINS_JSON_URL=https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json
+      # - DEBUG=true # Optional for development
     ports:
       - "3456:3456"
     networks:
       - pangolin_network
+
+  # Redis for Session Management
+  redis:
+    image: redis:alpine
+    container_name: redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: "10s"
+      timeout: "5s"
+      retries: 3
+    networks:
+      - pangolin_network
+
+  # MCP Server (Example with 3 replicas)
+  # mcp-server:
+  #   image: your-mcp-server-image
+  #   deploy:
+  #     replicas: 3
+  #     update_config:
+  #       parallelism: 1
+  #       delay: 10s
+  #     restart_policy:
+  #       condition: on-failure
+  #   environment:
+  #     - MCP_SERVER_ID=${MCP_SERVER_ID:-mcp-${HOSTNAME}}
+  #     - REDIS_URL=redis://redis:6379
+  #     - REGISTER_WITH_PANGOLIN=true
+  #     - PANGOLIN_API_URL=http://pangolin:3002/api/v1
+  #     - PANGOLIN_INTEGRATION_API_URL=http://pangolin:3002/api/v1/integration
+  #     - SERVICE_NAME=mcp-server
+  #     - SERVICE_PORT=8080
+  #     - SERVICE_TYPE=http
+  #     - SERVICE_PROTOCOL=http
+  #     - SERVICE_DOMAIN=localhost
+  #     - SERVICE_PATH=/
+  #     - SERVICE_HEALTH_CHECK_PATH=/health
+  #     - SERVICE_HEALTH_CHECK_INTERVAL=30s
+  #     - SERVICE_HEALTH_CHECK_TIMEOUT=5s
+  #     - SERVICE_HEALTH_CHECK_RETRIES=3
+  #   networks:
+  #     - pangolin_network
+  #   depends_on:
+  #     - pangolin
+  #     - redis
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: "30s"
+  #     timeout: "5s"
+  #     retries: 3
+  #     start_period: "30s"
+
+volumes:
+  redis_data:
 EOL
 fi
 
