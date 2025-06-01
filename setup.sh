@@ -316,14 +316,18 @@ cat > ./mm_config/config.json << 'EOL'
       "auth": {
         "type": "session",
         "login_url": "http://pangolin:3002/api/v1/auth/login",
-        "credentials": {
+        "login_method": "POST",
+        "login_body": {
           "email": "admin@example.com",
           "password": "Password123!"
         },
         "session_cookie": "p_session_token",
         "headers": {
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        "store_session": true,
+        "session_storage": "cookie"
       }
     },
     "traefik": {
