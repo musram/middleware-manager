@@ -160,6 +160,7 @@ cat > ./gerbil_config/config.json << 'EOL'
             "publicKey": "2/U4oyZ+sai336Dal/yExCphL8AxyqvIxMk4qsUy4iI=",
             "allowedIps": ["10.0.0.48/28"]
         }
+      "pangolin":{"access_token":{"id":"gerbil","token":"supersecret123"}}
     ]
 }
 EOL
@@ -173,8 +174,6 @@ print_status "Verifying Pangolin configuration..."
 ls -l ./pangolin_config/config.yml
 cat ./pangolin_config/config.yml
 
-# Set proper permissions for Gerbil config
-chmod 644 ./gerbil_config/config.yml
 
 # Create basic traefik.yml if it doesn't exist
 if [ ! -f ./traefik_static_config/traefik.yml ]; then
