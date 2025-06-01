@@ -160,7 +160,6 @@ cat > ./gerbil_config/config.json << 'EOL'
             "publicKey": "2/U4oyZ+sai336Dal/yExCphL8AxyqvIxMk4qsUy4iI=",
             "allowedIps": ["10.0.0.48/28"]
         }
-      "pangolin":{"access_token":{"id":"gerbil","token":"supersecret123"}}
     ]
 }
 EOL
