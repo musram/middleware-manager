@@ -314,9 +314,12 @@ cat > ./mm_config/config.json << 'EOL'
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
       "auth": {
-        "type": "api_key",
+        "type": "basic",
+        "username": "admin@example.com",
+        "password": "Password123!",
         "headers": {
-          "Authorization": "Bearer admin@example.com:Password123!"
+          "Content-Type": "application/json",
+          "Accept": "application/json"
         }
       }
     },
