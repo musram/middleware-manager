@@ -222,14 +222,13 @@ certificatesResolvers:
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
-      tlsChallenge: {}
-
+      
 # Providers configuration
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: pangolin
+    network: traefik
     useBindPortIP: true
   file:
     directory: "/rules"
