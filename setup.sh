@@ -79,7 +79,7 @@ fi
 print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
-  dashboard_url: "mcp.api.deepalign.ai"
+  dashboard_url: "https://mcp.api.deepalign.ai"
   log_level: "debug" # Set to DEBUG for troubleshooting
   save_logs: true
   log_failed_attempts: true
@@ -107,7 +107,7 @@ server:
 
 domains:
   default:
-    base_domain: "api.deepalign.ai"
+    base_domain: "mcp.api.deepalign.ai"
     cert_resolver: "letsencrypt"
     prefer_wildcard_cert: false
 
@@ -117,7 +117,7 @@ traefik:
 
 gerbil:
   start_port: 51820
-  base_endpoint: "localhost"
+  base_endpoint: "mcp.api.deepalign.ai"
   use_subdomain: false
   block_size: 24
   site_block_size: 30
