@@ -323,9 +323,10 @@ cat > ./mm_config/config.json << 'EOL'
     "pangolin": {
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
-      "basic_auth": {
-        "username": "",
-        "password": ""
+      "auth": {
+        "type": "basic",
+        "username": "admin@example.com",
+        "password": "Password123!"
       }
     },
     "traefik": {
@@ -339,6 +340,9 @@ cat > ./mm_config/config.json << 'EOL'
   }
 }
 EOL
+
+# set proper permissions for middleware-manager config
+chmod 644 ./mm_config/config.json
 
 # Create service templates
 print_status "Creating service templates..."
