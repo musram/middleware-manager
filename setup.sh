@@ -107,7 +107,7 @@ server:
 
 domains:
   default:
-    base_domain: "api.deepalign.ai"
+    base_domain: "34.67.58.70"
     cert_resolver: "letsencrypt"
     prefer_wildcard_cert: false
 
