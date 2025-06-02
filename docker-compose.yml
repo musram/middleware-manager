@@ -1,9 +1,9 @@
 version: '3.8'
 
 networks:
-  pangolin_network:
+  traefik:
     driver: bridge
-    name: pangolin
+    name: traefik
 
 services:
   # MCPAuth Service
@@ -46,7 +46,7 @@ services:
       retries: 3
       start_period: "30s"
     networks:
-      - pangolin_network
+      - traefik
 
   # Gerbil Service
   gerbil:
@@ -74,7 +74,7 @@ services:
       - "443:443"          # HTTPS
       - "8080:8080"        # Traefik Dashboard
     networks:
-      - pangolin_network
+      - traefik
 
   # Traefik Gateway
   traefik:
@@ -137,7 +137,7 @@ services:
     ports:
       - "3456:3456"
     networks:
-      - pangolin_network
+      - traefik
 
   # Redis for Session Management
   redis:
@@ -152,7 +152,7 @@ services:
       timeout: "5s"
       retries: 3
     networks:
-      - pangolin_network
+      - traefik
 
   # MCP Server (Example with 3 replicas)
   # mcp-server:
@@ -181,7 +181,7 @@ services:
   #     - SERVICE_HEALTH_CHECK_TIMEOUT=5s
   #     - SERVICE_HEALTH_CHECK_RETRIES=3
   #   networks:
-  #     - pangolin_network
+  #     - traefik
   #   depends_on:
   #     - pangolin
   #     - redis
