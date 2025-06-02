@@ -102,7 +102,8 @@ services:
       - ./traefik/plugins-storage:/plugins-storage:rw
       - ./traefik/plugins-storage:/plugins-local:rw
       - ./config/traefik/rules:/rules
-      - ./public_html:/var/www/html:ro 
+      - ./public_html:/var/www/html:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Add Docker socket mount
   
   # Middleware Manager
   middleware-manager:
