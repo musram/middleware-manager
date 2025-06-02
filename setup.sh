@@ -79,7 +79,7 @@ fi
 print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
-  dashboard_url: "http://localhost:3002"
+  dashboard_url: "mcp.api.deepalign.ai"
   log_level: "debug" # Set to DEBUG for troubleshooting
   save_logs: true
   log_failed_attempts: true
@@ -107,7 +107,7 @@ server:
 
 domains:
   default:
-    base_domain: "localhost"
+    base_domain: "api.deepalign.ai"
     cert_resolver: "letsencrypt"
     prefer_wildcard_cert: false
 

@@ -28,7 +28,7 @@ services:
 
   # Pangolin Router
   pangolin:
-    image: fosrl/pangolin:1.3.0
+    image: fosrl/pangolin:1.4.0
     container_name: pangolin
     restart: unless-stopped
     volumes:
