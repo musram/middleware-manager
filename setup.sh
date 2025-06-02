@@ -79,7 +79,7 @@ fi
 print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
-  dashboard_url: "http://34.67.58.70:3002"
+  dashboard_url: "mcp.api.deepalign.ai"
   log_level: "debug" # Set to DEBUG for troubleshooting
   save_logs: true
   log_failed_attempts: true
@@ -107,7 +107,7 @@ server:
 
 domains:
   default:
-    base_domain: "34.67.58.70"
+    base_domain: "api.deepalign.ai"
     cert_resolver: "letsencrypt"
     prefer_wildcard_cert: false
 
@@ -267,62 +267,62 @@ fi
 
 
 # Create dynnamic config for traefik
-if [ ! -f ./config/traefik/rules/traefik_dynamic_config.yml ]; then
+if [ ! -f ./config/traefik/rules/dynamic_config.yml ]; then
     print_status "Creating dynamic config for traefik..."
-    cat > ./config/traefik/rules/traefik_dynamic_config.yml << 'EOL'
-    # Dynamic config for traefik
+    cat > ./config/traefik/rules/dynamic_config.yml << 'EOL'
     # Dynamic config for traefik
     http:
     routers:
-      - name: "pangolin-router"
+      pangolin-router:
         rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/`)"
         entrypoints:
           - web
           - websecure
-        service: "pangolin-service"
+        service: pangolin-service
         middlewares:
-          - mcp-auth@file
-          - mcp-cors-headers@file
+          - mcp-auth
+          - mcp-cors-headers
         tls:
           certResolver: letsencrypt
           domains:
-            - "mcp.api.deepalign.ai"
-            - "www.mcp.api.deepalign.ai"
+            - main: "mcp.api.deepalign.ai"
+            - sans: "www.mcp.api.deepalign.ai"
 
-      - name: "traefik-router"
+      traefik-router:
         rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
         entrypoints:
           - web
           - websecure
-        service: "traefik-service"
+        service: traefik-service
         middlewares:
-          - mcp-auth@file
-          - redirect-regex@file
-          - crowdsec@file
+          - mcp-auth
+          - redirect-regex
+          - crowdsec
         tls:
           certResolver: letsencrypt
           domains:
-            - "mcp.api.deepalign.ai"
-            - "www.mcp.api.deepalign.ai"
+            - main: "mcp.api.deepalign.ai"
+            - sans: "www.mcp.api.deepalign.ai"
 
     services:
-      - name: "pangolin-service"
+      pangolin-service:
         loadBalancer:
           servers:
             - url: "http://pangolin:3002"
 
-      - name: "traefik-service"
+      traefik-service:
         loadBalancer:
           servers:
             - url: "http://traefik:8080"
 
     middlewares:
-      - name: "mcp-auth"
+      mcp-auth:
         forwardAuth:
           address: "http://mcpauth:11000/sse"
           authResponseHeaders:
             - "X-Forwarded-User"
-      - name: "mcp-cors-headers"
+
+      mcp-cors-headers:
         headers:
           accessControlAllowMethods:
             - GET
@@ -337,22 +337,24 @@ if [ ! -f ./config/traefik/rules/traefik_dynamic_config.yml ]; then
           accessControlMaxAge: 86400
           accessControlAllowCredentials: true
           addVaryHeader: true
-      - name: "redirect-regex"
+
+      redirect-regex:
         redirectRegex:
           regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
           replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
           permanent: true
-      - name: "crowdsec"
+
+      crowdsec:
         plugin:
-          name: crowdsec
-          enabled: true
-          crowdsecAppsecHost: "crowdsec:7422"
-          crowdsecAppsecPort: 7422
-          crowdsecApiKey: "your-api-key"
-          captchaProvider: turnstile
-          httpTimeout: 10s
-          updateIntervalSeconds: 15
-          updateMaxFailures: 0 
+          crowdsec:
+            enabled: true
+            crowdsecAppsecHost: "crowdsec:7422"
+            crowdsecAppsecPort: 7422
+            crowdsecApiKey: "your-api-key"
+            captchaProvider: turnstile
+            httpTimeout: 10s
+            updateIntervalSeconds: 15
+            updateMaxFailures: 0
 EOL
 fi
 
