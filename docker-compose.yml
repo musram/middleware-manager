@@ -60,7 +60,6 @@ services:
       - --config=/var/config/config.json
       - --reachableAt=http://gerbil:3003
       - --generateAndSaveKeyTo=/var/config/key
-      #- --reportBandwidthTo=http://pangolin:3002/api/v1/gerbil/receive-bandwidth 
       - --log-level=DEBUG
       - --interface=wg0
       - --listen=:3003
@@ -70,7 +69,10 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     ports:
-      - "51820:51820/udp"
+      - "51820:51820/udp"  # WireGuard
+      - "80:80"            # HTTP
+      - "443:443"          # HTTPS
+      - "8080:8080"        # Traefik Dashboard
     networks:
       - pangolin_network
 
@@ -95,10 +97,6 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --entrypoints.traefik.address=:8080
-    ports:
-      - "80:80"      # HTTP
-      - "443:443"    # HTTPS
-      - "8080:8080"  # Traefik Dashboard
     volumes:
       - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
       - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates
