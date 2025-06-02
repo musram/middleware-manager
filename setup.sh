@@ -210,10 +210,11 @@ entryPoints:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: your-email@example.com  # Change this
+      email: admin@deepalign.ai
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
+      tlsChallenge: {}
 
 # Providers configuration
 providers:
@@ -228,7 +229,8 @@ providers:
 
 # Logging configuration
 log:
-  level: DEBUG  # Set to DEBUG for troubleshooting
+  level: DEBUG
+  filePath: "/var/log/traefik/traefik.log"
 
 # Access log configuration
 accessLog:
@@ -264,7 +266,7 @@ if [ ! -f ./config/traefik/rules/traefik_dynamic_config.yml ]; then
     http:
       routers:
         - name: "traefik-router"
-          rule: "Host(`traefik.yourdomain.com`)"
+          rule: "Host(`mcp.api.deepalign.ai`)"
           entrypoints:
             - web
             - websecure
@@ -276,8 +278,8 @@ if [ ! -f ./config/traefik/rules/traefik_dynamic_config.yml ]; then
           tls:
             certResolver: letsencrypt
             domains:
-              - "traefik.yourdomain.com"
-              - "www.traefik.yourdomain.com"
+              - "mcp.api.deepalign.ai"
+              - "www.mcp.api.deepalign.ai"
 
       middlewares:
         - name: "mcp-auth"
@@ -490,13 +492,8 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
-    # Gerbil often exposes Traefik's ports if network_mode: service:gerbil is used for Traefik
     ports:
-      - "51820:51820/udp" # Gerbil VPN port
-      # Traefik ports might be exposed here or directly by Traefik service depending on setup
-      - "80:80"
-      - "443:443"
-      - "8080:8080" # Traefik API/Dashboard if exposed through Gerbil
+      - "51820:51820/udp"
     networks:
       - pangolin_network
 
@@ -511,6 +508,16 @@ services:
         condition: service_healthy
     command:
       - --configFile=/etc/traefik/traefik_config.yml
+      - --log.level=DEBUG
+      - --accesslog=true
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=pangolin
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.traefik.address=:8080
     volumes:
       - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
       - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates
