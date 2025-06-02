@@ -79,7 +79,7 @@ fi
 print_status "Creating Pangolin configuration..."
 cat > ./pangolin_config/config.yml << 'EOL'
 app:
-  dashboard_url: "mcp.api.deepalign.ai"
+  dashboard_url: "http://34.67.58.70:3002"
   log_level: "debug" # Set to DEBUG for troubleshooting
   save_logs: true
   log_failed_attempts: true
