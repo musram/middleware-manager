@@ -323,15 +323,9 @@ cat > ./mm_config/config.json << 'EOL'
     "pangolin": {
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
-      "auth": {
-        "type": "resource_token",
-        "headers": {
-          "P-Access-Token-Id": "admin@example.com",
-          "P-Access-Token": "Password123!",
-          "P-Session-Request": "true",
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        }
+      "basic_auth": {
+        "username": "",
+        "password": ""
       }
     },
     "traefik": {
@@ -432,9 +426,9 @@ if [ ! -f ./docker-compose.yml ]; then
 version: '3.8'
 
 networks:
-  pangolin_network:
+  traefik:
     driver: bridge
-    name: pangolin
+    name: traefik
 
 services:
   # MCPAuth Service
@@ -477,7 +471,7 @@ services:
       retries: 3
       start_period: "30s"
     networks:
-      - pangolin_network
+      - traefik
 
   # Gerbil Service
   gerbil:
@@ -491,7 +485,6 @@ services:
       - --config=/var/config/config.json
       - --reachableAt=http://gerbil:3003
       - --generateAndSaveKeyTo=/var/config/key
-      #- --reportBandwidthTo=http://pangolin:3002/api/v1/gerbil/receive-bandwidth 
       - --log-level=DEBUG
       - --interface=wg0
       - --listen=:3003
@@ -501,9 +494,12 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     ports:
-      - "51820:51820/udp"
+      - "51820:51820/udp"  # WireGuard
+      - "80:80"            # HTTP
+      - "443:443"          # HTTPS
+      - "8080:8080"        # Traefik Dashboard
     networks:
-      - pangolin_network
+      - traefik
 
   # Traefik Gateway
   traefik:
@@ -533,7 +529,8 @@ services:
       - ./traefik/plugins-storage:/plugins-storage:rw
       - ./traefik/plugins-storage:/plugins-local:rw
       - ./config/traefik/rules:/rules
-      - ./public_html:/var/www/html:ro 
+      - ./public_html:/var/www/html:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Add Docker socket mount
   
   # Middleware Manager
   middleware-manager:
@@ -565,7 +562,7 @@ services:
     ports:
       - "3456:3456"
     networks:
-      - pangolin_network
+      - traefik
 
   # Redis for Session Management
   redis:
@@ -580,7 +577,7 @@ services:
       timeout: "5s"
       retries: 3
     networks:
-      - pangolin_network
+      - traefik
 
   # MCP Server (Example with 3 replicas)
   # mcp-server:
@@ -609,7 +606,7 @@ services:
   #     - SERVICE_HEALTH_CHECK_TIMEOUT=5s
   #     - SERVICE_HEALTH_CHECK_RETRIES=3
   #   networks:
-  #     - pangolin_network
+  #     - traefik
   #   depends_on:
   #     - pangolin
   #     - redis
