@@ -251,7 +251,6 @@ EOL
 print_status "Creating Traefik dynamic configuration..."
 cat > ./config/traefik/rules/traefik_dynamic_config.yml << 'EOL'
 # Dynamic config for traefik
-# Dynamic config for traefik
 http:
   routers:
     acme-challenge:
@@ -355,15 +354,15 @@ cat > ./mm_config/config.json << 'EOL'
   "data_sources": {
     "pangolin": {
       "type": "pangolin",
-      "url": "http://mcp.api.deepalign.ai:3002/api/v1",
+      "url": "http://pangolin:3002/api/v1",
       "basic_auth": {
-        "username": "",
-        "password": ""
+        "username": "admin@example.com",
+        "password": "Password123!"
       }
     },
     "traefik": {
       "type": "traefik",
-      "url": "http://mcp.api.deepalign.ai:8080",
+      "url": "http://traefik:8080",
       "basic_auth": {
         "username": "",
         "password": ""
