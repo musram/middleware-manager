@@ -209,9 +209,6 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
-    http:
-      tls:
-        certResolver: letsencrypt
   traefik:
     address: ":8080"
 
@@ -364,8 +361,8 @@ cat > ./mm_config/config.json << 'EOL'
       "url": "http://pangolin:3002/api/v1",
       "auth": {
         "type": "basic",
-        "username": "admin",
-        "password": "admin"
+        "username": "admin@example.com",
+        "password": "Password123!"
       }
     },
     "traefik": {
@@ -377,7 +374,7 @@ cat > ./mm_config/config.json << 'EOL'
       }
     }
   }
-} 
+}
 EOL
 
 # set proper permissions for middleware-manager config
