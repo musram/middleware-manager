@@ -276,8 +276,8 @@ http:
         - websecure
       service: "pangolin-service"
       middlewares:
-        - mcp-auth@file
         - mcp-cors-headers@file
+        - mcp-auth@file
       tls:
         certResolver: letsencrypt
         domains:
@@ -291,8 +291,8 @@ http:
         - websecure
       service: "traefik-service"
       middlewares:
+        - mcp-cors-headers@file
         - mcp-auth@file
-        - redirect-regex@file
       tls:
         certResolver: letsencrypt
         domains:
@@ -310,16 +310,16 @@ http:
         servers:
           - url: "http://traefik:8080"
 
+    mcp-auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://mcpauth:11000"
+
   middlewares:
     redirect-web-to-websecure:
       redirectScheme:
         scheme: https
         permanent: true
-    mcp-auth:
-      forwardAuth:
-        address: "http://mcpauth:11000/sse"
-        authResponseHeaders:
-          - "X-Forwarded-User"
     mcp-cors-headers:
       headers:
         accessControlAllowMethods:
@@ -332,14 +332,19 @@ http:
           - Authorization
           - Content-Type
           - mcp-protocol-version
+          - Cookie
         accessControlMaxAge: 86400
         accessControlAllowCredentials: true
         addVaryHeader: true
-    redirect-regex:
-      redirectRegex:
-        regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
-        replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
-        permanent: true
+    mcp-auth:
+      forwardAuth:
+        address: "http://mcpauth:11000/sse"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "Authorization"
+          - "X-User-Email"
+          - "X-User-Name"
+          - "Cookie"
 EOL
 
 # Set proper permissions for Traefik configs
@@ -358,6 +363,9 @@ cat > ./mm_config/config.json << 'EOL'
       "basic_auth": {
         "username": "admin@example.com",
         "password": "Password123!"
+      },
+      "headers": {
+        "Cookie": "p_session_token=your_session_token"
       }
     },
     "traefik": {
