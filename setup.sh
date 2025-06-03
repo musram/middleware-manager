@@ -45,7 +45,6 @@ print_status "Creating required directories..."
 rm -rf ./pangolin_config \
        ./gerbil_config \
        ./traefik_static_config \
-       ./letsencrypt \
        ./config/traefik/rules \
        ./traefik_plugins \
        ./mm_data \
@@ -60,7 +59,6 @@ rm -rf ./pangolin_config \
 mkdir -p ./pangolin_config \
          ./gerbil_config \
          ./traefik_static_config \
-         ./letsencrypt \
          ./config/traefik/rules \
          ./traefik_plugins \
          ./mm_data \
@@ -232,11 +230,16 @@ providers:
     watch: true
 
 log:
+  #filePath: "/var/log/traefik/traefik.log" # write to file
   level: DEBUG
 
 accessLog:
   filePath: "/var/log/traefik/access.log"
   bufferingSize: 100
+  fields:
+    headers:
+      names:
+        User-Agent: keep
 
 metrics:
   prometheus:
@@ -284,20 +287,14 @@ http:
           - "mcp.api.deepalign.ai"
           - "www.mcp.api.deepalign.ai"
 
-    traefik-router:
+    traefik-dashboard:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
       entryPoints:
-        - web
-        - websecure
+        - traefik
       service: "traefik-service"
       middlewares:
         - mcp-cors-headers@file
         - mcp-auth@file
-      tls:
-        certResolver: letsencrypt
-        domains:
-          - "mcp.api.deepalign.ai"
-          - "www.mcp.api.deepalign.ai"
 
   services:
     pangolin-service:
