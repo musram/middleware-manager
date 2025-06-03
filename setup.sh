@@ -345,14 +345,6 @@ http:
           - "X-User-Email"
           - "X-User-Name"
           - "Cookie"
-        authResponseHeadersSet: true
-        authResponseHeadersRemove: true
-        authResponseHeadersSet:
-          X-Forwarded-User: "{{ .User }}"
-          X-Forwarded-Email: "{{ .Email }}"
-        authResponseHeadersRemove:
-          - "Authorization"
-          - "Cookie"
 EOL
 
 # Set proper permissions for Traefik configs
@@ -368,11 +360,12 @@ cat > ./mm_config/config.json << 'EOL'
     "pangolin": {
       "type": "pangolin",
       "url": "http://pangolin:3002/api/v1",
-      "session_auth": {
-        "cookie_name": "p_session_token",
-        "headers": {
-          "Cookie": "p_session_token=your_session_token"
-        }
+      "basic_auth": {
+        "username": "admin@example.com",
+        "password": "Password123!"
+      },
+      "headers": {
+        "Cookie": "p_session_token=your_session_token"
       }
     },
     "traefik": {
