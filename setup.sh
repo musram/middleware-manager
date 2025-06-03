@@ -222,7 +222,7 @@ certificatesResolvers:
       email: "admin@deepalign.ai"
       storage: "/letsencrypt/acme.json"
       #caServer: "https://acme-v02.api.letsencrypt.org/directory"  # prod (default)
-      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"   # staging
+      #caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"   # staging
       httpChallenge:
         entryPoint: web
 
@@ -294,6 +294,7 @@ http:
         domains:
           - "mcp.api.deepalign.ai"
           - "www.mcp.api.deepalign.ai"
+    
     # Next.js router (handles everything except API and WebSocket paths pangolin app)
     pangolin-app-router-nextjs:
       rule: "Host(`mcp.api.deepalign.ai`) && !PathPrefix(`/api/v1`)" 
