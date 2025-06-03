@@ -247,98 +247,103 @@ metrics:
 EOL
 fi
 
+# Create Traefik dynamic configuration
+print_status "Creating Traefik dynamic configuration..."
+cat > ./config/traefik/rules/traefik_dynamic_config.yml << 'EOL'
+# Dynamic config for traefik
+http:
+  routers:
+    - name: "acme-challenge"
+      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/.well-known/acme-challenge/`)"
+      entrypoints:
+        - web
+      service: "acme-http@internal"
+      priority: 100
 
-# Create dynnamic config for traefik
-if [ ! -f ./config/traefik/rules/dynamic_config.yml ]; then
-    print_status "Creating dynamic config for traefik..."
-    cat > ./config/traefik/rules/dynamic_config.yml << 'EOL'
-    # Dynamic config for traefik
-    http:
-    routers:
-      pangolin-router:
-        rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/`)"
-        entrypoints:
-          - web
-          - websecure
-        service: pangolin-service
-        middlewares:
-          - mcp-auth
-          - mcp-cors-headers
-        tls:
-          certResolver: letsencrypt
-          domains:
-            - main: "mcp.api.deepalign.ai"
-            - sans: "www.mcp.api.deepalign.ai"
+    - name: "pangolin-router"
+      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/`)"
+      entrypoints:
+        - web
+        - websecure
+      service: "pangolin-service"
+      middlewares:
+        - mcp-auth@file
+        - mcp-cors-headers@file
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - "mcp.api.deepalign.ai"
+          - "www.mcp.api.deepalign.ai"
 
-      traefik-router:
-        rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
-        entrypoints:
-          - web
-          - websecure
-        service: traefik-service
-        middlewares:
-          - mcp-auth
-          - redirect-regex
-          - crowdsec
-        tls:
-          certResolver: letsencrypt
-          domains:
-            - main: "mcp.api.deepalign.ai"
-            - sans: "www.mcp.api.deepalign.ai"
+    - name: "traefik-router"
+      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
+      entrypoints:
+        - web
+        - websecure
+      service: "traefik-service"
+      middlewares:
+        - mcp-auth@file
+        - redirect-regex@file
+        - crowdsec@file
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - "mcp.api.deepalign.ai"
+          - "www.mcp.api.deepalign.ai"
 
-    services:
-      pangolin-service:
-        loadBalancer:
-          servers:
-            - url: "http://pangolin:3002"
+  services:
+    - name: "pangolin-service"
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3002"
 
-      traefik-service:
-        loadBalancer:
-          servers:
-            - url: "http://traefik:8080"
+    - name: "traefik-service"
+      loadBalancer:
+        servers:
+          - url: "http://traefik:8080"
 
-    middlewares:
-      mcp-auth:
-        forwardAuth:
-          address: "http://mcpauth:11000/sse"
-          authResponseHeaders:
-            - "X-Forwarded-User"
-
-      mcp-cors-headers:
-        headers:
-          accessControlAllowMethods:
-            - GET
-            - POST
-            - OPTIONS
-          accessControlAllowOriginList:
-            - "*"
-          accessControlAllowHeaders:
-            - Authorization
-            - Content-Type
-            - mcp-protocol-version
-          accessControlMaxAge: 86400
-          accessControlAllowCredentials: true
-          addVaryHeader: true
-
-      redirect-regex:
-        redirectRegex:
-          regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
-          replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
-          permanent: true
-
-      crowdsec:
-        plugin:
-          crowdsec:
-            enabled: true
-            crowdsecAppsecHost: "crowdsec:7422"
-            crowdsecAppsecPort: 7422
-            crowdsecApiKey: "your-api-key"
-            captchaProvider: turnstile
-            httpTimeout: 10s
-            updateIntervalSeconds: 15
-            updateMaxFailures: 0
+  middlewares:
+    - name: "mcp-auth"
+      forwardAuth:
+        address: "http://mcpauth:11000/sse"
+        authResponseHeaders:
+          - "X-Forwarded-User"
+    - name: "mcp-cors-headers"
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - Authorization
+          - Content-Type
+          - mcp-protocol-version
+        accessControlMaxAge: 86400
+        accessControlAllowCredentials: true
+        addVaryHeader: true
+    - name: "redirect-regex"
+      redirectRegex:
+        regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
+        replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
+        permanent: true
+    - name: "crowdsec"
+      plugin:
+        name: crowdsec
+        enabled: true
+        crowdsecAppsecHost: "crowdsec:7422"
+        crowdsecAppsecPort: 7422
+        crowdsecApiKey: "your-api-key"
+        captchaProvider: turnstile
+        httpTimeout: 10s
+        updateIntervalSeconds: 15
+        updateMaxFailures: 0
 EOL
-fi
+
+# Set proper permissions for Traefik configs
+chmod 644 ./traefik_static_config/traefik_config.yml
+chmod 644 ./config/traefik/rules/traefik_dynamic_config.yml
 
 # Create basic config.json for middleware-manager
 print_status "Creating middleware-manager configuration..."
