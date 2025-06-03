@@ -293,7 +293,6 @@ http:
       middlewares:
         - mcp-auth@file
         - redirect-regex@file
-        - crowdsec@file
       tls:
         certResolver: letsencrypt
         domains:
@@ -341,17 +340,6 @@ http:
         regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
         replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
         permanent: true
-    crowdsec:
-      plugin:
-        crowdsec:
-          enabled: true
-          crowdsecAppsecHost: "crowdsec:7422"
-          crowdsecAppsecPort: 7422
-          crowdsecApiKey: "your-api-key"
-          captchaProvider: turnstile
-          httpTimeout: 10s
-          updateIntervalSeconds: 15
-          updateMaxFailures: 0 
 EOL
 
 # Set proper permissions for Traefik configs
