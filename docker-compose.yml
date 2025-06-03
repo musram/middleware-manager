@@ -31,8 +31,6 @@ services:
     image: fosrl/pangolin:latest
     container_name: pangolin
     restart: unless-stopped
-    command:
-      - --log-level=DEBUG
     volumes:
       - ./pangolin_config:/app/config
     environment:
