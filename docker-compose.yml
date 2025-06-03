@@ -78,7 +78,7 @@ services:
 
   # Traefik Gateway
   traefik:
-    image: traefik:v3.3.3
+    image: traefik:v3.4.1
     container_name: traefik
     restart: unless-stopped
     network_mode: service:gerbil # This is important for Traefik to work with Gerbil
