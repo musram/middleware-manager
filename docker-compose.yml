@@ -96,8 +96,6 @@ services:
       - ./config/traefik/rules:/rules
       - ./public_html:/var/www/html:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro # Add Docker socket mount
-    extra_hosts:
-      - "mcpauth:172.22.0.2"  # Add this line with the actual IP of mcpauth container
   
   # Middleware Manager
   middleware-manager:
