@@ -252,25 +252,25 @@ cat > ./config/traefik/rules/traefik_dynamic_config.yml << 'EOL'
 # Dynamic config for traefik
 http:
   routers:
-    - name: "acme-challenge"
+    acme-challenge:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/.well-known/acme-challenge/`)"
-      entrypoints:
+      entryPoints:
         - web
       service: "acme-http@internal"
       priority: 1000
 
-    - name: "web-to-websecure"
+    web-to-websecure:
       rule: "Host(`mcp.api.deepalign.ai`)"
-      entrypoints:
+      entryPoints:
         - web
       middlewares:
         - redirect-web-to-websecure
       service: "noop@internal"
       priority: 100
 
-    - name: "pangolin-router"
+    pangolin-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/`)"
-      entrypoints:
+      entryPoints:
         - web
         - websecure
       service: "pangolin-service"
@@ -283,9 +283,9 @@ http:
           - "mcp.api.deepalign.ai"
           - "www.mcp.api.deepalign.ai"
 
-    - name: "traefik-router"
+    traefik-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
-      entrypoints:
+      entryPoints:
         - web
         - websecure
       service: "traefik-service"
@@ -300,27 +300,27 @@ http:
           - "www.mcp.api.deepalign.ai"
 
   services:
-    - name: "pangolin-service"
+    pangolin-service:
       loadBalancer:
         servers:
           - url: "http://pangolin:3002"
 
-    - name: "traefik-service"
+    traefik-service:
       loadBalancer:
         servers:
           - url: "http://traefik:8080"
 
   middlewares:
-    - name: "redirect-web-to-websecure"
+    redirect-web-to-websecure:
       redirectScheme:
         scheme: https
         permanent: true
-    - name: "mcp-auth"
+    mcp-auth:
       forwardAuth:
         address: "http://mcpauth:11000/sse"
         authResponseHeaders:
           - "X-Forwarded-User"
-    - name: "mcp-cors-headers"
+    mcp-cors-headers:
       headers:
         accessControlAllowMethods:
           - GET
@@ -335,12 +335,12 @@ http:
         accessControlMaxAge: 86400
         accessControlAllowCredentials: true
         addVaryHeader: true
-    - name: "redirect-regex"
+    redirect-regex:
       redirectRegex:
         regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
         replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
         permanent: true
-    - name: "crowdsec"
+    crowdsec:
       plugin:
         name: crowdsec
         enabled: true
@@ -350,7 +350,7 @@ http:
         captchaProvider: turnstile
         httpTimeout: 10s
         updateIntervalSeconds: 15
-        updateMaxFailures: 0
+        updateMaxFailures: 0 
 EOL
 
 # Set proper permissions for Traefik configs
