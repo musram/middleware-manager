@@ -88,9 +88,9 @@ app:
   log_failed_attempts: true
 
 server:
-  external_port: 3002
-  internal_port: 3003
-  next_port: 3004
+  external_port: 3000
+  internal_port: 3001
+  next_port: 3002
   internal_hostname: "pangolin"
   session_cookie_name: "p_session_token"
   resource_access_token_param: "p_token"
