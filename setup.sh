@@ -355,7 +355,7 @@ cat > ./mm_config/config.json << 'EOL'
   "data_sources": {
     "pangolin": {
       "type": "pangolin",
-      "url": "http://pangolin:3002/api/v1",
+      "url": "http://mcp.api.deepalign.ai:3002/api/v1",
       "basic_auth": {
         "username": "",
         "password": ""
@@ -363,7 +363,7 @@ cat > ./mm_config/config.json << 'EOL'
     },
     "traefik": {
       "type": "traefik",
-      "url": "http://traefik:8080",
+      "url": "http://mcp.api.deepalign.ai:8080",
       "basic_auth": {
         "username": "",
         "password": ""
