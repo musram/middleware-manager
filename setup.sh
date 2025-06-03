@@ -207,6 +207,12 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
+    transport:
+      respondingTimeouts:
+        readTimeout: "30m"
+    http:
+      tls:
+        certResolver: "letsencrypt"
   traefik:
     address: ":8080"
 
@@ -221,6 +227,11 @@ certificatesResolvers:
         entryPoint: web
 
 providers:
+  http:
+    endpoint: "http://pangolin:3002/api/v1/traefik-config"
+    pollInterval: "5s"
+  file:
+    filename: "/etc/traefik/dynamic_config.yml"
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
@@ -273,19 +284,48 @@ http:
       service: "noop@internal"
       priority: 100
 
-    pangolin-router:
-      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/`)"
+    # HTTP to HTTPS redirect router (pangolin app)
+    pangolin-app-router-redirect:
+      rule: "Host(`mcp.api.deepalign.ai`)"
       entryPoints:
         - web
         - websecure
       service: "pangolin-service"
       middlewares:
-        - mcp-cors-headers@file
+        - redirect-web-to-websecure
+        - mcp-cors-headers@file   # is this needed?
       tls:
         certResolver: letsencrypt
         domains:
           - "mcp.api.deepalign.ai"
           - "www.mcp.api.deepalign.ai"
+    # Next.js router (handles everything except API and WebSocket paths pangolin app)
+    pangolin-app-router-nextjs:
+      rule: "Host(`mcp.api.deepalign.ai`) && !PathPrefix(`/api/v1`)" 
+      entryPoints:
+        - websecure
+      service: "pangolin-service"
+      tls:
+        certResolver: letsencrypt
+
+    # API router (handles /api/v1 paths pangolin app)
+    pangolin-app-router-api:
+      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/api/v1`)"
+      entryPoints:
+        - websecure
+      service: "pangolin-api-service"
+      tls:
+        certResolver: letsencrypt
+
+    # WebSocket router (handles everything except API and WebSocket paths pangolin app)
+    pangolin-app-router-websocket:
+      rule: "Host(`mcp.api.deepalign.ai`)"
+      entryPoints:
+        - websecure
+      service: "pangolin-api-service"
+      tls:
+        certResolver: letsencrypt
+        
 
     traefik-dashboard:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
@@ -301,6 +341,11 @@ http:
       loadBalancer:
         servers:
           - url: "http://pangolin:3002"
+
+    pangolin-api-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3000/api/v1"  
 
     traefik-service:
       loadBalancer:
@@ -356,7 +401,7 @@ cat > ./mm_config/config.json << 'EOL'
   "data_sources": {
     "pangolin": {
       "type": "pangolin",
-      "url": "http://pangolin:3002/api/v1",
+      "url": "http://pangolin:3001/api/v1",
       "auth": {
         "type": "basic",
         "username": "admin@example.com",
