@@ -291,6 +291,7 @@ http:
       service: "traefik-service"
       middlewares:
         - mcp-cors-headers@file
+        - mcp-auth@file
       tls:
         certResolver: letsencrypt
         domains:
