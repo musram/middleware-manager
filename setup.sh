@@ -217,6 +217,7 @@ certificatesResolvers:
     acme:
       email: "admin@deepalign.ai"
       storage: "/letsencrypt/acme.json"
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"   # Remove this line to use the production server
       httpChallenge:
         entryPoint: web
 
