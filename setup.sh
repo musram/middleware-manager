@@ -250,6 +250,7 @@ EOL
 print_status "Creating Traefik dynamic configuration..."
 cat > ./config/traefik/rules/traefik_dynamic_config.yml << 'EOL'
 # Dynamic config for traefik
+# Dynamic config for traefik
 http:
   routers:
     acme-challenge:
@@ -342,15 +343,15 @@ http:
         permanent: true
     crowdsec:
       plugin:
-        name: crowdsec
-        enabled: true
-        crowdsecAppsecHost: "crowdsec:7422"
-        crowdsecAppsecPort: 7422
-        crowdsecApiKey: "your-api-key"
-        captchaProvider: turnstile
-        httpTimeout: 10s
-        updateIntervalSeconds: 15
-        updateMaxFailures: 0 
+        crowdsec:
+          enabled: true
+          crowdsecAppsecHost: "crowdsec:7422"
+          crowdsecAppsecPort: 7422
+          crowdsecApiKey: "your-api-key"
+          captchaProvider: turnstile
+          httpTimeout: 10s
+          updateIntervalSeconds: 15
+          updateMaxFailures: 0 
 EOL
 
 # Set proper permissions for Traefik configs
