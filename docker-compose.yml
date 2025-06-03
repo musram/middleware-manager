@@ -85,6 +85,8 @@ services:
     depends_on:
       pangolin:
         condition: service_healthy
+      mcpauth:
+        condition: service_started
     command:
       - --configFile=/etc/traefik/traefik_config.yml
     volumes:
@@ -96,6 +98,8 @@ services:
       - ./config/traefik/rules:/rules
       - ./public_html:/var/www/html:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro # Add Docker socket mount
+    extra_hosts:
+      - "mcpauth:172.22.0.2"  # Add this line with the actual IP of mcpauth container
   
   # Middleware Manager
   middleware-manager:

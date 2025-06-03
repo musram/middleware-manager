@@ -229,6 +229,12 @@ providers:
     directory: "/rules"
     watch: true
 
+experimental:
+  plugins:
+    crowdsec:
+      moduleName: "github.com/crowdsecurity/traefik-crowdsec-bouncer"
+      version: "v1.4.0"
+
 log:
   level: DEBUG
 
