@@ -227,9 +227,6 @@ certificatesResolvers:
         entryPoint: web
 
 providers:
-  http:
-    endpoint: "http://pangolin:3002/api/v1/traefik-config"
-    pollInterval: "5s"
   file:
     directory: "/rules"
     watch: true
