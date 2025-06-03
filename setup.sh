@@ -277,7 +277,6 @@ http:
       service: "pangolin-service"
       middlewares:
         - mcp-cors-headers@file
-        - mcp-auth@file
       tls:
         certResolver: letsencrypt
         domains:
@@ -292,7 +291,6 @@ http:
       service: "traefik-service"
       middlewares:
         - mcp-cors-headers@file
-        - mcp-auth@file
       tls:
         certResolver: letsencrypt
         domains:
