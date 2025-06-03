@@ -97,7 +97,6 @@ services:
       - ./public_html:/var/www/html:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro # Add Docker socket mount
   
-    networks:
   # Middleware Manager
   middleware-manager:
     image: hhftechnology/middleware-manager:v3.0.0
