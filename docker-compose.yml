@@ -85,8 +85,6 @@ services:
     depends_on:
       pangolin:
         condition: service_healthy
-      mcpauth:
-        condition: service_started
     command:
       - --configFile=/etc/traefik/traefik_config.yml
     volumes:
