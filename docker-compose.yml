@@ -28,7 +28,7 @@ services:
 
   # Pangolin Router
   pangolin:
-    image: fosrl/pangolin:1.4.0
+    image: fosrl/pangolin:latest
     container_name: pangolin
     restart: unless-stopped
     volumes:
@@ -50,7 +50,7 @@ services:
 
   # Gerbil Service
   gerbil:
-    image: fosrl/gerbil:1.0.0
+    image: fosrl/gerbil:latest
     container_name: gerbil
     restart: unless-stopped
     depends_on:
@@ -87,16 +87,6 @@ services:
         condition: service_healthy
     command:
       - --configFile=/etc/traefik/traefik_config.yml
-      - --log.level=DEBUG
-      - --accesslog=true
-      - --api.dashboard=true
-      - --api.insecure=true
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=pangolin
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.traefik.address=:8080
     volumes:
       - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
       - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates

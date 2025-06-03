@@ -52,7 +52,9 @@ rm -rf ./pangolin_config \
        ./mm_config \
        ./config/traefik \
        ./config/traefik/logs \
-       ./public_html
+       ./public_html \
+       ./config/letsencrypt \
+       ./config/traefik/logs
 
 # Create new directories
 mkdir -p ./pangolin_config \
@@ -65,7 +67,10 @@ mkdir -p ./pangolin_config \
          ./mm_config \
          ./config/traefik \
          ./config/traefik/logs \
-         ./public_html
+         ./public_html \
+         ./config/letsencrypt \
+         ./config/traefik/logs
+
 
 
 # install docker-compose if not installed
@@ -183,21 +188,18 @@ cat ./pangolin_config/config.yml
 
 
 # Create basic traefik.yml if it doesn't exist
-if [ ! -f ./traefik_static_config/traefik.yml ]; then
-    print_status "Creating basic traefik.yml configuration..."
+if [ ! -f ./traefik_static_config/traefik_config.yml ]; then
+    print_status "Creating basic traefik_config.yml configuration..."
     cat > ./traefik_static_config/traefik_config.yml << 'EOL'
 # Global configuration
 global:
   checkNewVersion: true
   sendAnonymousUsage: false
 
-# API and Dashboard configuration
 api:
   dashboard: true
-  insecure: true  # Set to false in production and configure proper authentication
-  debug: true
+  insecure: true
 
-# Entrypoints configuration
 entryPoints:
   web:
     address: ":80"
@@ -208,59 +210,40 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
-    http:
-      tls:
-        certResolver: letsencrypt
   traefik:
     address: ":8080"
 
-# Certificate resolver configuration
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: admin@deepalign.ai
-      storage: /letsencrypt/acme.json
+      email: "admin@deepalign.ai"
+      storage: "/letsencrypt/acme.json"
       httpChallenge:
         entryPoint: web
-      
-# Providers configuration
+
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     network: traefik
-    useBindPortIP: true
   file:
     directory: "/rules"
     watch: true
 
-# Logging configuration
 log:
   level: DEBUG
-  filePath: "/var/log/traefik/traefik.log"
 
-# Access log configuration
 accessLog:
   filePath: "/var/log/traefik/access.log"
   bufferingSize: 100
 
-# Metrics configuration
 metrics:
   prometheus:
     buckets:
       - 0.1
       - 0.3
       - 1.2
-      - 5.0
-
-# Experimental features (for plugins)
-experimental:
-  plugins:
-    # Plugin configurations will be added here by middleware-manager
-    # Example:
-    # myplugin:
-    #   moduleName: github.com/vendor/my-traefik-plugin
-    #   version: v1.0.0
+      - 5.0 
 EOL
 fi
 
