@@ -188,9 +188,8 @@ cat ./pangolin_config/config.yml
 
 
 # Create basic traefik.yml if it doesn't exist
-if [ ! -f ./traefik_static_config/traefik_config.yml ]; then
-    print_status "Creating basic traefik_config.yml configuration..."
-    cat > ./traefik_static_config/traefik_config.yml << 'EOL'
+print_status "Creating basic traefik_config.yml configuration..."
+cat > ./traefik_static_config/traefik_config.yml << 'EOL'
 # Global configuration
 global:
   checkNewVersion: true
@@ -245,7 +244,7 @@ metrics:
       - 1.2
       - 5.0 
 EOL
-fi
+
 
 # Create Traefik dynamic configuration
 print_status "Creating Traefik dynamic configuration..."
@@ -258,6 +257,15 @@ http:
       entrypoints:
         - web
       service: "acme-http@internal"
+      priority: 1000
+
+    - name: "web-to-websecure"
+      rule: "Host(`mcp.api.deepalign.ai`)"
+      entrypoints:
+        - web
+      middlewares:
+        - redirect-web-to-websecure
+      service: "noop@internal"
       priority: 100
 
     - name: "pangolin-router"
@@ -303,6 +311,10 @@ http:
           - url: "http://traefik:8080"
 
   middlewares:
+    - name: "redirect-web-to-websecure"
+      redirectScheme:
+        scheme: https
+        permanent: true
     - name: "mcp-auth"
       forwardAuth:
         address: "http://mcpauth:11000/sse"
@@ -546,18 +558,8 @@ services:
         condition: service_healthy
     command:
       - --configFile=/etc/traefik/traefik_config.yml
-      - --log.level=DEBUG
-      - --accesslog=true
-      - --api.dashboard=true
-      - --api.insecure=true
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=pangolin
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --entrypoints.traefik.address=:8080
     volumes:
-      - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
+      - ./traefik_static_config:/etc/traefik:ro # Volume to store the Traefik configuration
       - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates
       - ./config/traefik/logs:/var/log/traefik # Volume to store Traefik logs
       - ./traefik/plugins-storage:/plugins-storage:rw
