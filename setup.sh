@@ -282,7 +282,7 @@ http:
       service: "pangolin-service"
       middlewares:
         - redirect-web-to-websecure
-        - mcp-cors-headers@file   # is this needed?
+        - mcp-cors-headers
       tls:
         certResolver: letsencrypt
         domains:
@@ -323,8 +323,19 @@ http:
         - traefik
       service: "traefik-service"
       middlewares:
-        - mcp-cors-headers@file
-        - mcp-auth@file
+        - mcp-cors-headers
+        - mcp-auth
+
+    middleware-manager:
+      rule: "Host(`middleware-manager.mcp.api.deepalign.ai`)"
+      service: "middleware-manager"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - auth-middleware
+        - mcp-cors-headers
 
   services:
     pangolin-service:
@@ -350,6 +361,11 @@ http:
         servers:
           - url: "http://mcpauth:11000"
         strategy: "wrr"
+
+    middleware-manager:
+      loadBalancer:
+        servers:
+          - url: "http://middleware-manager:3456"
 
   middlewares:
     redirect-web-to-websecure:
@@ -383,6 +399,15 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
+
+    middlewares:
+    auth-middleware:
+      forwardAuth:
+        address: "http://pangolin:3001/api/v1/auth/verify"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-User-Email"
+          - "X-User-Name"
 EOL
 
 # Set proper permissions for Traefik configs
@@ -463,19 +488,15 @@ print_status "Creating middleware templates..."
 cat > ./mm_config/templates.yaml << 'EOL'
 # Middleware templates for common use cases
 middlewares:
-  - id: mcp-auth
-    name: MCP Authentication
+  - id: auth-middleware
+    name: Authentication Middleware
     type: forwardAuth
     config:
-      address: "http://mcpauth:11000/sse"
+      address: "http://pangolin:3001/api/v1/auth/verify"
+      trustForwardHeader: true
       authResponseHeaders:
-        - "Authorization"
         - "X-User-Email"
         - "X-User-Name"
-        - "Cookie"
-        - "X-Forwarded-User"
-      maxBodySize: -1
-      trustForwardHeader: true
 
   - id: mcp-cors-headers
     name: MCP CORS Headers
@@ -491,6 +512,7 @@ middlewares:
         - Authorization
         - Content-Type
         - mcp-protocol-version
+        - Cookie
       accessControlMaxAge: 86400
       accessControlAllowCredentials: true
       addVaryHeader: true
@@ -499,8 +521,8 @@ middlewares:
     name: Regex Redirect
     type: redirectregex
     config:
-      regex: "^https://([a-z0-9-]+)\\.yourdomain\\.com/\\.well-known/oauth-authorization-server"
-      replacement: "https://oauth.yourdomain.com/.well-known/oauth-authorization-server"
+      regex: "^https://([a-z0-9-]+)\\.mcp\\.api\\.deepalign\\.ai/\\.well-known/oauth-authorization-server"
+      replacement: "https://oauth.mcp.api.deepalign.ai/.well-known/oauth-authorization-server"
       permanent: true
 EOL
 
