@@ -44,7 +44,6 @@ print_status "Creating required directories..."
 # Remove old directories
 rm -rf ./pangolin_config \
        ./gerbil_config \
-       ./traefik_static_config \
        ./config/traefik/rules \
        ./traefik_plugins \
        ./mm_data \
@@ -58,16 +57,15 @@ rm -rf ./pangolin_config \
 # Create new directories
 mkdir -p ./pangolin_config \
          ./gerbil_config \
-         ./traefik_static_config \
-         ./config/traefik/rules \
          ./traefik_plugins \
          ./mm_data \
          ./mm_config \
          ./config/traefik \
-         ./config/traefik/logs \
-         ./public_html \
          ./config/letsencrypt \
-         ./config/traefik/logs
+         ./config/traefik/logs \
+         ./config/traefik/rules \
+         ./public_html
+
 
 
 
@@ -147,6 +145,11 @@ EOL
 # Set proper permissions for Pangolin config
 chmod 644 ./pangolin_config/config.yml
 
+# Debug: Verify config file exists and show its contents
+print_status "Verifying Pangolin configuration..."
+ls -l ./pangolin_config/config.yml
+cat ./pangolin_config/config.yml
+
 # Create Gerbil configuration
 print_status "Creating Gerbil configuration..."
 cat > ./gerbil_config/config.json << 'EOL'
@@ -178,16 +181,9 @@ EOL
 # set proper permissions for gerbil config
 chmod 644 ./gerbil_config/config.json
 
-
-# Debug: Verify config file exists and show its contents
-print_status "Verifying Pangolin configuration..."
-ls -l ./pangolin_config/config.yml
-cat ./pangolin_config/config.yml
-
-
 # Create basic traefik.yml if it doesn't exist
 print_status "Creating basic traefik_config.yml configuration..."
-cat > ./traefik_static_config/traefik_config.yml << 'EOL'
+cat > ./config/traefik/traefik_config.yml << 'EOL'
 # Global configuration
 global:
   checkNewVersion: true
@@ -230,7 +226,9 @@ providers:
   file:
     directory: "/rules"
     watch: true
-    filename: "/etc/traefik/dynamic_config.yml"
+  http:
+    endpoint: "http://pangolin:3001/api/v1/traefik_config"
+    pollInterval: "10s"
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
@@ -543,8 +541,9 @@ if ! docker-compose ps | grep -q "healthy"; then
 fi
 
 print_status "Setup completed!"
-print_status "You can access the middleware-manager UI at: http://localhost:3456"
-print_status "Traefik dashboard is available at: http://localhost:8080"
+print_status "You can access the middleware-manager UI at: http://mcp.api.deepalign.ai:3456"
+print_status "Traefik dashboard is available at: http://mcp.api.deepalign.ai:8080"
+print_status "Pangolin app is available at: https://mcp.api.deepalign.ai"
 print_warning "Please review and update the following before using in production:"
 print_warning "1. Update email in traefik.yml for Let's Encrypt"
 print_warning "2. Configure proper authentication in traefik.yml"

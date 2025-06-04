@@ -86,7 +86,7 @@ services:
     command:
       - --configFile=/etc/traefik/traefik_config.yml
     volumes:
-      - ./traefik_static_config:/etc/traefik:ro # Volume to store the Traefik configuration
+      - ./config/traefik:/etc/traefik:ro # Volume to store the Traefik configuration
       - ./config/letsencrypt:/letsencrypt # Volume to store the Let's Encrypt certificates
       - ./config/traefik/logs:/var/log/traefik # Volume to store Traefik logs
       - ./traefik/plugins-storage:/plugins-storage:rw
@@ -105,12 +105,12 @@ services:
       - traefik  # This is important for Traefik to work with Gerbil
     volumes:
       - ./mm_data:/data                             # For the SQLite database
-      - ./traefik_rules:/conf                     # MUST MATCH Traefik's rule directory
+      - ./config/traefik/rules:/conf                     # MUST MATCH Traefik's rule directory
       - ./mm_config/templates.yaml:/app/config/templates.yaml # Optional custom middleware templates
       - ./mm_config/templates_services.yaml:/app/config/templates_services.yaml # Optional custom service templates
       - ./mm_config/config.json:/app/config/config.json       # For data source settings
       # Mount Traefik's static config directory for plugin management
-      - ./traefik_static_config:/etc/traefik 
+      - ./config/traefik:/etc/traefik
     environment:
       - PANGOLIN_API_URL=http://pangolin:3001/api/v1 # If ACTIVE_DATA_SOURCE is pangolin
       - TRAEFIK_API_URL=http://traefik:8080 # Or http://gerbil:8080 if Traefik API is via Gerbil
