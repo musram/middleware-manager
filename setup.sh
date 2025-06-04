@@ -372,17 +372,17 @@ http:
         accessControlMaxAge: 86400
         accessControlAllowCredentials: true
         addVaryHeader: true
-     mcp-auth:
-        forwardAuth:
-          address: "http://mcpauth:11000/sse"
-          authResponseHeaders:
-            - "Authorization"
-            - "X-User-Email"
-            - "X-User-Name"
-            - "Cookie"
-            - "X-Forwarded-User"
-          maxBodySize: -1
-          trustForwardHeader: true
+    mcp-auth:
+      forwardAuth:
+        address: "http://mcpauth:11000/sse"
+        authResponseHeaders:
+          - "Authorization"
+          - "X-User-Email"
+          - "X-User-Name"
+          - "Cookie"
+          - "X-Forwarded-User"
+        maxBodySize: -1
+        trustForwardHeader: true
 EOL
 
 # Set proper permissions for Traefik configs
