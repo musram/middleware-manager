@@ -126,8 +126,7 @@ services:
       - TRAEFIK_STATIC_CONFIG_PATH=/etc/traefik/traefik_config.yml
       - PLUGINS_JSON_URL=https://raw.githubusercontent.com/hhftechnology/middleware-manager/traefik-int/plugin/plugins.json
       # - DEBUG=true # Optional for development
-    ports:
-      - "3456:3456"
+ 
     networks:
       - traefik
 
