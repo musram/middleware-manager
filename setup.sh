@@ -51,7 +51,6 @@ rm -rf ./pangolin_config \
        ./config/traefik \
        ./config/traefik/logs \
        ./public_html \
-       ./config/letsencrypt \
        ./config/traefik/logs
 
 # Create new directories
