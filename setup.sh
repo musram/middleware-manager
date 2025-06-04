@@ -226,9 +226,6 @@ providers:
   file:
     directory: "/rules"
     watch: true
-  http:
-    endpoint: "http://pangolin:3001/api/v1/traefik_config"
-    pollInterval: "10s"
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
@@ -384,7 +381,7 @@ http:
 EOL
 
 # Set proper permissions for Traefik configs
-chmod 644 ./traefik_static_config/traefik_config.yml
+chmod 644 ./config/traefik/traefik_config.yml
 chmod 644 ./config/traefik/rules/traefik_dynamic_config.yml
 
 # Create basic config.json for middleware-manager
