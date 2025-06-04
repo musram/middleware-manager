@@ -344,8 +344,12 @@ http:
 
     mcp-auth-service:
       loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
         servers:
           - url: "http://mcpauth:11000"
+        strategy: "wrr"
 
   middlewares:
     redirect-web-to-websecure:
@@ -368,15 +372,17 @@ http:
         accessControlMaxAge: 86400
         accessControlAllowCredentials: true
         addVaryHeader: true
-    mcp-auth:
-      forwardAuth:
-        address: "http://mcpauth:11000/sse"
-        trustForwardHeader: true
-        authResponseHeaders:
-          - "Authorization"
-          - "X-User-Email"
-          - "X-User-Name"
-          - "Cookie"
+     mcp-auth:
+        forwardAuth:
+          address: "http://mcpauth:11000/sse"
+          authResponseHeaders:
+            - "Authorization"
+            - "X-User-Email"
+            - "X-User-Name"
+            - "Cookie"
+            - "X-Forwarded-User"
+          maxBodySize: -1
+          trustForwardHeader: true
 EOL
 
 # Set proper permissions for Traefik configs
@@ -463,7 +469,13 @@ middlewares:
     config:
       address: "http://mcpauth:11000/sse"
       authResponseHeaders:
+        - "Authorization"
+        - "X-User-Email"
+        - "X-User-Name"
+        - "Cookie"
         - "X-Forwarded-User"
+      maxBodySize: -1
+      trustForwardHeader: true
 
   - id: mcp-cors-headers
     name: MCP CORS Headers
@@ -544,4 +556,35 @@ print_warning "Please review and update the following before using in production
 print_warning "1. Update email in traefik.yml for Let's Encrypt"
 print_warning "2. Configure proper authentication in traefik.yml"
 print_warning "3. Review and update service and middleware templates"
-print_warning "4. Set proper credentials in config.json" 
+print_warning "4. Set proper credentials in config.json"
+
+# Create MCP Auth configuration
+print_status "Creating MCP Auth configuration..."
+cat > ./config/traefik/rules/mcp_auth.yml << 'EOL'
+http:
+  middlewares:
+    mcp-auth:
+      forwardAuth:
+        address: "http://mcpauth:11000/sse"
+        authResponseHeaders:
+          - "Authorization"
+          - "X-User-Email"
+          - "X-User-Name"
+          - "Cookie"
+          - "X-Forwarded-User"
+        maxBodySize: -1
+        trustForwardHeader: true
+
+  services:
+    mcp-auth-service:
+      loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "100ms"
+        servers:
+          - url: "http://mcpauth:11000"
+        strategy: "wrr"
+EOL
+
+# Set proper permissions
+chmod 644 ./config/traefik/rules/mcp_auth.yml 
