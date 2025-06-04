@@ -37,6 +37,10 @@ services:
       - NODE_ENV=development
       - CONFIG_PATH=/app/config/config.yml
       - PORT=3000
+    ports:
+      - "3000:3000" # Next.js App
+      - "3001:3001" # Pangolin API
+      - "3002:3002" # Pangolin Admin
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
       interval: "10s"
