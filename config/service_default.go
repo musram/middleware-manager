@@ -29,15 +29,15 @@ type DefaultServiceTemplates struct {
 func LoadDefaultServiceTemplates(db *database.DB) error {
 	// Determine the path to the templates file
 	templatesFile := "config/templates_services.yaml"
-	
+
 	// Check if the file exists in the current directory
 	if _, err := os.Stat(templatesFile); os.IsNotExist(err) {
 		// Try to find it in different locations
 		possiblePaths := []string{
-			"/app/config/templates_services.yaml",  // Docker container path
-			"templates_services.yaml",              // Current directory
+			"/app/config/templates_services.yaml", // Docker container path
+			"templates_services.yaml",             // Current directory
 		}
-		
+
 		found := false
 		for _, path := range possiblePaths {
 			if _, err := os.Stat(path); err == nil {
@@ -46,25 +46,25 @@ func LoadDefaultServiceTemplates(db *database.DB) error {
 				break
 			}
 		}
-		
+
 		if !found {
 			log.Printf("Warning: templates_services.yaml not found, skipping default service templates")
 			return nil
 		}
 	}
-	
+
 	// Read the templates file
 	data, err := ioutil.ReadFile(templatesFile)
 	if err != nil {
 		return err
 	}
-	
+
 	// Parse the YAML
 	var templates DefaultServiceTemplates
 	if err := yaml.Unmarshal(data, &templates); err != nil {
 		return err
 	}
-	
+
 	// Process templates to ensure proper value preservation
 	for i := range templates.Services {
 		// Apply service-specific processing based on type
@@ -92,28 +92,28 @@ func LoadDefaultServiceTemplates(db *database.DB) error {
 			// Service exists, skip
 			continue
 		}
-		
+
 		// Convert config to JSON string
 		configJSON, err := json.Marshal(service.Config)
 		if err != nil {
 			log.Printf("Failed to marshal config for %s: %v", service.Name, err)
 			continue
 		}
-		
+
 		// Insert into database
 		_, err = db.Exec(
 			"INSERT INTO services (id, name, type, config) VALUES (?, ?, ?, ?)",
 			service.ID, service.Name, service.Type, string(configJSON),
 		)
-		
+
 		if err != nil {
 			log.Printf("Failed to insert service %s: %v", service.Name, err)
 			continue
 		}
-		
+
 		log.Printf("Added default service: %s", service.Name)
 	}
-	
+
 	return nil
 }
 
@@ -127,63 +127,63 @@ func processLoadBalancerService(config *map[string]interface{}) {
 				if url, ok := serverMap["url"].(string); ok && url != "" {
 					serverMap["url"] = url
 				}
-				
+
 				// Process address if present
 				if address, ok := serverMap["address"].(string); ok && address != "" {
 					serverMap["address"] = address
 				}
-				
+
 				// Process weight if present
 				if weight, ok := serverMap["weight"].(float64); ok {
 					if weight == float64(int(weight)) {
 						serverMap["weight"] = int(weight)
 					}
 				}
-				
+
 				// Process tls flag if present
 				if tls, ok := serverMap["tls"].(bool); ok {
 					serverMap["tls"] = tls
 				}
-				
+
 				// Process preservePath if present
 				if preservePath, ok := serverMap["preservePath"].(bool); ok {
 					serverMap["preservePath"] = preservePath
 				}
-				
+
 				servers[i] = serverMap
 			}
 		}
 	}
-	
+
 	// Process healthCheck if present
 	if healthCheck, ok := (*config)["healthCheck"].(map[string]interface{}); ok {
 		// Process path
 		if path, ok := healthCheck["path"].(string); ok && path != "" {
 			healthCheck["path"] = path
 		}
-		
+
 		// Process interval
 		if interval, ok := healthCheck["interval"].(string); ok && interval != "" {
 			healthCheck["interval"] = interval
 		}
-		
+
 		// Process timeout
 		if timeout, ok := healthCheck["timeout"].(string); ok && timeout != "" {
 			healthCheck["timeout"] = timeout
 		}
-		
+
 		// Process port
 		if port, ok := healthCheck["port"].(float64); ok {
 			if port == float64(int(port)) {
 				healthCheck["port"] = int(port)
 			}
 		}
-		
+
 		// Process scheme
 		if scheme, ok := healthCheck["scheme"].(string); ok && scheme != "" {
 			healthCheck["scheme"] = scheme
 		}
-		
+
 		// Process headers
 		if headers, ok := healthCheck["headers"].(map[string]interface{}); ok {
 			for key, value := range headers {
@@ -193,7 +193,7 @@ func processLoadBalancerService(config *map[string]interface{}) {
 			}
 		}
 	}
-	
+
 	// Process sticky if present
 	if sticky, ok := (*config)["sticky"].(map[string]interface{}); ok {
 		// Process cookie if present
@@ -202,24 +202,24 @@ func processLoadBalancerService(config *map[string]interface{}) {
 			if name, ok := cookie["name"].(string); ok && name != "" {
 				cookie["name"] = name
 			}
-			
+
 			// Process secure flag
 			if secure, ok := cookie["secure"].(bool); ok {
 				cookie["secure"] = secure
 			}
-			
+
 			// Process httpOnly flag
 			if httpOnly, ok := cookie["httpOnly"].(bool); ok {
 				cookie["httpOnly"] = httpOnly
 			}
 		}
 	}
-	
+
 	// Process passHostHeader flag
 	if passHostHeader, ok := (*config)["passHostHeader"].(bool); ok {
 		(*config)["passHostHeader"] = passHostHeader
 	}
-	
+
 	// Process responseForwarding if present
 	if responseForwarding, ok := (*config)["responseForwarding"].(map[string]interface{}); ok {
 		// Process flushInterval
@@ -227,7 +227,7 @@ func processLoadBalancerService(config *map[string]interface{}) {
 			responseForwarding["flushInterval"] = flushInterval
 		}
 	}
-	
+
 	// Process other fields
 	*config = preserveTraefikValues(*config).(map[string]interface{})
 }
@@ -242,25 +242,25 @@ func processWeightedService(config *map[string]interface{}) {
 				if name, ok := serviceMap["name"].(string); ok && name != "" {
 					serviceMap["name"] = name
 				}
-				
+
 				// Process weight
 				if weight, ok := serviceMap["weight"].(float64); ok {
 					if weight == float64(int(weight)) {
 						serviceMap["weight"] = int(weight)
 					}
 				}
-				
+
 				services[i] = serviceMap
 			}
 		}
 	}
-	
+
 	// Process healthCheck if present
 	if healthCheck, ok := (*config)["healthCheck"].(map[string]interface{}); ok {
 		// Just ensure it's preserved if empty
 		(*config)["healthCheck"] = healthCheck
 	}
-	
+
 	// Process sticky if present
 	if sticky, ok := (*config)["sticky"].(map[string]interface{}); ok {
 		// Process cookie if present
@@ -269,19 +269,19 @@ func processWeightedService(config *map[string]interface{}) {
 			if name, ok := cookie["name"].(string); ok && name != "" {
 				cookie["name"] = name
 			}
-			
+
 			// Process secure flag
 			if secure, ok := cookie["secure"].(bool); ok {
 				cookie["secure"] = secure
 			}
-			
+
 			// Process httpOnly flag
 			if httpOnly, ok := cookie["httpOnly"].(bool); ok {
 				cookie["httpOnly"] = httpOnly
 			}
 		}
 	}
-	
+
 	// Process other fields
 	*config = preserveTraefikValues(*config).(map[string]interface{})
 }
@@ -292,7 +292,7 @@ func processMirroringService(config *map[string]interface{}) {
 	if service, ok := (*config)["service"].(string); ok && service != "" {
 		(*config)["service"] = service
 	}
-	
+
 	// Process mirrors array
 	if mirrors, ok := (*config)["mirrors"].([]interface{}); ok {
 		for i, mirror := range mirrors {
@@ -301,37 +301,37 @@ func processMirroringService(config *map[string]interface{}) {
 				if name, ok := mirrorMap["name"].(string); ok && name != "" {
 					mirrorMap["name"] = name
 				}
-				
+
 				// Process percent
 				if percent, ok := mirrorMap["percent"].(float64); ok {
 					if percent == float64(int(percent)) {
 						mirrorMap["percent"] = int(percent)
 					}
 				}
-				
+
 				mirrors[i] = mirrorMap
 			}
 		}
 	}
-	
+
 	// Process mirrorBody flag
 	if mirrorBody, ok := (*config)["mirrorBody"].(bool); ok {
 		(*config)["mirrorBody"] = mirrorBody
 	}
-	
+
 	// Process maxBodySize
 	if maxBodySize, ok := (*config)["maxBodySize"].(float64); ok {
 		if maxBodySize == float64(int(maxBodySize)) {
 			(*config)["maxBodySize"] = int(maxBodySize)
 		}
 	}
-	
+
 	// Process healthCheck if present
 	if healthCheck, ok := (*config)["healthCheck"].(map[string]interface{}); ok {
 		// Just ensure it's preserved if empty
 		(*config)["healthCheck"] = healthCheck
 	}
-	
+
 	// Process other fields
 	*config = preserveTraefikValues(*config).(map[string]interface{})
 }
@@ -342,18 +342,18 @@ func processFailoverService(config *map[string]interface{}) {
 	if service, ok := (*config)["service"].(string); ok && service != "" {
 		(*config)["service"] = service
 	}
-	
+
 	// Process fallback name
 	if fallback, ok := (*config)["fallback"].(string); ok && fallback != "" {
 		(*config)["fallback"] = fallback
 	}
-	
+
 	// Process healthCheck if present
 	if healthCheck, ok := (*config)["healthCheck"].(map[string]interface{}); ok {
 		// Just ensure it's preserved if empty
 		(*config)["healthCheck"] = healthCheck
 	}
-	
+
 	// Process other fields
 	*config = preserveTraefikValues(*config).(map[string]interface{})
 }
@@ -361,13 +361,13 @@ func processFailoverService(config *map[string]interface{}) {
 // SaveTemplateServicesFile saves the default services templates file if it doesn't exist
 func SaveTemplateServicesFile(templatesDir string) error {
 	templatesFile := filepath.Join(templatesDir, "templates_services.yaml")
-	
+
 	// Check if file already exists
 	if _, err := os.Stat(templatesFile); err == nil {
 		// File exists, skip
 		return nil
 	}
-	
+
 	// Create default templates
 	templates := DefaultServiceTemplates{
 		Services: []DefaultService{
@@ -416,7 +416,7 @@ func SaveTemplateServicesFile(templatesDir string) error {
 					},
 				},
 			},
-			
+
 			// TCP service
 			{
 				ID:   "tcp-service",
@@ -430,7 +430,7 @@ func SaveTemplateServicesFile(templatesDir string) error {
 					},
 				},
 			},
-			
+
 			// UDP service
 			{
 				ID:   "udp-service",
@@ -444,7 +444,7 @@ func SaveTemplateServicesFile(templatesDir string) error {
 					},
 				},
 			},
-			
+
 			// Weighted service
 			{
 				ID:   "weighted-service",
@@ -463,7 +463,7 @@ func SaveTemplateServicesFile(templatesDir string) error {
 					},
 				},
 			},
-			
+
 			// Mirroring service
 			{
 				ID:   "traffic-mirror",
@@ -479,7 +479,7 @@ func SaveTemplateServicesFile(templatesDir string) error {
 					},
 				},
 			},
-			
+
 			// Failover service
 			{
 				ID:   "failover-service",
@@ -492,7 +492,7 @@ func SaveTemplateServicesFile(templatesDir string) error {
 			},
 		},
 	}
-	
+
 	// Process all templates to ensure proper value preservation
 	for i := range templates.Services {
 		// Apply service-specific processing based on type
@@ -510,23 +510,23 @@ func SaveTemplateServicesFile(templatesDir string) error {
 			templates.Services[i].Config = preserveTraefikValues(templates.Services[i].Config).(map[string]interface{})
 		}
 	}
-	
+
 	// Create a custom YAML encoder that preserves string formatting
 	yamlNode := &yaml.Node{}
 	err := yamlNode.Encode(templates)
 	if err != nil {
 		return fmt.Errorf("failed to encode templates to YAML node: %w", err)
 	}
-	
+
 	// Apply additional string preservation to the YAML node
 	preserveStringsInYamlNode(yamlNode)
-	
+
 	// Marshal the processed node
 	data, err := yaml.Marshal(yamlNode)
 	if err != nil {
 		return fmt.Errorf("failed to marshal YAML node: %w", err)
 	}
-	
+
 	// Write to file
 	return ioutil.WriteFile(templatesFile, data, 0644)
 }
