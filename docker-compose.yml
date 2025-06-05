@@ -134,7 +134,7 @@ services:
       - "traefik.http.routers.middleware-manager.entrypoints=websecure"
       - "traefik.http.routers.middleware-manager.tls=true"
       - "traefik.http.routers.middleware-manager.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.middleware-manager.middlewares=mcp-auth"
+      - "traefik.http.routers.middleware-manager.middlewares=mcp-cors-headers@file,mcp-auth@file"
       - "traefik.http.services.middleware-manager.loadbalancer.server.port=3456"
     networks:
       - traefik
