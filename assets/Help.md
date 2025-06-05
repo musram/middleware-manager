@@ -18,10 +18,17 @@ Check the netwrok
 docker inspect traefik | grep -A 5 "Networks"
 ```
 
+Look for acme , certificate errors
+
 ```bash
 docker-compose logs traefik | grep -i "acme\|certificate\|error"
 ```
 
+To check correctly serving the Let's Encrypt cert:
+
+```bash
+openssl s_client -connect mcp.api.deepalign.ai:443 -servername mcp.api.deepalign.ai
+```
 
 1. Check Traefik Dashboard
 ```bash
