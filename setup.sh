@@ -287,8 +287,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
     
     # Next.js router (handles everything except API and WebSocket paths pangolin app)
     pangolin-app-router-nextjs:
@@ -300,8 +298,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
 
     # API router (handles /api/v1 paths pangolin app)
     pangolin-app-router-api:
@@ -313,8 +309,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
 
     # WebSocket router (handles everything except API and WebSocket paths pangolin app)
     pangolin-app-router-websocket:
@@ -326,8 +320,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
 
     traefik-dashboard:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
@@ -341,8 +333,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
 
     # MCP Auth router
     mcp-auth-router:
@@ -354,8 +344,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
       middlewares:
         - mcp-cors-headers
 
@@ -369,8 +357,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-            sans:
-              - "*.mcp.api.deepalign.ai"
       middlewares:
         - mcp-auth
         - mcp-cors-headers
