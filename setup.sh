@@ -221,10 +221,6 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web
       tlsChallenge: {}
-      domains:
-        - main: "mcp.api.deepalign.ai"
-          sans:
-            - "*.mcp.api.deepalign.ai" 
 
 providers:
   file:
@@ -254,7 +250,6 @@ metrics:
       - 1.2
       - 5.0
 EOL
-
 
 # Create Traefik dynamic configuration
 print_status "Creating Traefik dynamic configuration..."
@@ -291,8 +286,9 @@ http:
       tls:
         certResolver: letsencrypt
         domains:
-          - "mcp.api.deepalign.ai"
-          - "www.mcp.api.deepalign.ai"
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
     
     # Next.js router (handles everything except API and WebSocket paths pangolin app)
     pangolin-app-router-nextjs:
@@ -302,6 +298,10 @@ http:
       service: "pangolin-service"
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
 
     # API router (handles /api/v1 paths pangolin app)
     pangolin-app-router-api:
@@ -311,6 +311,10 @@ http:
       service: "pangolin-api-service"
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
 
     # WebSocket router (handles everything except API and WebSocket paths pangolin app)
     pangolin-app-router-websocket:
@@ -320,7 +324,10 @@ http:
       service: "pangolin-api-service"
       tls:
         certResolver: letsencrypt
-        
+        domains:
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
 
     traefik-dashboard:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/dashboard`)"
@@ -330,6 +337,12 @@ http:
       middlewares:
         - mcp-cors-headers@file
         - mcp-auth@file
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
 
     # MCP Auth router
     mcp-auth-router:
@@ -339,6 +352,10 @@ http:
       service: "mcp-auth-service"
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
       middlewares:
         - mcp-cors-headers@file
 
@@ -350,6 +367,10 @@ http:
       service: "middleware-manager-service"
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: "mcp.api.deepalign.ai"
+            sans:
+              - "*.mcp.api.deepalign.ai"
       middlewares:
         - mcp-auth@file
         - mcp-cors-headers@file
@@ -378,6 +399,11 @@ http:
         servers:
           - url: "http://mcpauth:11000"
         strategy: "wrr"
+
+    middleware-manager-service:
+      loadBalancer:
+        servers:
+          - url: "http://middleware-manager:3456"
 
   middlewares:
     redirect-web-to-websecure:
@@ -412,7 +438,7 @@ http:
         maxBodySize: -1
         trustForwardHeader: true
         authResponseHeadersSet: true
-        authResponseHeadersRemove: true 
+        authResponseHeadersRemove: true
 EOL
 
 # Set proper permissions for Traefik configs
