@@ -349,7 +349,6 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-      priority: 200
 
     middleware-manager-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/middleware`)"
@@ -418,15 +417,6 @@ http:
         accessControlAllowCredentials: true
         addVaryHeader: true
 
-    mcp-auth-headers:
-      headers:
-        customRequestHeaders:
-          Authorization: "Bearer ${MCP_AUTH_TOKEN}"
-          X-User-Email: "admin@example.com"
-          X-User-Name: "admin"
-          Cookie: "session_token=1234567890"
-          X-Forwarded-User: "admin"
-
     mcp-auth:
       forwardAuth:
         address: "http://mcpauth:11000/sse"
@@ -438,6 +428,16 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
+        preserveRequestMethod: true
+
+    mcp-auth-headers:
+      headers:
+        customRequestHeaders:
+          Authorization: "Bearer ${MCP_AUTH_TOKEN}"
+          X-User-Email: "admin@example.com"
+          X-User-Name: "admin"
+          Cookie: "session_token=1234567890"
+          X-Forwarded-User: "admin"
 
 EOL
 
@@ -638,6 +638,7 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
+        preserveRequestMethod: true
 
   services:
     mcp-auth-service:
