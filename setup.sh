@@ -335,7 +335,7 @@ http:
     pangolin-api-service:
       loadBalancer:
         servers:
-          - url: "http://pangolin:3001/"  
+          - url: "http://pangolin:3000/api/v1"  
 
     traefik-service:
       loadBalancer:
