@@ -400,7 +400,6 @@ http:
         maxBodySize: -1
         trustForwardHeader: true
 
-    middlewares:
     auth-middleware:
       forwardAuth:
         address: "http://pangolin:3001/api/v1/auth/verify"
@@ -422,7 +421,7 @@ cat > ./mm_config/config.json << 'EOL'
   "data_sources": {
     "pangolin": {
       "type": "pangolin",
-      "url": "http://pangolin:3001/api/v1",
+      "url": "http://pangolin:3000/api/v1",
       "auth": {
         "type": "basic",
         "username": "admin@example.com",
