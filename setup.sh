@@ -292,6 +292,7 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
+      priority: 100
 
     pangolin-app-router-nextjs:
       rule: "Host(`mcp.api.deepalign.ai`) && !PathPrefix(`/api/v1`)" 
@@ -348,6 +349,7 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
+      priority: 200
 
     middleware-manager-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/middleware`)"
