@@ -65,8 +65,14 @@ mkdir -p ./pangolin_config \
          ./config/traefik/rules \
          ./public_html
 
-
-
+# Generate MCP_AUTH_TOKEN if not set
+if [ -z "$MCP_AUTH_TOKEN" ]; then
+    print_status "Generating MCP_AUTH_TOKEN..."
+    export MCP_AUTH_TOKEN=$(openssl rand -hex 32)
+    print_status "MCP_AUTH_TOKEN generated: $MCP_AUTH_TOKEN"
+    # Save to .env file for future use
+    echo "MCP_AUTH_TOKEN=$MCP_AUTH_TOKEN" > .env
+fi
 
 # install docker-compose if not installed
 if ! command -v docker-compose &> /dev/null; then
@@ -423,6 +429,11 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
+        authResponseHeadersSet: true
+        authResponseHeadersRemove: true
+        headers:
+          customRequestHeaders:
+            Authorization: "Bearer ${MCP_AUTH_TOKEN}"
 EOL
 
 # Set proper permissions for Traefik configs
