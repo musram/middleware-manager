@@ -429,8 +429,6 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
-        authResponseHeadersSet: true
-        authResponseHeadersRemove: true
         headers:
           customRequestHeaders:
             Authorization: "Bearer ${MCP_AUTH_TOKEN}"
