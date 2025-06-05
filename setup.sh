@@ -326,6 +326,17 @@ http:
         - mcp-cors-headers@file
         - mcp-auth@file
 
+    # MCP Auth router
+    mcp-auth-router:
+      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/sse`)"
+      entryPoints:
+        - websecure
+      service: "mcp-auth-service"
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - mcp-cors-headers@file
+
   services:
     pangolin-service:
       loadBalancer:
@@ -411,6 +422,14 @@ cat > ./mm_config/config.json << 'EOL'
         "username": "",
         "password": ""
       }
+    },
+    "mcpauth": {
+      "type": "mcpauth",
+      "url": "http://mcpauth:11000",
+      "auth": {
+        "type": "bearer",
+        "token": "${MCP_AUTH_TOKEN}"
+      }
     }
   }
 }
@@ -463,15 +482,18 @@ print_status "Creating middleware templates..."
 cat > ./mm_config/templates.yaml << 'EOL'
 # Middleware templates for common use cases
 middlewares:
-  - id: auth-middleware
+  - id: mcp-auth
     name: Authentication Middleware
     type: forwardAuth
     config:
       address: "http://pangolin:3001/api/v1/auth/verify"
       trustForwardHeader: true
       authResponseHeaders:
+        - "Authorization"
         - "X-User-Email"
         - "X-User-Name"
+        - "Cookie"
+        - "X-Forwarded-User"
 
   - id: mcp-cors-headers
     name: MCP CORS Headers
