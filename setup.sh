@@ -429,9 +429,8 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
-        headers:
-          customRequestHeaders:
-            Authorization: "Bearer ${MCP_AUTH_TOKEN}"
+        customRequestHeaders:
+          Authorization: "Bearer ${MCP_AUTH_TOKEN}"
 EOL
 
 # Set proper permissions for Traefik configs
