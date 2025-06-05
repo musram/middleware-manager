@@ -282,7 +282,7 @@ http:
       service: "pangolin-service"
       middlewares:
         - redirect-web-to-websecure
-        - mcp-cors-headers@file   # is this needed?
+        - mcp-cors-headers
       tls:
         certResolver: letsencrypt
         domains:
@@ -335,8 +335,8 @@ http:
         - traefik
       service: "traefik-service"
       middlewares:
-        - mcp-cors-headers@file
-        - mcp-auth@file
+        - mcp-cors-headers
+        - mcp-auth
       tls:
         certResolver: letsencrypt
         domains:
@@ -357,7 +357,7 @@ http:
             sans:
               - "*.mcp.api.deepalign.ai"
       middlewares:
-        - mcp-cors-headers@file
+        - mcp-cors-headers
 
     # Middleware Manager router
     middleware-manager-router:
@@ -372,8 +372,8 @@ http:
             sans:
               - "*.mcp.api.deepalign.ai"
       middlewares:
-        - mcp-auth@file
-        - mcp-cors-headers@file
+        - mcp-auth
+        - mcp-cors-headers
 
   services:
     pangolin-service:
@@ -437,8 +437,6 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
-        authResponseHeadersSet: true
-        authResponseHeadersRemove: true
 EOL
 
 # Set proper permissions for Traefik configs
