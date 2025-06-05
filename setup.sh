@@ -220,6 +220,11 @@ certificatesResolvers:
       #caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"   # staging
       httpChallenge:
         entryPoint: web
+      tlsChallenge: {}
+      domains:
+        - main: "mcp.api.deepalign.ai"
+          sans:
+            - "*.mcp.api.deepalign.ai" 
 
 providers:
   file:
@@ -337,6 +342,18 @@ http:
       middlewares:
         - mcp-cors-headers@file
 
+    # Middleware Manager router
+    middleware-manager-router:
+      rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/middleware`)"
+      entryPoints:
+        - websecure
+      service: "middleware-manager-service"
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - mcp-auth@file
+        - mcp-cors-headers@file
+
   services:
     pangolin-service:
       loadBalancer:
@@ -394,6 +411,8 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
+        authResponseHeadersSet: true
+        authResponseHeadersRemove: true 
 EOL
 
 # Set proper permissions for Traefik configs
