@@ -349,6 +349,7 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
+      priority: 200
 
     middleware-manager-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/middleware`)"
