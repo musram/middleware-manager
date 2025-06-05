@@ -279,7 +279,6 @@ http:
       service: "noop@internal"
       priority: 100
 
-    # HTTP to HTTPS redirect router (pangolin app)
     pangolin-app-router-redirect:
       rule: "Host(`mcp.api.deepalign.ai`)"
       entryPoints:
@@ -293,8 +292,7 @@ http:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-    
-    # Next.js router (handles everything except API and WebSocket paths pangolin app)
+
     pangolin-app-router-nextjs:
       rule: "Host(`mcp.api.deepalign.ai`) && !PathPrefix(`/api/v1`)" 
       entryPoints:
@@ -305,7 +303,6 @@ http:
         domains:
           - main: "mcp.api.deepalign.ai"
 
-    # API router (handles /api/v1 paths pangolin app)
     pangolin-app-router-api:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/api/v1`)"
       entryPoints:
@@ -316,7 +313,6 @@ http:
         domains:
           - main: "mcp.api.deepalign.ai"
 
-    # WebSocket router (handles everything except API and WebSocket paths pangolin app)
     pangolin-app-router-websocket:
       rule: "Host(`mcp.api.deepalign.ai`)"
       entryPoints:
@@ -334,38 +330,38 @@ http:
       service: "traefik-service"
       middlewares:
         - mcp-cors-headers
+        - mcp-auth-headers
         - mcp-auth
       tls:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
 
-    # MCP Auth router
     mcp-auth-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/sse`)"
       entryPoints:
         - websecure
       service: "mcp-auth-service"
+      middlewares:
+        - mcp-cors-headers
       tls:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-      middlewares:
-        - mcp-cors-headers
 
-    # Middleware Manager router
     middleware-manager-router:
       rule: "Host(`mcp.api.deepalign.ai`) && PathPrefix(`/middleware`)"
       entryPoints:
         - websecure
       service: "middleware-manager-service"
+      middlewares:
+        - mcp-cors-headers
+        - mcp-auth-headers
+        - mcp-auth
       tls:
         certResolver: letsencrypt
         domains:
           - main: "mcp.api.deepalign.ai"
-      middlewares:
-        - mcp-auth
-        - mcp-cors-headers
 
   services:
     pangolin-service:
@@ -402,6 +398,7 @@ http:
       redirectScheme:
         scheme: https
         permanent: true
+
     mcp-cors-headers:
       headers:
         accessControlAllowMethods:
@@ -418,6 +415,16 @@ http:
         accessControlMaxAge: 86400
         accessControlAllowCredentials: true
         addVaryHeader: true
+
+    mcp-auth-headers:
+      headers:
+        customRequestHeaders:
+          Authorization: "Bearer ${MCP_AUTH_TOKEN}"
+          X-User-Email: "admin@example.com"
+          X-User-Name: "admin"
+          Cookie: "session_token=1234567890"
+          X-Forwarded-User: "admin"
+
     mcp-auth:
       forwardAuth:
         address: "http://mcpauth:11000/sse"
@@ -429,13 +436,7 @@ http:
           - "X-Forwarded-User"
         maxBodySize: -1
         trustForwardHeader: true
-        headers:
-          customRequestHeaders:
-            Authorization: "Bearer ${MCP_AUTH_TOKEN}"
-            X-User-Email: "admin@example.com"
-            X-User-Name: "admin"
-            Cookie: "session_token=1234567890"
-            X-Forwarded-User: "admin"
+
 EOL
 
 # Set proper permissions for Traefik configs
