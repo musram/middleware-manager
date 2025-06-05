@@ -346,7 +346,7 @@ http:
     pangolin-api-service:
       loadBalancer:
         servers:
-          - url: "http://pangolin:3000/api/v1"  
+          - url: "http://pangolin:3001"  
 
     traefik-service:
       loadBalancer:
@@ -421,7 +421,7 @@ cat > ./mm_config/config.json << 'EOL'
   "data_sources": {
     "pangolin": {
       "type": "pangolin",
-      "url": "http://pangolin:3000/api/v1",
+      "url": "http://pangolin:3001/api/v1",
       "auth": {
         "type": "basic",
         "username": "admin@example.com",
